@@ -1,3 +1,5 @@
+import random
+
 from anki import hooks
 from anki.consts import *
 from anki.template import TemplateRenderContext
@@ -37,7 +39,6 @@ def on_field_filter(
         args_dict[key] = value.strip()
     # check each arg key is valid, gather a list of the invalid and then show tooltip about those
     valid_args = ["did", "deck_name", "mid", "note_type_name", "card_id_fld_name", "fld_name_to_get_from_card", "pick_card_by"]
-    present_args = []
     invalid_keys = []
     for key in args_dict.keys():
         if key not in valid_args:
@@ -91,9 +92,13 @@ def on_field_filter(
         return ''
 
     pick_card_by = check_key("pick_card_by")
+    pick_card_by_valid_values = ('random', 'least_reps')
     if pick_card_by is None:
         tooltip("Error in 'fetch-' field args: 'pick_card_by=' value must be provided")
         return ''
+    elif pick_card_by not in pick_card_by_valid_values:
+        tooltip(f"Error in 'fetch-' field args: 'pick_card_by=' value must be one of {pick_card_by_valid_values}")
+
 
     # First, fetch the ord value of the card_id_fld_name
     model = mw.col.models.get(mid)
@@ -148,12 +153,18 @@ def on_field_filter(
         AND nid IN ({note_ids_str})
         """
     )
-    # Loop through cards and find the one with the least reviews
-    least_revs_card = min(cards, key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c[0]}"))
-    least_revs_note_id = least_revs_card[1]
+    selected_card = None
+    if pick_card_by == 'random':
+        selected_card = random.choice(cards)
+    elif pick_card_by == 'least_reps':
+        # Loop through cards and find the one with the least reviews
+        selected_card = min(cards, key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c[0]}"))
+    if selected_card is None:
+        tooltip("Error in 'fetch-' query: could not select card")
+    selected_card_id = selected_card[0]
 
     # And finally, return the value from the field in the note
-    target_note_vals_str = mw.col.db.scalar(f"SELECT flds FROM notes WHERE id = {least_revs_note_id}")
+    target_note_vals_str = mw.col.db.scalar(f"SELECT flds FROM notes WHERE id = {selected_card_id}")
     target_note_vals = target_note_vals_str.split("\x1f")
     return target_note_vals[fld_ord_to_get]
 
