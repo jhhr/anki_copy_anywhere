@@ -17,36 +17,52 @@ def gc(arg, fail=False):
         return out
 
 
-
-
 def on_field_filter(
-    text: str, field_name: str, filter: str, context: TemplateRenderContext
+        text: str, field_name: str, filter: str, context: TemplateRenderContext
 ) -> str:
-    if not filter.startswith("fetch-"):
+    """
+     The filter syntax is like this:
+     {{fetch=[
+      did='deck_id';
+      deck_name='deck_name';
+      mid='note_type_id'
+      note_type_name='note_type_name';
+      card_id_fld_name='note_fld_name_to_get_card_by';
+      fld_name_to_get_from_card='note_field_name_to_get';
+      pick_card_by='random'/'least_reps[ord]';
+     ]:text}}
+    """
+    if not filter.startswith("fetch=[") and filter.endswith("]"):
         return ''
 
     # extract the field args
-    _, args = filter.split("-", maxsplit=1)
-
-    # args should be a ;-separated list of values like
-    # "did=<deck_id>;deck_name=<deck_name>;mid=<note_type_id>note_type_name=<note_type_name>;card_id_fld_name=<note_fld_name_to_get_card_by>;fld_name_to_get_from_card=<note_field_name_to_get>;pick_card_by=random/least_reps[ord]"
-    # but not necessarily in that order
-    # extract each arg
-    args_list = args.split(";")
+    # args don't have to be in the above order and  not necessarily have new lines
+    args_string = filter.strip("fetch=[").strip("]")
+    args_list = args_string.split(";")
     args_dict = {}
-    for arg in args_list:
-        key, value = arg.split("=")
-        args_dict[key] = value.strip()
+
+    # Get args from the string
+    for arg_str in args_list:
+        print("arg_str", arg_str)
+        key, value = arg_str.split("=", maxsplit=1)
+        # strip extra whitespace
+        key = key.strip()
+        # and also '' around value
+        value = value.strip().strip("'")
+        args_dict[key] = value
+
+    print("args_dict", args_dict)
     # check each arg key is valid, gather a list of the invalid and then show tooltip about those
-    valid_args = ["did", "deck_name", "mid", "note_type_name", "card_id_fld_name", "fld_name_to_get_from_card", "pick_card_by"]
+    valid_args = ["did", "deck_name", "mid", "note_type_name", "card_id_fld_name", "fld_name_to_get_from_card",
+                  "pick_card_by"]
     invalid_keys = []
     for key in args_dict.keys():
         if key not in valid_args:
             invalid_keys.append(key)
     if len(invalid_keys) > 0:
         tooltip(
-            f"Error in 'fetch-' field args: Unrecognized arguments: {', '.join(invalid_keys)}",
-            parent=mw.app.activeWindow(),
+            f"Error in 'fetch=[]' field args: Unrecognized arguments: {', '.join(invalid_keys)}",
+            period=10000,
         )
         return ''
 
@@ -64,7 +80,8 @@ def on_field_filter(
         if deck_name is not None:
             did = mw.col.decks.id_for_name(deck_name)
         else:
-            tooltip("Error in 'fetch-' field args: Either 'did=' or 'deck_name=' value must be provided")
+            tooltip("Error in 'fetch=[]' field args: Either 'did=' or 'deck_name=' value must be provided",
+                    period=10000)
             return ''
 
     # Get mid either directly or through note_type_name
@@ -74,36 +91,42 @@ def on_field_filter(
         if note_type_name is not None:
             mid = mw.col.models.id_for_name(note_type_name)
             if mid is None:
-                tooltip(f"Error in 'fetch-' field args: Note type for note_type_name='{note_type_name}' not found, check your spelling")
+                tooltip(
+                    f"Error in 'fetch=[]' field args: Note type for note_type_name='{note_type_name}' not found, check your spelling",
+                    period=10000)
                 return ''
         else:
-            tooltip("Error in 'fetch-' field args: Either 'mid=' or 'note_type_name=' value must be provided")
+            tooltip("Error in 'fetch=[]' field args: Either 'mid=' or 'note_type_name=' value must be provided",
+                    period=10000)
             return ''
 
     card_id_fld_name = check_key("card_id_fld_name")
     if card_id_fld_name is None:
-        tooltip("Error in 'fetch-' field args: 'card_id_fld_name=' value must be provided")
+        tooltip("Error in 'fetch=[]' field args: 'card_id_fld_name=' value must be provided", period=10000)
         return ''
 
     fld_name_to_get_from_card = check_key("fld_name_to_get_from_card")
     if fld_name_to_get_from_card is None:
         tooltip(
-            "Error in 'fetch-' field args: 'fld_name_to_get_from_card=' value must be provided")
+            "Error in 'fetch=[]' field args: 'fld_name_to_get_from_card=' value must be provided",
+            period=10000
+        )
         return ''
 
     pick_card_by = check_key("pick_card_by")
     pick_card_by_valid_values = ('random', 'least_reps')
     if pick_card_by is None:
-        tooltip("Error in 'fetch-' field args: 'pick_card_by=' value must be provided")
+        tooltip("Error in 'fetch=[]' field args: 'pick_card_by=' value must be provided", period=10000)
         return ''
     elif pick_card_by not in pick_card_by_valid_values:
-        tooltip(f"Error in 'fetch-' field args: 'pick_card_by=' value must be one of {pick_card_by_valid_values}")
-
+        tooltip(f"Error in 'fetch=[]' field args: 'pick_card_by=' value must be one of {pick_card_by_valid_values}",
+                period=10000)
 
     # First, fetch the ord value of the card_id_fld_name
     model = mw.col.models.get(mid)
     if model is None:
-        tooltip(f"Error in 'fetch-' field args: Note type for mid='{mid}' not found, check your spelling")
+        tooltip(f"Error in 'fetch=[]' field args: Note type for mid='{mid}' not found, check your spelling",
+                period=10000)
         return ''
 
     def get_ord_from_model(fld_name):
@@ -112,7 +135,9 @@ def on_field_filter(
             return card_id_fld["ord"]
         else:
             tooltip(
-                f"Error in 'fetch-' field args: No field with name '{fld_name}' found in the note type '{model['name']}'")
+                f"Error in 'fetch=[]' field args: No field with name '{fld_name}' found in the note type '{model['name']}'",
+                period=10000
+            )
             return ''
 
     fld_ord_to_id_card = get_ord_from_model(card_id_fld_name)
@@ -130,7 +155,8 @@ def on_field_filter(
                 note_ids.append(note_id)
 
     if len(note_ids) == 0:
-        tooltip(f"Error in 'fetch-' query: Did not find any notes where '{card_id_fld_name}' contains '{text}'")
+        tooltip(f"Error in 'fetch=[]' query: Did not find any notes where '{card_id_fld_name}' contains '{text}'",
+                period=10000)
         return ''
     note_ids_str = ids2str(note_ids)
 
@@ -152,7 +178,7 @@ def on_field_filter(
         # Loop through cards and find the one with the least reviews
         selected_card = min(cards, key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c[0]}"))
     if selected_card is None:
-        tooltip("Error in 'fetch-' query: could not select card")
+        tooltip("Error in 'fetch=[]' query: could not select card", period=10000)
     selected_note_id = selected_card[1]
 
     # And finally, return the value from the field in the note
