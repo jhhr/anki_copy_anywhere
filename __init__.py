@@ -2,7 +2,7 @@ import random
 
 from anki import hooks
 from anki.consts import *
-from anki.template import TemplateRenderContext
+from anki.template import TemplateRenderContext, TemplateRenderOutput
 from anki.utils import ids2str
 from aqt import mw
 from aqt.utils import tooltip
@@ -17,6 +17,19 @@ def gc(arg, fail=False):
         return out
 
 
+random_stable_dict = {}
+
+
+def reset_random_stable_dict(output: TemplateRenderOutput, context: TemplateRenderContext):
+    # After card render completes, reset the dict, so we start fresh on
+    # 1. the next review
+    # 2. if we close the reviewer and open it again
+    # 3. edit the card which causes re-render
+    random_stable_dict.clear()
+
+
+hooks.card_did_render.append(reset_random_stable_dict)
+
 def on_field_filter(
         text: str, field_name: str, filter: str, context: TemplateRenderContext
 ) -> str:
@@ -29,7 +42,7 @@ def on_field_filter(
       note_type_name='note_type_name';
       card_id_fld_name='note_fld_name_to_get_card_by';
       fld_name_to_get_from_card='note_field_name_to_get';
-      pick_card_by='random'/'least_reps[ord]';
+      pick_card_by='random'/'random_stable'/'least_reps[ord]';
      ]:text}}
     """
     if not filter.startswith("fetch=[") and filter.endswith("]"):
@@ -114,7 +127,7 @@ def on_field_filter(
         return ''
 
     pick_card_by = check_key("pick_card_by")
-    pick_card_by_valid_values = ('random', 'least_reps')
+    pick_card_by_valid_values = ('random', 'random_stable', 'least_reps')
     if pick_card_by is None:
         tooltip("Error in 'fetch=[]' field args: 'pick_card_by=' value must be provided", period=10000)
         return ''
@@ -174,6 +187,14 @@ def on_field_filter(
     selected_card = None
     if pick_card_by == 'random':
         selected_card = random.choice(cards)
+    elif pick_card_by == 'random_stable':
+        # pick the same random card for the same deck_id and mid combination
+        random_key = did + mid
+        try:
+            selected_card = random_stable_dict[random_key]
+        except KeyError:
+            selected_card = random.choice(cards)
+            random_stable_dict[random_key] = selected_card
     elif pick_card_by == 'least_reps':
         # Loop through cards and find the one with the least reviews
         selected_card = min(cards, key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c[0]}"))
