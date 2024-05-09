@@ -118,25 +118,17 @@ def on_field_filter(
     fld_ord_to_id_card = get_ord_from_model(card_id_fld_name)
     fld_ord_to_get = get_ord_from_model(fld_name_to_get_from_card)
 
-    # Now use the ord value to query the notes
-    notes = mw.col.db.all(
-        f"""
-        SELECT
-            id,
-            flds
-        FROM notes
-        WHERE mid = {mid}
-        AND 
-        AND (
-            SELECT SUBSTR(
-                SUBSTR(flds, 0, INSTR(flds, X'1f', 1, {fld_ord_to_id_card} * 2) + 1),
-                INSTR(flds, X'1f', 1, {fld_ord_to_id_card} * 2) - INSTR(flds, X'1f', 1, {fld_ord_to_id_card} * 2, 1) - 1
-            )
-        ) LIKE '{text}'
-        """
-    )
-    # Make note ids str for the next query
-    note_ids = [note[0] for note in notes]
+    # Now select from the notes table the ones we have a matching field value
+    # `flds` is a string containing a list of values separated by a 0x1f character)
+    # We need to get the value in that list in index `fld_ord_to_id_card`
+    # and test whether it has a substring `text`
+    note_ids = []
+    for note_id, fields_str in mw.col.db.all(f"select id, flds from notes where mid={mid}"):
+        if fields_str is not None:
+            fields = fields_str.split("\x1f")
+            if text in fields[fld_ord_to_id_card]:
+                note_ids.append(note_id)
+
     if len(note_ids) == 0:
         tooltip(f"Error in 'fetch-' query: Did not find any notes where '{card_id_fld_name}' contains '{text}'")
         return ''
@@ -146,11 +138,11 @@ def on_field_filter(
     cards = mw.col.db.all(
         f"""
         SELECT
-            id
+            id,
             nid
         FROM cards
         WHERE (did = {did} OR odid = {did})
-        AND nid IN ({note_ids_str})
+        AND nid IN {note_ids_str}
         """
     )
     selected_card = None
@@ -161,12 +153,14 @@ def on_field_filter(
         selected_card = min(cards, key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c[0]}"))
     if selected_card is None:
         tooltip("Error in 'fetch-' query: could not select card")
-    selected_card_id = selected_card[0]
+    selected_note_id = selected_card[1]
 
     # And finally, return the value from the field in the note
-    target_note_vals_str = mw.col.db.scalar(f"SELECT flds FROM notes WHERE id = {selected_card_id}")
-    target_note_vals = target_note_vals_str.split("\x1f")
-    return target_note_vals[fld_ord_to_get]
+    target_note_vals_str = mw.col.db.scalar(f"SELECT flds FROM notes WHERE id = {selected_note_id}")
+    if target_note_vals_str is not None:
+        target_note_vals = target_note_vals_str.split("\x1f")
+        return target_note_vals[fld_ord_to_get]
+    return ''
 
 
 hooks.field_filter.append(on_field_filter)
