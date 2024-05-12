@@ -9,9 +9,8 @@ from anki.decks import DeckManager
 from anki.template import TemplateRenderContext
 from anki.utils import ids2str
 from aqt import mw
-from aqt.utils import tooltip
 
-from .utils import write_custom_data, parse_filter_args
+from .utils import write_custom_data, filter_init
 
 
 def get_ord_from_model(model, fld_name):
@@ -49,20 +48,7 @@ def on_fetch_filter(
     if not (filter.startswith("fetch[") and filter.endswith("]")):
         return text
 
-    is_cache = None
-    try:
-        is_cache = context.extra_state["is_cache"]
-    except KeyError:
-        is_cache = False
-
-    def show_error_message(message: str):
-        # caching op is background, so we can't show tooltip
-        if not is_cache:
-            tooltip(message, period=10000)
-        else:
-            print(message)
-
-    args_dict = parse_filter_args("fetch", VALID_ARGS, filter, show_error_message)
+    args_dict, is_cache, show_error_message = filter_init("fetch", VALID_ARGS, filter, context)
 
     (
         did,

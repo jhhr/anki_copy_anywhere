@@ -1,6 +1,7 @@
 import json
 
 from anki.cards import Card
+from aqt.utils import tooltip
 
 
 def write_custom_data(card: Card, key, value):
@@ -18,7 +19,19 @@ def write_custom_data(card: Card, key, value):
     card.custom_data = json.dumps(custom_data)
 
 
-def parse_filter_args(filter_prefix, valid_args, filter_str, show_error_message):
+def filter_init(filter_prefix, valid_args, filter_str, context):
+    is_cache = None
+    try:
+        is_cache = context.extra_state["is_cache"]
+    except KeyError:
+        is_cache = False
+
+    def show_error_message(message: str):
+        if not is_cache:
+            tooltip(message, period=10000)
+        else:
+            print(message)
+
     # extract the field args
     # args don't have to be in the above order and  not necessarily have new lines
     args_string = filter_str.strip(f"{filter_prefix}[").strip("]")
@@ -32,7 +45,7 @@ def parse_filter_args(filter_prefix, valid_args, filter_str, show_error_message)
             except ValueError:
                 show_error_message(
                     f"Error in '{filter_prefix}[]' field args: Invalid argument '{arg_str}', did you forget '='?")
-                return {}
+                return {}, is_cache, show_error_message
             # strip extra whitespace
             key = key.strip()
             # and also '' around value
@@ -48,7 +61,7 @@ def parse_filter_args(filter_prefix, valid_args, filter_str, show_error_message)
         show_error_message(
             f"Error in '{filter_prefix}[]' field args: Unrecognized arguments: {', '.join(invalid_keys)}"
         )
-        return {}
+        return {}, is_cache, show_error_message
 
     # No extra invalid keys? Check that we have all valid keys then
     def check_key(key):
@@ -57,4 +70,4 @@ def parse_filter_args(filter_prefix, valid_args, filter_str, show_error_message)
         except KeyError:
             return None
 
-    return {key: check_key(key) for key in valid_args}
+    return {key: check_key(key) for key in valid_args}, is_cache, show_error_message

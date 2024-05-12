@@ -2,10 +2,9 @@ import re
 from operator import itemgetter
 
 from anki.template import TemplateRenderContext
-from aqt.utils import tooltip
 
 from .kana_conv import to_katakana, to_hiragana
-from .utils import parse_filter_args
+from .utils import filter_init
 
 HIRAGANA_CONVERSION_DICT = {
     "か": ["が"],
@@ -93,19 +92,7 @@ def on_kana_highlight_filter(
     if not (filter.startswith("kana_highlight[") and filter.endswith("]")):
         return text
 
-    is_cache = None
-    try:
-        is_cache = context.extra_state["is_cache"]
-    except KeyError:
-        is_cache = False
-
-    def show_error_message(message: str):
-        if not is_cache:
-            tooltip(message, period=10000)
-        else:
-            print(message)
-
-    args_dict = parse_filter_args("kana_highlight", VALID_ARGS, filter, show_error_message)
+    args_dict, is_cache, show_error_message = filter_init("kana_highlight", VALID_ARGS, filter, context)
 
     onyomi_field_name, kunyomi_field_name, kanji_field_name = itemgetter(
         "onyomi_field_name", "kunyomi_field_name", "kanji_field_name")(args_dict)
