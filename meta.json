@@ -1,0 +1,7 @@
+{
+  "config": {
+    "cache_new_cards_count": 20,
+    "days_to_cache_fields_auto": 1,
+    "days_to_cache_fields_menu": 6
+  }
+}

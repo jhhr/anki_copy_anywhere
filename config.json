@@ -1,2 +1,5 @@
 {
-} 
+    "days_to_cache_fields_menu": 5,
+    "days_to_cache_fields_auto": 1,
+    "cache_new_cards_count": 20
+}
