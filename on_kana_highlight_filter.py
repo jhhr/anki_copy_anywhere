@@ -1,9 +1,11 @@
 import re
+from operator import itemgetter
 
 from anki.template import TemplateRenderContext
 from aqt.utils import tooltip
 
 from .kana_conv import is_kana_char, to_katakana, to_hiragana
+from .utils import parse_filter_args
 
 FURIGANA_RE = re.compile(r" ?([^ >]+?)\[(.+?)\]")
 
@@ -50,19 +52,29 @@ def kana_filter(text):
     return FURIGANA_RE.sub(replace_func, text.replace("&nbsp;", " "))
 
 
+VALID_ARGS = ["onyomi_field_name", "kunyomi_field_name", "kanji_field_name"]
+
+
 def on_kana_highlight_filter(
         text: str, field_name: str, filter: str, context: TemplateRenderContext
 ) -> str:
     """
      The filter syntax is like this:
-     {{kana_highlight:Field}}
+     {{kana_highlight[
+        onyomi_field_name='onyomi_field_name';
+        kunyomi_field_name='kunyomi_field_name';
+        kanji_field_name='kanji_field_name';
+     ]:Field}}
         where kanji_to_highlight is the kanji that will be highlighted in the text
         gotten from Field.
         Assuming that the text contains furigana, the furigana to be highlighted
         will be the one that corresponds to the kanji_to_highlight.
         The kanji is then stripped from the text and the kana from the furigana is left.
+
+        If anything goes wrong, returns the text with kanji removed but
+        no kana highlighted.
     """
-    if filter != "kana_highlight":
+    if not (filter.startswith("kana_highlight[") and filter.endswith("]")):
         return text
 
     is_cache = None
@@ -77,31 +89,48 @@ def on_kana_highlight_filter(
         else:
             print(message)
 
+    args_dict = parse_filter_args("kana_highlight", VALID_ARGS, filter, show_error_message)
+
+    onyomi_field_name, kunyomi_field_name, kanji_field_name = itemgetter(
+        "onyomi_field_name", "kunyomi_field_name", "kanji_field_name")(args_dict)
+
+    if onyomi_field_name is None:
+        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'onyomi_field_name'")
+        return kana_filter(text)
+
+    if kunyomi_field_name is None:
+        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'kunyomi_field_name'")
+        return kana_filter(text)
+
+    if kanji_field_name is None:
+        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'kanji_field_name'")
+        return kana_filter(text)
+
     note = context.card().note()
-    # Get original content of the field
+    # Get field contents from the note
     kanji_to_highlight = None
     onyomi = None
     kunyomi = None
     for name, field_text in note.items():
-        if name == 'Kanji':
+        if name == kanji_field_name:
             kanji_to_highlight = field_text
-        if name == 'Onyomi':
+        if name == onyomi_field_name:
             onyomi = field_text
-        if name == 'Kunyomi':
+        if name == kunyomi_field_name:
             kunyomi = field_text
         if kanji_to_highlight and onyomi and kunyomi:
             break
     if kanji_to_highlight is None or onyomi is None or kunyomi is None:
         show_error_message(
             f"Error in kana_highlight[]: note doesn't contain fields: Kanji ({kanji_to_highlight}), Onyomi ({onyomi}), Kunyomi ({kunyomi})")
-        return text
+        return kana_filter(text)
 
     # kanji_to_highlight = filter[13:-1]
     # Find the position of the kanji in the text
     kanji_pos = text.find(kanji_to_highlight)
     if kanji_pos == -1:
         show_error_message(f"Error in kana_highlight[]: Kanji ({kanji_to_highlight}) not found in text ({text})")
-        return text
+        return kana_filter(text)
 
     # Find the furigana that corresponds to the kanji
     # It will be the next brackets after the kanji where they may be 0 or more
@@ -177,7 +206,7 @@ def on_kana_highlight_filter(
     if new_furigana is None:
         show_error_message(
             f"Error in kana_highlight[]: No reading found for furigana ({furigana}) among onyomi ({onyomi}) and kunyomi ({kunyomi})")
-        return text
+        return kana_filter(text)
 
     # Replace furigana in the text with the new furigana
     # using furigana_start_pos and furigana_end_pos

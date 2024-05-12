@@ -2,6 +2,7 @@ import base64
 import math
 import random
 import time
+from operator import itemgetter
 
 from anki.consts import QUEUE_TYPE_SUSPENDED
 from anki.decks import DeckManager
@@ -10,7 +11,7 @@ from anki.utils import ids2str
 from aqt import mw
 from aqt.utils import tooltip
 
-from .utils import write_custom_data
+from .utils import write_custom_data, parse_filter_args
 
 
 def get_ord_from_model(model, fld_name):
@@ -18,6 +19,14 @@ def get_ord_from_model(model, fld_name):
     if card_id_fld is not None:
         return card_id_fld["ord"]
     return None
+
+
+VALID_ARGS = ["did", "deck_name", "mid",
+              "note_type_name", "card_id_fld_name",
+              "fld_name_to_get_from_card",
+              "pick_card_by"]
+
+PICK_CARD_BY_VALID_VALUES = ('random', 'random_stable', 'least_reps')
 
 
 def on_fetch_filter(
@@ -51,51 +60,14 @@ def on_fetch_filter(
         else:
             print(message)
 
-    # extract the field args
-    # args don't have to be in the above order and  not necessarily have new lines
-    args_string = filter.strip("fetch[").strip("]")
-    args_list = args_string.split(";")
-    args_dict = {}
+    args_dict = parse_filter_args("fetch", VALID_ARGS, filter, show_error_message)
 
-    # Get args from the string
-    for arg_str in args_list:
-        if arg_str.strip() != '':
-            # Final ; in the args list will produce only whitespace, so we skip it
-            try:
-                key, value = arg_str.split("=", maxsplit=1)
-            except ValueError:
-                show_error_message(f"Error in 'fetch[]' field args: Invalid argument '{arg_str}', did you forget '='?")
-                return ''
-            # strip extra whitespace
-            key = key.strip()
-            # and also '' around value
-            value = value.strip().strip("'")
-            args_dict[key] = value
-
-    # check each arg key is valid, gather a list of the invalid and then show error about those
-    valid_args = ["did", "deck_name", "mid", "note_type_name", "card_id_fld_name", "fld_name_to_get_from_card",
-                  "pick_card_by"]
-    invalid_keys = []
-    for key in args_dict.keys():
-        if key not in valid_args:
-            invalid_keys.append(key)
-    if len(invalid_keys) > 0:
-        show_error_message(
-            f"Error in 'fetch[]' field args: Unrecognized arguments: {', '.join(invalid_keys)}"
-        )
-        return ''
-
-    # No extra invalid keys? Check that we have all valid keys then
-    def check_key(key):
-        try:
-            return args_dict[key]
-        except KeyError:
-            return None
+    did, deck_name, mid, note_type_name, card_id_fld_name, fld_name_to_get_from_card, pick_card_by = itemgetter(
+        "did", "deck_name", "mid", "note_type_name", "card_id_fld_name", "fld_name_to_get_from_card", "pick_card_by"
+    )(args_dict)
 
     # Get did either directly or through deck_name
-    did = check_key("did")
     if did is None:
-        deck_name = check_key("deck_name")
         if deck_name is not None:
             did = mw.col.decks.id_for_name(deck_name)
         else:
@@ -105,9 +77,7 @@ def on_fetch_filter(
             return ''
 
     # Get mid either directly or through note_type_name
-    mid = check_key("mid")
     if mid is None:
-        note_type_name = check_key("note_type_name")
         if note_type_name is not None:
             mid = mw.col.models.id_for_name(note_type_name)
             if mid is None:
@@ -120,26 +90,22 @@ def on_fetch_filter(
                 "Error in 'fetch[]' field args: Either 'mid=' or 'note_type_name=' value must be provided")
             return ''
 
-    card_id_fld_name = check_key("card_id_fld_name")
     if card_id_fld_name is None:
         show_error_message("Error in 'fetch[]' field args: 'card_id_fld_name=' value must be provided")
         return ''
 
-    fld_name_to_get_from_card = check_key("fld_name_to_get_from_card")
     if fld_name_to_get_from_card is None:
         show_error_message(
             "Error in 'fetch[]' field args: 'fld_name_to_get_from_card=' value must be provided",
         )
         return ''
 
-    pick_card_by = check_key("pick_card_by")
-    pick_card_by_valid_values = ('random', 'random_stable', 'least_reps')
     if pick_card_by is None:
         show_error_message("Error in 'fetch[]' field args: 'pick_card_by=' value must be provided")
         return ''
-    elif pick_card_by not in pick_card_by_valid_values:
+    elif pick_card_by not in PICK_CARD_BY_VALID_VALUES:
         show_error_message(
-            f"Error in 'fetch[]' field args: 'pick_card_by=' value must be one of {pick_card_by_valid_values}",
+            f"Error in 'fetch[]' field args: 'pick_card_by=' value must be one of {PICK_CARD_BY_VALID_VALUES}",
         )
 
     # First, fetch the ord value of the card_id_fld_name
