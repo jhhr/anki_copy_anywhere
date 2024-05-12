@@ -51,7 +51,6 @@ FETCH_FILTER_RE = re.compile(
     re.S
 )
 
-print("FETCH_FILTER_RE", FETCH_FILTER_RE)
 
 
 def cache_fetches_in_background(

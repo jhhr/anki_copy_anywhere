@@ -24,7 +24,7 @@ def get_ord_from_model(model, fld_name):
 VALID_ARGS = ["did", "deck_name", "mid",
               "note_type_name", "card_id_fld_name",
               "fld_name_to_get_from_card",
-              "pick_card_by"]
+              "pick_card_by", "multiple", "multi_sep"]
 
 PICK_CARD_BY_VALID_VALUES = ('random', 'random_stable', 'least_reps')
 
@@ -42,6 +42,8 @@ def on_fetch_filter(
       card_id_fld_name='note_fld_name_to_get_card_by';
       fld_name_to_get_from_card='note_field_name_to_get';
       pick_card_by='random'/'random_stable'/'least_reps[ord]';
+      multiple='number_of_cards_to_get';
+      multi_sep='separator_for_multiple_results(default=", ")';
      ]:Field}}
     """
     if not (filter.startswith("fetch[") and filter.endswith("]")):
@@ -62,8 +64,26 @@ def on_fetch_filter(
 
     args_dict = parse_filter_args("fetch", VALID_ARGS, filter, show_error_message)
 
-    did, deck_name, mid, note_type_name, card_id_fld_name, fld_name_to_get_from_card, pick_card_by = itemgetter(
-        "did", "deck_name", "mid", "note_type_name", "card_id_fld_name", "fld_name_to_get_from_card", "pick_card_by"
+    (
+        did,
+        deck_name,
+        mid,
+        note_type_name,
+        card_id_fld_name,
+        fld_name_to_get_from_card,
+        pick_card_by,
+        multiple,
+        multi_sep
+    ) = itemgetter(
+        "did",
+        "deck_name",
+        "mid",
+        "note_type_name",
+        "card_id_fld_name",
+        "fld_name_to_get_from_card",
+        "pick_card_by",
+        "multiple",
+        "multi_sep"
     )(args_dict)
 
     # Get did either directly or through deck_name
@@ -107,6 +127,23 @@ def on_fetch_filter(
         show_error_message(
             f"Error in 'fetch[]' field args: 'pick_card_by=' value must be one of {PICK_CARD_BY_VALID_VALUES}",
         )
+        return ''
+
+    if multiple:
+        try:
+            multiple = int(multiple)
+            if multiple < 1:
+                raise ValueError
+        except ValueError:
+            show_error_message(
+                "Error in 'fetch[]' field args: 'multiple=' value must be a positive integer"
+            )
+            return ''
+    else:
+        multiple = 1
+
+    if multi_sep is None:
+        multi_sep = ", "
 
     # First, fetch the ord value of the card_id_fld_name
     model = mw.col.models.get(mid)
@@ -161,7 +198,7 @@ def on_fetch_filter(
 
     did_list = ids2str(DM.deck_and_child_ids(did))
 
-    cards_query_id = base64.b64encode(f"cards{did_list}{mid}{note_ids_str}".encode()).decode()
+    cards_query_id = base64.b64encode(f"cards{did_list}{mid}{card_id_fld_name}".encode()).decode()
     try:
         cards = context.extra_state[cards_query_id]
     except KeyError:
@@ -187,46 +224,60 @@ def on_fetch_filter(
             mw.col.update_card(context.card())
         return ''
 
-    # select a card based on the pick_card_by value
-    selected_card = None
-    card_select_key = base64.b64encode(f"selected_card{did_list}{mid}{note_ids_str}{pick_card_by}".encode()).decode()
-    if pick_card_by == 'random':
-        # We don't want to cache this as it should in fact be different each time
-        selected_card = random.choice(cards)
-    elif pick_card_by == 'random_stable':
-        # pick the same random card for the same deck_id and mid combination
-        try:
-            selected_card = context.extra_state[card_select_key]
-        except KeyError:
+    # select a card or cards based on the pick_card_by value
+    selected_cards = []
+    result_val = ""
+    for i in range(multiple):
+        # remove already selected cards from cards
+        selected_card = None
+        selected_val = ""
+        card_select_key = base64.b64encode(
+            f"selected_card{did_list}{mid}{fld_name_to_get_from_card}{pick_card_by}{i}".encode()).decode()
+        if pick_card_by == 'random':
+            # We don't want to cache this as it should in fact be different each time
             selected_card = random.choice(cards)
-            context.extra_state[card_select_key] = selected_card
-    elif pick_card_by == 'least_reps':
-        # Loop through cards and find the one with the least reviews
-        # Check cache first
+        elif pick_card_by == 'random_stable':
+            # pick the same random card for the same deck_id and mid combination
+            # this will still work for multiple as we're caching the selected card by the index too
+            try:
+                selected_card = context.extra_state[card_select_key]
+            except KeyError:
+                selected_card = random.choice(cards)
+                context.extra_state[card_select_key] = selected_card
+        elif pick_card_by == 'least_reps':
+            # Loop through cards and find the one with the least reviews
+            # Check cache first
+            try:
+                selected_card = context.extra_state[card_select_key]
+            except KeyError:
+                selected_card = min(cards,
+                                    key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c[0]}"))
+                context.extra_state = {}
+                context.extra_state[card_select_key] = selected_card
+        if selected_card is None:
+            show_error_message("Error in 'fetch[]' query: could not select card")
+
+        selected_cards.append(selected_card)
+        # Remove selected card so it can't be picked again
+        cards = [c for c in cards if c != selected_card]
+        selected_note_id = selected_card[1]
+
+        # And finally, return the value from the field in the note
+        # Check for cached result again
+        result_val_key = base64.b64encode(f"{selected_note_id}{fld_ord_to_get}{i}".encode()).decode()
         try:
-            selected_card = context.extra_state[card_select_key]
+            selected_val = context.extra_state[result_val_key]
         except KeyError:
-            selected_card = min(cards, key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c[0]}"))
-            context.extra_state = {}
-            context.extra_state[card_select_key] = selected_card
-    if selected_card is None:
-        show_error_message("Error in 'fetch[]' query: could not select card")
+            target_note_vals_str = mw.col.db.scalar(f"SELECT flds FROM notes WHERE id = {selected_note_id}")
+            if target_note_vals_str is not None:
+                target_note_vals = target_note_vals_str.split("\x1f")
+                selected_val = target_note_vals[fld_ord_to_get]
+                context.extra_state[result_val_key] = selected_val
 
-    selected_note_id = selected_card[1]
+        result_val += f"{multi_sep if i > 0 else ''}{selected_val}"
 
-    # And finally, return the value from the field in the note
-    # Check for cached result again
-    result_val_key = base64.b64encode(f"{selected_note_id}{fld_ord_to_get}".encode()).decode()
-    try:
-        return context.extra_state[result_val_key]
-    except KeyError:
-        pass
+        # If we've run out of cards, stop and return what we got
+        if len(cards) == 0:
+            break
 
-    target_note_vals_str = mw.col.db.scalar(f"SELECT flds FROM notes WHERE id = {selected_note_id}")
-    if target_note_vals_str is not None:
-        target_note_vals = target_note_vals_str.split("\x1f")
-        result_val = target_note_vals[fld_ord_to_get]
-        context.extra_state[result_val_key] = result_val
-        return result_val
-
-    return ''
+    return result_val
