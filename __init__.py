@@ -6,10 +6,12 @@ from aqt.qt import QAction, qconnect, QMenu
 
 from .cache_fetches import cache_fetches
 from .configuration import Config
-from .on_field_filter import on_field_filter
+from .on_cache_filter import on_cache_filter
+from .on_fetch_filter import on_fetch_filter
 from .reset_custom_data import reset_custom_data
 
-hooks.field_filter.append(on_field_filter)
+hooks.field_filter.append(on_fetch_filter)
+hooks.field_filter.append(on_cache_filter)
 
 config = Config()
 config.load()

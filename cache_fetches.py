@@ -21,6 +21,39 @@ class CacheResults:
         self.changes = changes
 
 
+# regex pattern to identify {{fetch=[...]}} calls in template
+ANY_OTHER_STUFF = r'(?:[^}{])*?'
+ARBITRARY_TEXT_NON_MATCHING = r'(?:[^:}{]+)'
+# The field name can have spaces and pretty much any characters except :
+CACHE_FILTER = r'(?:cache\[' + ARBITRARY_TEXT_NON_MATCHING + r']:)'
+OTHER_FILTERS = r'(?:\w*:)*?'
+FETCH_FILTER_RE = re.compile(
+    # start of field replacement
+    r'(\{\{' +
+    # Cache filter first
+    CACHE_FILTER +
+    # potentially other filters chained before fetch filter
+    OTHER_FILTERS +
+    # start of the fetch filter
+    r'fetch\[' +
+    # All args in fetch filter
+    ANY_OTHER_STUFF +
+    # end of args and filter match group
+    r']:' +
+    # potentially other filters chained after fetch filter
+    OTHER_FILTERS +
+    # the text identifying the field in the note, field names can have spaces
+    # and pretty much any characters except :
+    ARBITRARY_TEXT_NON_MATCHING +
+    # end of field replacement
+    r'}})',
+    # flags, allow . to match newlines
+    re.S
+)
+
+print("FETCH_FILTER_RE", FETCH_FILTER_RE)
+
+
 def cache_fetches_in_background(
         did=None, card_ids=None, result_text="", from_menu=False
 ):
@@ -29,7 +62,7 @@ def cache_fetches_in_background(
     1. Get all due cards whose
       - templates contains fetch=[] field calls
       - those calls have specified a cache field
-      - the card's customData "fc" > 1 days old
+      - the card's customData "fc" > X days old
     2. Run the field calls to get their results
     3. Cache the results in the card's customData
     4. And set customData "fc" = <current_time>
@@ -54,39 +87,6 @@ def cache_fetches_in_background(
     config.load()
     DM = DeckManager(mw.col)
 
-    # regex pattern to identify {{fetch=[...]}} calls in template
-    any_other_stuff = r'(?:[^}{])*?'
-    arbitrary_text_non_matching = r'(?:[^:}{]+)'
-    # The field name can have spaces and pretty much any characters except :
-    cache_field_part = r'(?:cache_field\s*=\s*\'' + arbitrary_text_non_matching + r'\'\s*?;{0,1})'
-    other_filters = r'(?:\w*:)*?'
-    fetch_pattern = re.compile(
-        # start of field replacement
-        r'(\{\{' +
-        # potentially other filters chained before fetch filter
-        other_filters +
-        # start of the fetch filter
-        r'fetch\[' +
-        # other args before cache_field, possibly empty, if cache_field is first
-        # don't bother specifically matching the args, just match anything that isn't a closing bracket
-        any_other_stuff +
-        # cache_field arg
-        cache_field_part +
-        # other args after cache_field, possibly empty, if cache_field is last
-        any_other_stuff +
-        # end of args and filter match group
-        r'\]:' +
-        # potentially other filters chained after fetch filter
-        other_filters +
-        # the text identifying the field in the note, field names can have spaces
-        # and pretty much any characters except :
-        arbitrary_text_non_matching +
-        # end of field replacement
-        r'\}\})',
-        # flags, allow . to match newlines
-        re.S
-    )
-
     tmpl_data_by_note_id = {}
     tmpl_data_by_model_id = {}
 
@@ -97,8 +97,8 @@ def cache_fetches_in_background(
         tmpls = model["tmpls"]
         # Check each template with the regex and mark the ords that match
         for tmpl in tmpls:
-            question_side_matches = re.findall(fetch_pattern, tmpl["qfmt"])
-            answer_side_matches = re.findall(fetch_pattern, tmpl["afmt"])
+            question_side_matches = re.findall(FETCH_FILTER_RE, tmpl["qfmt"])
+            answer_side_matches = re.findall(FETCH_FILTER_RE, tmpl["afmt"])
             if len(question_side_matches) > 0 or len(answer_side_matches) > 0:
                 all_matches = question_side_matches + answer_side_matches
                 try:

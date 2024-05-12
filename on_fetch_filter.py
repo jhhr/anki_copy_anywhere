@@ -20,7 +20,7 @@ def get_ord_from_model(model, fld_name):
     return None
 
 
-def on_field_filter(
+def on_fetch_filter(
         text: str, field_name: str, filter: str, context: TemplateRenderContext
 ) -> str:
     """
@@ -33,8 +33,7 @@ def on_field_filter(
       card_id_fld_name='note_fld_name_to_get_card_by';
       fld_name_to_get_from_card='note_field_name_to_get';
       pick_card_by='random'/'random_stable'/'least_reps[ord]';
-      cache_field='cache_field'
-     ]:text}}
+     ]:Field}}
     """
     if not (filter.startswith("fetch[") and filter.endswith("]")):
         return text
@@ -60,20 +59,22 @@ def on_field_filter(
 
     # Get args from the string
     for arg_str in args_list:
-        try:
-            key, value = arg_str.split("=", maxsplit=1)
-        except ValueError:
-            show_error_message(f"Error in 'fetch=[]' field args: Invalid argument '{arg_str}', did you forget '='?")
-            return ''
-        # strip extra whitespace
-        key = key.strip()
-        # and also '' around value
-        value = value.strip().strip("'")
-        args_dict[key] = value
+        if arg_str.strip() != '':
+            # Final ; in the args list will produce only whitespace, so we skip it
+            try:
+                key, value = arg_str.split("=", maxsplit=1)
+            except ValueError:
+                show_error_message(f"Error in 'fetch=[]' field args: Invalid argument '{arg_str}', did you forget '='?")
+                return ''
+            # strip extra whitespace
+            key = key.strip()
+            # and also '' around value
+            value = value.strip().strip("'")
+            args_dict[key] = value
 
     # check each arg key is valid, gather a list of the invalid and then show error about those
     valid_args = ["did", "deck_name", "mid", "note_type_name", "card_id_fld_name", "fld_name_to_get_from_card",
-                  "pick_card_by", "cache_field"]
+                  "pick_card_by"]
     invalid_keys = []
     for key in args_dict.keys():
         if key not in valid_args:
@@ -260,22 +261,6 @@ def on_field_filter(
         target_note_vals = target_note_vals_str.split("\x1f")
         result_val = target_note_vals[fld_ord_to_get]
         context.extra_state[result_val_key] = result_val
-        if is_cache:
-            # Cache result into the note's cache_field if we have one
-            cache_field = check_key("cache_field")
-            if cache_field is not None:
-                try:
-                    cache_field_ord = context.note().keys().index(cache_field)
-                    context.note().fields[cache_field_ord] = result_val
-                    mw.col.update_note(context.note())
-                    # Set cache time into card.customDate
-                    card = context.card()
-                    write_custom_data(card, "fc", math.floor(time.time()))
-                    mw.col.update_card(card)
-                    print(f"Result: note_id={context.note().id} ", result_val)
-                except ValueError:
-                    return ''
-        else:
-            return result_val
+        return result_val
 
     return ''
