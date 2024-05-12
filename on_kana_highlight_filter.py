@@ -163,6 +163,12 @@ def on_kana_highlight_filter(
                 "Error in kana_highlight[]: process_readings() called with no edge specified")
             return None
 
+        # Check onyomi readings
+        # If we find an onyomi match, we'll convert the furigana to katana to signify this is an
+        # onyomi reading for the kanji
+        def onyomi_replacer(match):
+            return f'<b>{to_katakana(match.group(1))}</b>'
+
         for onyomi_reading in onyomi.split("、"):
             # remove text in () in the reading
             onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
@@ -170,16 +176,15 @@ def on_kana_highlight_filter(
             onyomi_reading = to_hiragana(onyomi_reading)
             if onyomi_reading in target_furigana_section:
                 print(f"\nonyomi_reading: {onyomi_reading}")
-                return furigana.replace(onyomi_reading, f"<b>{onyomi_reading}</b>")
+                return re.sub(rf'({onyomi_reading})', onyomi_replacer, furigana)
             # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
             # This only applies to the first kana in the reading
             if onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
-                if isinstance(HIRAGANA_CONVERSION_DICT[onyomi_reading[0]], list):
-                    for kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
-                        converted_onyomi = onyomi_reading.replace(onyomi_reading[0], kana, 1)
-                        if converted_onyomi in target_furigana_section:
-                            print(f"\nconverted_onyomi: {converted_onyomi}")
-                            return furigana.replace(converted_onyomi, f"<b>{converted_onyomi}</b>")
+                for kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
+                    converted_onyomi = onyomi_reading.replace(onyomi_reading[0], kana, 1)
+                    if converted_onyomi in target_furigana_section:
+                        print(f"\nconverted_onyomi: {converted_onyomi}")
+                        return re.sub(rf'({converted_onyomi})', onyomi_replacer, furigana)
         # Then also check for small tsu conversion of some consonants
         # this only happens in the last kana of the reading
         for kana in SMALL_TSU_POSSIBLE_KATAKANA:
@@ -187,8 +192,10 @@ def on_kana_highlight_filter(
                 converted_onyomi = onyomi[:-1] + "っ"
                 if converted_onyomi in target_furigana_section:
                     print(f"\nconverted_onyomi: {converted_onyomi}")
-                    return furigana.replace(converted_onyomi, f"<b>{converted_onyomi}</b>")
+                    return re.sub(rf'({converted_onyomi})', onyomi_replacer, furigana)
+
         # Then check the kunyomi readings
+        # We'll keep these as hiragana
         for kunyomi_reading in kunyomi.split("、"):
             # Remove the okurigana in the reading which are split by a dot
             kunyomi_stem = re.sub(r"\..+", "", kunyomi_reading).strip()
@@ -198,12 +205,11 @@ def on_kana_highlight_filter(
                 return furigana.replace(kunyomi_stem, f"<b>{kunyomi_stem}</b>")
             # Also check for changed kana
             if kunyomi_stem[0] in HIRAGANA_CONVERSION_DICT:
-                if isinstance(HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]], list):
-                    for kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
-                        converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kana, 1)
-                        if converted_kunyomi in target_furigana_section:
-                            print(f"\nconverted_kunyomi: {converted_kunyomi}")
-                            return furigana.replace(converted_kunyomi, f"<b>{converted_kunyomi}</b>")
+                for kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
+                    converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kana, 1)
+                    if converted_kunyomi in target_furigana_section:
+                        print(f"\nconverted_kunyomi: {converted_kunyomi}")
+                        return furigana.replace(converted_kunyomi, f"<b>{converted_kunyomi}</b>")
         # No onyomi or kunyomi reading matched the furigana
         show_error_message(
             f"Error in kana_highlight[]: No reading found for furigana ({furigana}) among onyomi ({onyomi}) and kunyomi ({kunyomi})")
