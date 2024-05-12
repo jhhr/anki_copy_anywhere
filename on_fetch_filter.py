@@ -217,8 +217,12 @@ def on_fetch_filter(
         # remove already selected cards from cards
         selected_card = None
         selected_val = ""
+        # We don't make this key entirely unique as we want to cache the selected card for the same deck_id and
+        # mid combination, so that getting a different field from the same card type will still return the same card
         card_select_key = base64.b64encode(
-            f"selected_card{did_list}{mid}{fld_name_to_get_from_card}{pick_card_by}{i}".encode()).decode()
+            f"selected_card{did_list}{mid}{pick_card_by}{i}".encode()).decode()
+        print("card_select_key", card_select_key, f'{did_list}{mid}{fld_name_to_get_from_card}{pick_card_by}{i}')
+
         if pick_card_by == 'random':
             # We don't want to cache this as it should in fact be different each time
             selected_card = random.choice(cards)
@@ -227,6 +231,7 @@ def on_fetch_filter(
             # this will still work for multiple as we're caching the selected card by the index too
             try:
                 selected_card = context.extra_state[card_select_key]
+                print("selected_card from cached key value")
             except KeyError:
                 selected_card = random.choice(cards)
                 context.extra_state[card_select_key] = selected_card
