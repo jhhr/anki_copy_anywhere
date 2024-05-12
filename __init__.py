@@ -8,11 +8,12 @@ from .cache_fetches import cache_fetches
 from .configuration import Config
 from .on_cache_filter import on_cache_filter
 from .on_fetch_filter import on_fetch_filter
+from .on_kana_highlight_filter import on_kana_highlight_filter
 from .reset_custom_data import reset_custom_data
 
 hooks.field_filter.append(on_fetch_filter)
 hooks.field_filter.append(on_cache_filter)
-
+hooks.field_filter.append(on_kana_highlight_filter)
 config = Config()
 config.load()
 

@@ -19,7 +19,6 @@ def on_cache_filter(
     """
 
     if not (filter.startswith("cache[") and filter.endswith("]")):
-        print("Not cache filter")
         return text
 
     is_cache = None
@@ -45,7 +44,7 @@ def on_cache_filter(
             write_custom_data(card, "fc", math.floor(time.time()))
             mw.col.update_card(card)
         except ValueError:
-            print(f"Error: cache_field {cache_field} not found in note")
+            print(f"Error in cache[]: cache_field {cache_field} not found in note")
             pass
 
     return text

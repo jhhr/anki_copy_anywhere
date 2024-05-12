@@ -64,7 +64,7 @@ def on_fetch_filter(
             try:
                 key, value = arg_str.split("=", maxsplit=1)
             except ValueError:
-                show_error_message(f"Error in 'fetch=[]' field args: Invalid argument '{arg_str}', did you forget '='?")
+                show_error_message(f"Error in 'fetch[]' field args: Invalid argument '{arg_str}', did you forget '='?")
                 return ''
             # strip extra whitespace
             key = key.strip()
@@ -81,7 +81,7 @@ def on_fetch_filter(
             invalid_keys.append(key)
     if len(invalid_keys) > 0:
         show_error_message(
-            f"Error in 'fetch=[]' field args: Unrecognized arguments: {', '.join(invalid_keys)}"
+            f"Error in 'fetch[]' field args: Unrecognized arguments: {', '.join(invalid_keys)}"
         )
         return ''
 
@@ -100,7 +100,7 @@ def on_fetch_filter(
             did = mw.col.decks.id_for_name(deck_name)
         else:
             show_error_message(
-                "Error in 'fetch=[]' field args: Either 'did=' or 'deck_name=' value must be provided"
+                "Error in 'fetch[]' field args: Either 'did=' or 'deck_name=' value must be provided"
             )
             return ''
 
@@ -112,41 +112,41 @@ def on_fetch_filter(
             mid = mw.col.models.id_for_name(note_type_name)
             if mid is None:
                 show_error_message(
-                    f"Error in 'fetch=[]' field args: Note type for note_type_name='{note_type_name}' not found, check your spelling",
+                    f"Error in 'fetch[]' field args: Note type for note_type_name='{note_type_name}' not found, check your spelling",
                 )
                 return ''
         else:
             show_error_message(
-                "Error in 'fetch=[]' field args: Either 'mid=' or 'note_type_name=' value must be provided")
+                "Error in 'fetch[]' field args: Either 'mid=' or 'note_type_name=' value must be provided")
             return ''
 
     card_id_fld_name = check_key("card_id_fld_name")
     if card_id_fld_name is None:
-        show_error_message("Error in 'fetch=[]' field args: 'card_id_fld_name=' value must be provided")
+        show_error_message("Error in 'fetch[]' field args: 'card_id_fld_name=' value must be provided")
         return ''
 
     fld_name_to_get_from_card = check_key("fld_name_to_get_from_card")
     if fld_name_to_get_from_card is None:
         show_error_message(
-            "Error in 'fetch=[]' field args: 'fld_name_to_get_from_card=' value must be provided",
+            "Error in 'fetch[]' field args: 'fld_name_to_get_from_card=' value must be provided",
         )
         return ''
 
     pick_card_by = check_key("pick_card_by")
     pick_card_by_valid_values = ('random', 'random_stable', 'least_reps')
     if pick_card_by is None:
-        show_error_message("Error in 'fetch=[]' field args: 'pick_card_by=' value must be provided")
+        show_error_message("Error in 'fetch[]' field args: 'pick_card_by=' value must be provided")
         return ''
     elif pick_card_by not in pick_card_by_valid_values:
         show_error_message(
-            f"Error in 'fetch=[]' field args: 'pick_card_by=' value must be one of {pick_card_by_valid_values}",
+            f"Error in 'fetch[]' field args: 'pick_card_by=' value must be one of {pick_card_by_valid_values}",
         )
 
     # First, fetch the ord value of the card_id_fld_name
     model = mw.col.models.get(mid)
     if model is None:
         show_error_message(
-            f"Error in 'fetch=[]' field args: Note type for mid='{mid}' not found, check your spelling"
+            f"Error in 'fetch[]' field args: Note type for mid='{mid}' not found, check your spelling"
         )
         return ''
 
@@ -154,7 +154,7 @@ def on_fetch_filter(
     fld_ord_to_get = get_ord_from_model(model, fld_name_to_get_from_card)
     if fld_ord_to_get is None:
         show_error_message(
-            f"Error in 'fetch=[]' field args: No field with name '{fld_name_to_get_from_card}' found in the note type '{model['name']}'"
+            f"Error in 'fetch[]' field args: No field with name '{fld_name_to_get_from_card}' found in the note type '{model['name']}'"
         )
         return ''
 
@@ -178,7 +178,7 @@ def on_fetch_filter(
 
     if len(note_ids) == 0:
         show_error_message(
-            f"Error in 'fetch=[]' query: Did not find any notes where '{card_id_fld_name}' contains '{text}'"
+            f"Error in 'fetch[]' query: Did not find any notes where '{card_id_fld_name}' contains '{text}'"
         )
         if is_cache:
             # Set cache time into card.customData, so we don't keep querying this again
@@ -214,7 +214,7 @@ def on_fetch_filter(
 
     if (len(cards) == 0):
         show_error_message(
-            f"Error in 'fetch=[]' query: Did not find any non-suspended cards with did={did} for the notes whose '{card_id_fld_name}' contains '{text}'")
+            f"Error in 'fetch[]' query: Did not find any non-suspended cards with did={did} for the notes whose '{card_id_fld_name}' contains '{text}'")
         if is_cache:
             # Set cache time into card.customData, so we don't keep querying this again
             write_custom_data(context.card(), "fc", math.floor(time.time()))
@@ -244,7 +244,7 @@ def on_fetch_filter(
             context.extra_state = {}
             context.extra_state[card_select_key] = selected_card
     if selected_card is None:
-        show_error_message("Error in 'fetch=[]' query: could not select card")
+        show_error_message("Error in 'fetch[]' query: could not select card")
 
     selected_note_id = selected_card[1]
 
