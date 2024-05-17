@@ -20,10 +20,10 @@ def get_ord_from_model(model, fld_name):
     return None
 
 
-VALID_ARGS = ["did", "deck_name", "mid",
-              "note_type_name", "card_id_fld_name",
+VALID_ARGS = ["from_did", "from_deck_name", "from_note_type_id",
+              "from_note_type_name", "select_card_by_fld_name",
               "fld_name_to_get_from_card",
-              "pick_card_by", "multiple", "multi_sep"]
+              "pick_card_by", "multi_value_count", "multi_value_separator"]
 
 PICK_CARD_BY_VALID_VALUES = ('random', 'random_stable', 'least_reps')
 
@@ -34,15 +34,15 @@ def on_fetch_filter(
     """
      The filter syntax is like this:
      {{fetch[
-      did='deck_id';
-      deck_name='deck_name';
-      mid='note_type_id'
-      note_type_name='note_type_name';
-      card_id_fld_name='note_fld_name_to_get_card_by';
-      fld_name_to_get_from_card='note_field_name_to_get';
+      from_did='deck_id';
+      from_deck_name='from_deck_name';
+      from_note_type_id='note_type_id'
+      from_note_type_name='from_note_type_name';
+      select_card_by_fld_name='note_fld_name_to_get_card_by';
       pick_card_by='random'/'random_stable'/'least_reps[ord]';
-      multiple='number_of_cards_to_get';
-      multi_sep='separator_for_multiple_results(default=", ")';
+      fld_name_to_get_from_card='note_field_name_to_get';
+      multi_value_count='number_of_cards_to_get';
+      multi_value_separator='separator_for_multiple_results(default=", ")';
      ]:Field}}
     """
     if not (filter.startswith("fetch[") and filter.endswith("]")):
@@ -51,53 +51,53 @@ def on_fetch_filter(
     args_dict, is_cache, show_error_message = filter_init("fetch", VALID_ARGS, filter, context)
 
     (
-        did,
-        deck_name,
-        mid,
-        note_type_name,
-        card_id_fld_name,
+        from_did,
+        from_deck_name,
+        from_note_type_id,
+        from_note_type_name,
+        select_card_by_fld_name,
         fld_name_to_get_from_card,
         pick_card_by,
-        multiple,
-        multi_sep
+        multi_value_count,
+        multi_value_separator
     ) = itemgetter(
-        "did",
-        "deck_name",
-        "mid",
-        "note_type_name",
-        "card_id_fld_name",
+        "from_did",
+        "from_deck_name",
+        "from_note_type_id",
+        "from_note_type_name",
+        "select_card_by_fld_name",
         "fld_name_to_get_from_card",
         "pick_card_by",
-        "multiple",
-        "multi_sep"
+        "multi_value_count",
+        "multi_value_separator"
     )(args_dict)
 
-    # Get did either directly or through deck_name
-    if did is None:
-        if deck_name is not None:
-            did = mw.col.decks.id_for_name(deck_name)
+    # Get from_did either directly or through from_deck_name
+    if from_did is None:
+        if from_deck_name is not None:
+            from_did = mw.col.decks.id_for_name(from_deck_name)
         else:
             show_error_message(
-                "Error in 'fetch[]' field args: Either 'did=' or 'deck_name=' value must be provided"
+                "Error in 'fetch[]' field args: Either 'from_did=' or 'from_deck_name=' value must be provided"
             )
             return ''
 
-    # Get mid either directly or through note_type_name
-    if mid is None:
-        if note_type_name is not None:
-            mid = mw.col.models.id_for_name(note_type_name)
-            if mid is None:
+    # Get from_note_type_id either directly or through from_note_type_name
+    if from_note_type_id is None:
+        if from_note_type_name is not None:
+            from_note_type_id = mw.col.models.id_for_name(from_note_type_name)
+            if from_note_type_id is None:
                 show_error_message(
-                    f"Error in 'fetch[]' field args: Note type for note_type_name='{note_type_name}' not found, check your spelling",
+                    f"Error in 'fetch[]' field args: Note type for from_note_type_name='{from_note_type_name}' not found, check your spelling",
                 )
                 return ''
         else:
             show_error_message(
-                "Error in 'fetch[]' field args: Either 'mid=' or 'note_type_name=' value must be provided")
+                "Error in 'fetch[]' field args: Either 'from_note_type_id=' or 'from_note_type_name=' value must be provided")
             return ''
 
-    if card_id_fld_name is None:
-        show_error_message("Error in 'fetch[]' field args: 'card_id_fld_name=' value must be provided")
+    if select_card_by_fld_name is None:
+        show_error_message("Error in 'fetch[]' field args: 'select_card_by_fld_name=' value must be provided")
         return ''
 
     if fld_name_to_get_from_card is None:
@@ -115,31 +115,31 @@ def on_fetch_filter(
         )
         return ''
 
-    if multiple:
+    if multi_value_count:
         try:
-            multiple = int(multiple)
-            if multiple < 1:
+            multi_value_count = int(multi_value_count)
+            if multi_value_count < 1:
                 raise ValueError
         except ValueError:
             show_error_message(
-                "Error in 'fetch[]' field args: 'multiple=' value must be a positive integer"
+                "Error in 'fetch[]' field args: 'multi_value_count=' value must be a positive integer"
             )
             return ''
     else:
-        multiple = 1
+        multi_value_count = 1
 
-    if multi_sep is None:
-        multi_sep = ", "
+    if multi_value_separator is None:
+        multi_value_separator = ", "
 
-    # First, fetch the ord value of the card_id_fld_name
-    model = mw.col.models.get(mid)
+    # First, fetch the ord value of the select_card_by_fld_name
+    model = mw.col.models.get(from_note_type_id)
     if model is None:
         show_error_message(
-            f"Error in 'fetch[]' field args: Note type for mid='{mid}' not found, check your spelling"
+            f"Error in 'fetch[]' field args: Note type for from_note_type_id='{from_note_type_id}' not found, check your spelling"
         )
         return ''
 
-    fld_ord_to_id_card = get_ord_from_model(model, card_id_fld_name)
+    fld_ord_to_id_card = get_ord_from_model(model, select_card_by_fld_name)
     fld_ord_to_get = get_ord_from_model(model, fld_name_to_get_from_card)
     if fld_ord_to_get is None:
         show_error_message(
@@ -153,12 +153,13 @@ def on_fetch_filter(
     # and test whether it has a substring `text`
     note_ids = None
     # First, check if we have cached the note_ids from a similar query already in extra_state
-    notes_query_id = base64.b64encode(f"note_ids{mid}{fld_ord_to_id_card}{text}".encode()).decode()
+    notes_query_id = base64.b64encode(f"note_ids{from_note_type_id}{fld_ord_to_id_card}{text}".encode()).decode()
     try:
         note_ids = context.extra_state[notes_query_id]
     except KeyError:
         note_ids = []
-        for note_id, fields_str in mw.col.db.all(f"select id, flds from notes where mid={mid}"):
+        for note_id, fields_str in mw.col.db.all(
+                f"select id, flds from notes where from_note_type_id={from_note_type_id}"):
             if fields_str is not None:
                 fields = fields_str.split("\x1f")
                 if text in fields[fld_ord_to_id_card]:
@@ -167,7 +168,7 @@ def on_fetch_filter(
 
     if len(note_ids) == 0:
         show_error_message(
-            f"Error in 'fetch[]' query: Did not find any notes where '{card_id_fld_name}' contains '{text}'"
+            f"Error in 'fetch[]' query: Did not find any notes where '{select_card_by_fld_name}' contains '{text}'"
         )
         if is_cache:
             # Set cache time into card.customData, so we don't keep querying this again
@@ -175,16 +176,16 @@ def on_fetch_filter(
             mw.col.update_card(context.card())
         return ''
     else:
-        print(f"Found {len(note_ids)} notes with '{card_id_fld_name}' containing '{text}'")
+        print(f"Found {len(note_ids)} notes with '{select_card_by_fld_name}' containing '{text}'")
     note_ids_str = ids2str(note_ids)
 
-    # Next, find cards with did and nid in the note_ids
+    # Next, find cards with from_did and nid in the note_ids
     # Check for cached result again
     DM = DeckManager(mw.col)
 
-    did_list = ids2str(DM.deck_and_child_ids(did))
+    did_list = ids2str(DM.deck_and_child_ids(from_did))
 
-    cards_query_id = base64.b64encode(f"cards{did_list}{mid}{card_id_fld_name}".encode()).decode()
+    cards_query_id = base64.b64encode(f"cards{did_list}{from_note_type_id}{select_card_by_fld_name}".encode()).decode()
     try:
         cards = context.extra_state[cards_query_id]
     except KeyError:
@@ -194,7 +195,7 @@ def on_fetch_filter(
                 id,
                 nid
             FROM cards
-            WHERE (did IN {did_list} OR odid IN {did_list})
+            WHERE (from_did IN {did_list} OR odid IN {did_list})
             AND nid IN {note_ids_str}
             AND queue != {QUEUE_TYPE_SUSPENDED}
             """
@@ -203,7 +204,7 @@ def on_fetch_filter(
 
     if (len(cards) == 0):
         show_error_message(
-            f"Error in 'fetch[]' query: Did not find any non-suspended cards with did={did} for the notes whose '{card_id_fld_name}' contains '{text}'")
+            f"Error in 'fetch[]' query: Did not find any non-suspended cards with from_did={from_did} for the notes whose '{select_card_by_fld_name}' contains '{text}'")
         if is_cache:
             # Set cache time into card.customData, so we don't keep querying this again
             write_custom_data(context.card(), "fc", math.floor(time.time()))
@@ -213,22 +214,23 @@ def on_fetch_filter(
     # select a card or cards based on the pick_card_by value
     selected_cards = []
     result_val = ""
-    for i in range(multiple):
+    for i in range(multi_value_count):
         # remove already selected cards from cards
         selected_card = None
         selected_val = ""
         # We don't make this key entirely unique as we want to cache the selected card for the same deck_id and
-        # mid combination, so that getting a different field from the same card type will still return the same card
+        # from_note_type_id combination, so that getting a different field from the same card type will still return the same card
         card_select_key = base64.b64encode(
-            f"selected_card{did_list}{mid}{pick_card_by}{i}".encode()).decode()
-        print("card_select_key", card_select_key, f'{did_list}{mid}{fld_name_to_get_from_card}{pick_card_by}{i}')
+            f"selected_card{did_list}{from_note_type_id}{pick_card_by}{i}".encode()).decode()
+        print("card_select_key", card_select_key,
+              f'{did_list}{from_note_type_id}{fld_name_to_get_from_card}{pick_card_by}{i}')
 
         if pick_card_by == 'random':
             # We don't want to cache this as it should in fact be different each time
             selected_card = random.choice(cards)
         elif pick_card_by == 'random_stable':
-            # pick the same random card for the same deck_id and mid combination
-            # this will still work for multiple as we're caching the selected card by the index too
+            # pick the same random card for the same deck_id and from_note_type_id combination
+            # this will still work for multi_value_count as we're caching the selected card by the index too
             try:
                 selected_card = context.extra_state[card_select_key]
                 print("selected_card from cached key value")
@@ -265,7 +267,7 @@ def on_fetch_filter(
                 selected_val = target_note_vals[fld_ord_to_get]
                 context.extra_state[result_val_key] = selected_val
 
-        result_val += f"{multi_sep if i > 0 else ''}{selected_val}"
+        result_val += f"{multi_value_separator if i > 0 else ''}{selected_val}"
 
         # If we've run out of cards, stop and return what we got
         if len(cards) == 0:
