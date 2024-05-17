@@ -48,8 +48,13 @@ def filter_init(filter_prefix, valid_args, filter_str, context):
                 return {}, is_cache, show_error_message
             # strip extra whitespace
             key = key.strip()
-            # and also '' around value
-            value = value.strip().strip("'")
+            # if the value is wrapped with [], it's an array of ''-wrapped values separated by comma
+            if value.startswith("[") and value.endswith("]"):
+                value = value.strip("[]").split(",")
+                value = [v.strip().strip("'") for v in value]
+            else:
+                # it's a single ''-wrapped value
+                value = value.strip().strip("'")
             args_dict[key] = value
 
     # check each arg key is valid, gather a list of the invalid and then show error about those

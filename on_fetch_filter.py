@@ -22,7 +22,7 @@ def get_ord_from_model(model, fld_name):
 
 VALID_ARGS = ["from_did", "from_deck_name", "from_note_type_id",
               "from_note_type_name", "select_card_by_fld_name",
-              "fld_name_to_get_from_card",
+              "fld_name_to_get_from_card", "cur_deck_white_list",
               "pick_card_by", "multi_value_count", "multi_value_separator"]
 
 PICK_CARD_BY_VALID_VALUES = ('random', 'random_stable', 'least_reps')
@@ -38,6 +38,7 @@ def on_fetch_filter(
       from_deck_name='from_deck_name';
       from_note_type_id='note_type_id'
       from_note_type_name='from_note_type_name';
+      cur_deck_white_list=['deck_name1', 'deck_name2', ...'];
       select_card_by_fld_name='note_fld_name_to_get_card_by';
       pick_card_by='random'/'random_stable'/'least_reps[ord]';
       fld_name_to_get_from_card='note_field_name_to_get';
@@ -57,6 +58,7 @@ def on_fetch_filter(
         from_note_type_name,
         select_card_by_fld_name,
         fld_name_to_get_from_card,
+        cur_deck_white_list,
         pick_card_by,
         multi_value_count,
         multi_value_separator
@@ -67,6 +69,7 @@ def on_fetch_filter(
         "from_note_type_name",
         "select_card_by_fld_name",
         "fld_name_to_get_from_card",
+        "cur_deck_white_list",
         "pick_card_by",
         "multi_value_count",
         "multi_value_separator"
@@ -127,6 +130,12 @@ def on_fetch_filter(
             return ''
     else:
         multi_value_count = 1
+
+    if cur_deck_white_list is not None:
+        # Check if the current deck is in the white list, otherwise we don't fetch
+        cur_deck_id = context.card().did
+        if cur_deck_id not in [mw.col.decks.id_for_name(deck_name) for deck_name in cur_deck_white_list]:
+            return ''
 
     if multi_value_separator is None:
         multi_value_separator = ", "
