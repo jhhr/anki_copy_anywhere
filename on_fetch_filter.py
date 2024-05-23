@@ -131,10 +131,24 @@ def on_fetch_filter(
     else:
         multi_value_count = 1
 
+    DM = DeckManager(mw.col)
+
     if cur_deck_white_list is not None:
         # Check if the current deck is in the white list, otherwise we don't fetch
-        cur_deck_id = context.card().did
-        if cur_deck_id not in [mw.col.decks.id_for_name(deck_name) for deck_name in cur_deck_white_list]:
+        card = context.card()
+        cur_deck_id = card.odid or card.did
+        all_decks = DM.all_names_and_ids(include_filtered=False)
+        # whitelist deck is a list of deck or sub deck names
+        # parent names can't be included since adding :: would break the filter text
+        whitelist_dids = [
+            deck.id for
+            deck in all_decks if
+            any(
+                deck.name.endswith(f"::{whitelist_deck_name}") for
+                whitelist_deck_name in cur_deck_white_list
+            )
+        ]
+        if cur_deck_id not in whitelist_dids:
             return ''
 
     if multi_value_separator is None:
@@ -190,7 +204,6 @@ def on_fetch_filter(
 
     # Next, find cards with from_did and nid in the note_ids
     # Check for cached result again
-    DM = DeckManager(mw.col)
 
     did_list = ids2str(DM.deck_and_child_ids(from_did))
 
