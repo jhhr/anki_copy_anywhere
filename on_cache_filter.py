@@ -13,7 +13,7 @@ VALID_ARGS = ["cache_field", "only_empty", "ignore_if_cached"]
 
 
 def on_cache_filter(
-        text: str, field_name: str, filter: str, context: TemplateRenderContext
+        text: str, field_name: str, filter_str: str, context: TemplateRenderContext
 ) -> str:
     """
      The filter syntax is like this:
@@ -30,10 +30,10 @@ def on_cache_filter(
     When rendering the card and the cache has expired, it is automatically updated.
     """
 
-    if not (filter.startswith("cache[") and filter.endswith("]")):
+    if not (filter_str.startswith("cache[") and filter_str.endswith("]")):
         return text
 
-    args_dict, is_cache, show_error_message = filter_init("cache", VALID_ARGS, filter, context)
+    args_dict, is_cache, show_error_message = filter_init("cache", VALID_ARGS, filter_str, context)
 
     (
         cache_field,

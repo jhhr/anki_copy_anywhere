@@ -29,7 +29,7 @@ PICK_CARD_BY_VALID_VALUES = ('random', 'random_stable', 'least_reps')
 
 
 def on_fetch_filter(
-        text: str, field_name: str, filter: str, context: TemplateRenderContext
+        text: str, field_name: str, filter_str: str, context: TemplateRenderContext
 ) -> str:
     """
      The filter syntax is like this:
@@ -46,10 +46,10 @@ def on_fetch_filter(
       multi_value_separator='separator_for_multiple_results(default=", ")';
      ]:Field}}
     """
-    if not (filter.startswith("fetch[") and filter.endswith("]")):
+    if not (filter_str.startswith("fetch[") and filter_str.endswith("]")):
         return text
 
-    args_dict, is_cache, show_error_message = filter_init("fetch", VALID_ARGS, filter, context)
+    args_dict, is_cache, show_error_message = filter_init("fetch", VALID_ARGS, filter_str, context)
 
     (
         from_did,
