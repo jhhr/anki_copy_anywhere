@@ -182,12 +182,14 @@ def on_fetch_filter(
     except KeyError:
         note_ids = []
         for note_id, fields_str in mw.col.db.all(
-                f"select id, flds from notes where from_note_type_id={from_note_type_id}"):
+                f"select id, flds from notes where mid={from_note_type_id}"):
             if fields_str is not None:
                 fields = fields_str.split("\x1f")
                 if text in fields[fld_ord_to_id_card]:
                     note_ids.append(note_id)
                     context.extra_state[notes_query_id] = note_ids
+
+    print(f"len(note_ids)={len(note_ids)}")
 
     if len(note_ids) == 0:
         show_error_message(
@@ -217,7 +219,7 @@ def on_fetch_filter(
                 id,
                 nid
             FROM cards
-            WHERE (from_did IN {did_list} OR odid IN {did_list})
+            WHERE (did IN {did_list} OR odid IN {did_list})
             AND nid IN {note_ids_str}
             AND queue != {QUEUE_TYPE_SUSPENDED}
             """
