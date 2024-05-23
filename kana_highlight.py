@@ -47,17 +47,28 @@ FURIGANA_RE = re.compile(r" ?([^ >]+?)\[(.+?)\]")
 # Regex matching any kanji and furigana
 KANJI_AND_FURIGANA_RE = re.compile(r"([々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]")
 
-
 def re_match_from_right(text):
-    return re.compile(rf"(.+)({text})(.*?)$")
-
+    return re.compile(rf"(.*)({text})(.*?)$")
 
 def re_match_from_left(text):
-    return re.compile(rf"^(.*?)({text})(.+)$")
-
+    return re.compile(rf"^(.*?)({text})(.*)$")
 
 def re_match_from_middle(text):
-    return re.compile(rf"^(.+?)({text})(.+?)$")
+    return re.compile(rf"^(.*?)({text})(.*?)$")
+
+
+def onyomi_replacer(match):
+    """
+    re.sub replacer function for onyomi used with the above regexes
+    """
+    return f'{match.group(1)}<b>{to_katakana(match.group(2))}</b>{match.group(3)}'
+
+
+def kunyomi_replacer(match):
+    """
+    re.sub replacer function for kunyomi used with the above regexes
+    """
+    return f'{match.group(1)}<b>{match.group(2)}</b>{match.group(3)}'
 
 
 # Implementation of the basic Anki kana filter
@@ -103,7 +114,7 @@ def kana_highlight(
         debug_text += text + "\n"
         print(text)
 
-    # Function that processess a furigana by checking all possible onyomi and kunyomi readings on it
+    # Function that processes a furigana by checking all possible onyomi and kunyomi readings on it
     # Either returns the furigana as-is when there is no match or modifies the furigana by
     # adding <b> tags around the part that matches the reading
     def process_readings(furigana, right_edge=False, left_edge=False, middle=False,
@@ -125,15 +136,16 @@ def kana_highlight(
                 "Error in kana_highlight[]: process_readings() called with no edge specified")
             return None
 
-        # Check onyomi readings
-        # If we find an onyomi match, we'll convert the furigana to katana to signify this is an
-        # onyomi reading for the kanji
         def replace_onyomi_match(onyomi_that_matched):
-            # def onyomi_replacer(match):
-            #     return f'<b>{to_katakana(match.group(1))}</b>'
-
             nonlocal furigana
-            return furigana.replace(onyomi_that_matched, f'<b>{to_katakana(onyomi_that_matched)}</b>')
+
+            if right_edge:
+                reg = re_match_from_right(onyomi_that_matched)
+            elif left_edge:
+                reg = re_match_from_left(onyomi_that_matched)
+            else:
+                reg = re_match_from_middle(onyomi_that_matched)
+            return re.sub(reg, onyomi_replacer, furigana)
 
         for onyomi_reading in onyomi.split("、"):
             # remove text in () in the reading
@@ -162,7 +174,14 @@ def kana_highlight(
 
         def replace_kunyomi_match(kunyomi_that_matched):
             nonlocal furigana
-            return furigana.replace(kunyomi_that_matched, f"<b>{kunyomi_that_matched}</b>")
+
+            if right_edge:
+                reg = re_match_from_right(kunyomi_that_matched)
+            elif left_edge:
+                reg = re_match_from_left(kunyomi_that_matched)
+            else:
+                reg = re_match_from_middle(kunyomi_that_matched)
+            return re.sub(reg, kunyomi_replacer, furigana)
 
         # Then check the kunyomi readings
         # We'll keep these as hiragana
@@ -194,7 +213,7 @@ def kana_highlight(
             # break the audio tag. But we know the text to the right is kanji (what is it doing there next
             # to a sound tag?) so we'll just leave it out anyway
             return furigana
-        if word == kanji_to_highlight or word == f"{kanji_to_highlight}々":
+        if word in (kanji_to_highlight, f"{kanji_to_highlight}々"):
             return f"<b>{furigana}</b>"
         kanji_pos = word.find(kanji_to_highlight)
         if kanji_pos == -1:
