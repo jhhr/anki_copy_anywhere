@@ -37,15 +37,20 @@ SMALL_TSU_POSSIBLE_KATAKANA = [to_katakana(k) for k in [
     "ぱ", "ぴ", "ぷ", "ぺ", "ぽ", "こ", "か", "く", "き"
 ]]
 
+HIRAGANA_RE = "([ぁ-ん])"
+
 # Regex matching any kanji characters
-# Include the kanji repeater puncuation as something that will be cleaned off
-KANJI_RE = re.compile(r"([々\u4e00-\u9faf\u3400-\u4dbf]+)")
+# Include the kanji repeater punctuation as something that will be cleaned off
+KANJI_RE = "([々\u4e00-\u9faf\u3400-\u4dbf]+)"
+KANJI_REC = re.compile(rf"{KANJI_RE}")
 
 # Regex matching any furigana
-FURIGANA_RE = re.compile(r" ?([^ >]+?)\[(.+?)\]")
+FURIGANA_RE = " ?([^ >]+?)\[(.+?)\]"
+FURIGANA_REC = re.compile(rf"{FURIGANA_RE}")
 
 # Regex matching any kanji and furigana
-KANJI_AND_FURIGANA_RE = re.compile(r"([々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]")
+KANJI_AND_FURIGANA_RE = "([々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]"
+KANJI_AND_FURIGANA_REC = re.compile(rf"{KANJI_AND_FURIGANA_RE}")
 
 def re_match_from_right(text):
     return re.compile(rf"(.*)({text})(.*?)$")
@@ -55,6 +60,23 @@ def re_match_from_left(text):
 
 def re_match_from_middle(text):
     return re.compile(rf"^(.*?)({text})(.*?)$")
+
+
+# Regex for lone kanji with some hiragana to their right, then some kanji,
+# then furigana that includes the hiragana in the middle
+# This is used to match cases of furigana used for　kunyomi compound words with
+# okurigana in the middle like 消え去る[きえさ]る
+OKURIGANA_MIX_CLEANING_RE = re.compile(rf"{KANJI_RE}([ぁ-ん]+){KANJI_RE}\[(.+?)\2(.+?)\]")
+
+
+def okurigana_mix_cleaning_replacer(match):
+    """
+    re.sub replacer function for OKURIGANA_MIX_CLEANING_RE when it's only needed to
+    clean the kanji and leave the furigana. The objective is to turn the hard to process
+    case into a normal case, so 消え去る[きえさ]る becomes 消[き]え去[さ]る
+    """
+    return f'{match.group(1)}[{match.group(4)}]{match.group(2)}{match.group(3)}[{match.group(5)}]'
+
 
 
 def onyomi_replacer(match):
@@ -86,7 +108,7 @@ def kana_filter(text):
 
     # First remove all brackets and then remove all kanji
     # Assuming every kanji had furigana, we'll be left with the correct kana
-    return KANJI_RE.sub("", FURIGANA_RE.sub(bracket_replace, text.replace("&nbsp;", " ")))
+    return KANJI_REC.sub("", FURIGANA_REC.sub(bracket_replace, text.replace("&nbsp;", " ")))
 
 
 def kana_highlight(
@@ -237,7 +259,9 @@ def kana_highlight(
 
     # First clean any existing <b> tags from the text, as we don't want to nest them
     clean_text = re.sub(r"<b>(.+?)</b>", r"\1", text)
-    return KANJI_AND_FURIGANA_RE.sub(furigana_replacer, clean_text)
+    # Then clean any potential mixed okurigana cases, turning them normal
+    clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, clean_text)
+    return KANJI_AND_FURIGANA_REC.sub(furigana_replacer, clean_text)
 
 
 def test(test_name, expected_result, sentence, kanji, onyomi, kunyomi):
@@ -265,6 +289,15 @@ def main():
         kanji="視",
         onyomi="シ(漢)、ジ(呉)",
         kunyomi="み.る"
+    )
+    test(
+        test_name="Should be able to clean furigana that bridges over some okurigana",
+        expected_result="<b>ダン</b>ごが きえさった。",
+        # 消え去[きえさ]った　has え　in the middle of the kanji, causing the 消え part to be tricky
+        sentence="団子[だんご]が 消え去[きえさ]った。",
+        kanji="団",
+        onyomi="ダン(呉)、トン(唐)、タン(漢)",
+        kunyomi="かたまり、まる.い",
     )
     print("Ok.")
 
