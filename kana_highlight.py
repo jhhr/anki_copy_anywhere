@@ -299,6 +299,14 @@ def main():
         onyomi="ダン(呉)、トン(唐)、タン(漢)",
         kunyomi="かたまり、まる.い",
     )
+    test(
+        test_name="Is able to match the same kanji occuring twice",
+        expected_result="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
+        sentence="新[しん] 内閣[ないかく]の 組閣[そかく]が 発表[はっぴょう]された。",
+        kanji="閣",
+        onyomi="カク(呉)",
+        kunyomi="たかどの、たな",
+    )
     print("Ok.")
 
 

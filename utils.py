@@ -4,6 +4,10 @@ from anki.cards import Card
 from aqt.utils import tooltip
 
 
+class CacheResults:
+    def __init__(self, result_text: str, changes):
+        self.result_text = result_text
+        self.changes = changes
 def write_custom_data(card: Card, key, value):
     if card.custom_data != "":
         custom_data = json.loads(card.custom_data)

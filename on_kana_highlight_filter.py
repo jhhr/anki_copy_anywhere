@@ -5,7 +5,7 @@ from anki.template import TemplateRenderContext
 from .kana_highlight import kana_highlight, kana_filter
 from .utils import filter_init
 
-VALID_ARGS = ["onyomi_field_name", "kunyomi_field_name", "kanji_field_name"]
+VALID_ARGS = ["onyomi_field", "kunyomi_field", "kanji_field"]
 
 
 def on_kana_highlight_filter(
@@ -14,9 +14,9 @@ def on_kana_highlight_filter(
     """
      The filter syntax is like this:
      {{kana_highlight[
-        onyomi_field_name='onyomi_field_name';
-        kunyomi_field_name='kunyomi_field_name';
-        kanji_field_name='kanji_field_name';
+        onyomi_field='onyomi_field';
+        kunyomi_field='kunyomi_field';
+        kanji_field='kanji_field';
      ]:Field}}
         where kanji_to_highlight is the kanji that will be highlighted in the text
         gotten from Field.
@@ -32,19 +32,19 @@ def on_kana_highlight_filter(
 
     args_dict, is_cache, show_error_message = filter_init("kana_highlight", VALID_ARGS, filter_str, context)
 
-    onyomi_field_name, kunyomi_field_name, kanji_field_name = itemgetter(
-        "onyomi_field_name", "kunyomi_field_name", "kanji_field_name")(args_dict)
+    onyomi_field, kunyomi_field, kanji_field = itemgetter(
+        "onyomi_field", "kunyomi_field", "kanji_field")(args_dict)
 
-    if onyomi_field_name is None:
-        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'onyomi_field_name'")
+    if onyomi_field is None:
+        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'onyomi_field'")
         return kana_filter(text)
 
-    if kunyomi_field_name is None:
-        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'kunyomi_field_name'")
+    if kunyomi_field is None:
+        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'kunyomi_field'")
         return kana_filter(text)
 
-    if kanji_field_name is None:
-        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'kanji_field_name'")
+    if kanji_field is None:
+        show_error_message(f"Error in 'kana_highlight[]' field args: Missing 'kanji_field'")
         return kana_filter(text)
 
     note = context.card().note()
@@ -53,11 +53,11 @@ def on_kana_highlight_filter(
     onyomi = None
     kunyomi = None
     for name, field_text in note.items():
-        if name == kanji_field_name:
+        if name == kanji_field:
             kanji_to_highlight = field_text
-        if name == onyomi_field_name:
+        if name == onyomi_field:
             onyomi = field_text
-        if name == kunyomi_field_name:
+        if name == kunyomi_field:
             kunyomi = field_text
         if kanji_to_highlight and onyomi and kunyomi:
             break

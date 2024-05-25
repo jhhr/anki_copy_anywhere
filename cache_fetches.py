@@ -13,13 +13,7 @@ from aqt.qt import QWidget
 from aqt.utils import tooltip
 
 from .configuration import Config
-
-
-class CacheResults:
-    def __init__(self, result_text: str, changes):
-        self.result_text = result_text
-        self.changes = changes
-
+from .utils import CacheResults
 
 # regex pattern to identify {{fetch=[...]}} calls in template
 ANY_OTHER_STUFF = r'(?:[^}{])*?'
@@ -258,8 +252,8 @@ def cache_fetches_in_background(
                     max=total_cards_count,
                 )
             )
-            if mw.progress.want_cancel():
-                break
+        if mw.progress.want_cancel():
+            break
 
     return CacheResults(
         result_text=f"{result_text + '<br>' if result_text != '' else ''}{card_cnt} cards' fetches cached",
@@ -273,7 +267,6 @@ def cache_fetches(did=None, card_ids=None, result_text="", from_menu=False, pare
     def on_done(cache_results):
         mw.progress.finish()
         tooltip(f"{cache_results.result_text} in {time.time() - start_time:.2f} seconds", parent=parent, period=5000)
-        # mw.reset()
 
     return (
         CollectionOp(
@@ -281,6 +274,5 @@ def cache_fetches(did=None, card_ids=None, result_text="", from_menu=False, pare
             op=lambda col: cache_fetches_in_background(did, card_ids, result_text, from_menu),
         )
         .success(on_done)
-        # .with_progress("Fetch Field Result Caching")
         .run_in_background()
     )

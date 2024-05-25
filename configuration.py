@@ -1,10 +1,8 @@
+from typing import TypedDict
+
 from aqt import mw
 
 tag = mw.addonManager.addonFromModule(__name__)
-
-DAYS_TO_CACHE_FIELDS_MENU = "days_to_cache_fields_menu"
-DAYS_TO_CACHE_FIELDS_AUTO = "days_to_cache_fields_auto"
-CACHE_NEW_CARDS_COUNT = "cache_new_cards_count"
 
 
 def load_config():
@@ -16,7 +14,29 @@ def save_config(data):
 
 
 def run_on_configuration_change(function):
-    mw.addonManager.setConfigUpdatedAction(__name__, lambda *_: function())
+    mw.addonManager.setConfigUpdatadAction(__name__, lambda *_: function())
+
+
+class KanaHighlightProcess(TypedDict):
+    name: str
+    onyomi_field: str
+    kunyomi_field: str
+    kanji_field: str
+
+
+class CopyDefinition(TypedDict):
+    definition_name: str
+    copy_into_note_type: str
+    copy_into_note_field: str
+    search_with_field: str
+    only_copy_into_decks: str
+    copy_from_cards_query: str
+    copy_from_field: str
+    copy_if_empty: bool
+    select_card_by: str
+    select_card_count: int
+    select_card_separator: str
+    process_chain: list[KanaHighlightProcess]
 
 
 class Config:
@@ -28,27 +48,61 @@ class Config:
 
     @property
     def days_to_cache_fields_menu(self):
-        return self.data[DAYS_TO_CACHE_FIELDS_MENU]
+        return self.data["days_to_cache_fields_menu"]
 
     @days_to_cache_fields_menu.setter
     def days_to_cache_fields_menu(self, value):
-        self.data[DAYS_TO_CACHE_FIELDS_MENU] = value
+        self.data["days_to_cache_fields_menu"] = value
         self.save()
 
     @property
     def days_to_cache_fields_auto(self):
-        return self.data[DAYS_TO_CACHE_FIELDS_AUTO]
+        return self.data["days_to_cache_fields_auto"]
 
     @days_to_cache_fields_auto.setter
     def days_to_cache_fields_auto(self, value):
-        self.data[DAYS_TO_CACHE_FIELDS_AUTO] = value
+        self.data["days_to_cache_fields_auto"] = value
         self.save()
 
     @property
     def cache_new_cards_count(self):
-        return self.data[CACHE_NEW_CARDS_COUNT]
+        return self.data["cache_new_cards_count"]
 
     @cache_new_cards_count.setter
     def cache_new_cards_count(self, value):
-        self.data[CACHE_NEW_CARDS_COUNT] = value
+        self.data["cache_new_cards_count"] = value
+        self.save()
+
+    @property
+    def copy_definitions(self):
+        return self.data["copy_definitions"] or []
+
+    def get_definition_by_name(self, name) -> dict:
+        # find the definition in the list of definitions
+        for definition in self.data["copy_definitions"]:
+            if definition["definition_name"] == name:
+                return definition
+
+    def add_definition(self, definition: CopyDefinition):
+        self.data["copy_definitions"].append(definition)
+        self.save()
+
+    def remove_definition_by_name(self, name: str):
+        definition = self.get_definition_by_name(name)
+        if definition:
+            self.data["copy_definitions"].remove(definition)
+            self.save()
+
+    def remove_definition_by_index(self, index: int):
+        self.data["copy_definitions"].pop(index)
+        self.save()
+
+    def update_definition_by_name(self, name: str, definition: dict):
+        for index, definition in enumerate(self.data["copy_definitions"]):
+            if definition["definition_name"] == name:
+                self.update_definition_by_index(index, definition)
+                break
+
+    def update_definition_by_index(self, index: int, definition: dict):
+        self.data["copy_definitions"][index] = definition
         self.save()
