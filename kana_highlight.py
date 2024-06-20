@@ -52,11 +52,14 @@ FURIGANA_REC = re.compile(rf"{FURIGANA_RE}")
 KANJI_AND_FURIGANA_RE = "([々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]"
 KANJI_AND_FURIGANA_REC = re.compile(rf"{KANJI_AND_FURIGANA_RE}")
 
+
 def re_match_from_right(text):
     return re.compile(rf"(.*)({text})(.*?)$")
 
+
 def re_match_from_left(text):
     return re.compile(rf"^(.*?)({text})(.*)$")
+
 
 def re_match_from_middle(text):
     return re.compile(rf"^(.*?)({text})(.*?)$")
@@ -65,18 +68,40 @@ def re_match_from_middle(text):
 # Regex for lone kanji with some hiragana to their right, then some kanji,
 # then furigana that includes the hiragana in the middle
 # This is used to match cases of furigana used for　kunyomi compound words with
-# okurigana in the middle like 消え去る[きえさ]る
-OKURIGANA_MIX_CLEANING_RE = re.compile(rf"{KANJI_RE}([ぁ-ん]+){KANJI_RE}\[(.+?)\2(.+?)\]")
+# okurigana in the middle. For example
+# (1) 消え去[きえさ]る
+# (2)隣り合わせ[となりあわせ]
+OKURIGANA_MIX_CLEANING_RE = re.compile(rf"""
+{KANJI_RE}  # match group 1, kanji　(1)消　(2)隣
+([ぁ-ん]+)   # match group 2, hiragana (1)え　(2)り
+{KANJI_RE}  # match group 3, kanji (1)去　(2)合
+([ぁ-ん]*)   # match group 4, potential hiragana (1)nothing　(2)わせ
+\[          # opening bracket of furigana
+(.+?)       # match group 5, furigana for kanji in group 1 (1)きえ　(2)となり
+\2          # group 2 occuring again (1)え　(2)り
+(.+?)       # match group 6, furigana for kanji in group 3 (1)さ　(2)あわせ
+\4          # group 4 occuring again (if present) (1)nothing　(2)わせ
+\]          # closing bracket of furigana
+""", re.VERBOSE)
 
 
 def okurigana_mix_cleaning_replacer(match):
     """
     re.sub replacer function for OKURIGANA_MIX_CLEANING_RE when it's only needed to
     clean the kanji and leave the furigana. The objective is to turn the hard to process
-    case into a normal case, so 消え去る[きえさ]る becomes 消[き]え去[さ]る
+    case into a normal case. For example:
+    (1) 消え去る[きえさ]る becomes 消[き]え去[さ]る
+    (2) 隣り合わせ[となりあわせ] becomes 隣[とな]り合[あ]わせ
     """
-    return f'{match.group(1)}[{match.group(4)}]{match.group(2)}{match.group(3)}[{match.group(5)}]'
+    kanji1 = match.group(1)  # first kanji
+    furigana1 = match.group(5)  # furigana for first kanji
+    hiragana1 = match.group(2)  # hiragana in the middle, after the first kanji
+    kanji2 = match.group(3)  # second kanji
+    furigana2 = match.group(6)  # furigana for second kanji
+    hiragana2 = match.group(4)  # potential hiragana at the end, after the second kanji
 
+    # Return the cleaned and restructured string
+    return f'{kanji1}[{furigana1}]{hiragana1}{kanji2}[{furigana2}]{hiragana2}'
 
 
 def onyomi_replacer(match):
@@ -291,13 +316,22 @@ def main():
         kunyomi="み.る"
     )
     test(
-        test_name="Should be able to clean furigana that bridges over some okurigana",
+        test_name="Should be able to clean furigana that bridges over some okurigana 1/2",
         expected_result="<b>ダン</b>ごが きえさった。",
-        # 消え去[きえさ]った　has え　in the middle of the kanji, causing the 消え part to be tricky
+        # 消え去[きえさ]った　has え　in the middle of the kanji but った at the end is not included in the furigana
         sentence="団子[だんご]が 消え去[きえさ]った。",
         kanji="団",
         onyomi="ダン(呉)、トン(唐)、タン(漢)",
         kunyomi="かたまり、まる.い",
+    )
+    test(
+        test_name="Should be able to clean furigana that bridges over some okurigana 2/2",
+        expected_result="<b>とな</b>りあわせのまち。",
+        # 隣り合わせ[となりあわせ]のまち　has り　in the middle and わせ　at the end of the group
+        sentence="隣り合わせ[となりあわせ]の町[まち]。",
+        kanji="隣",
+        onyomi="リン(呉)",
+        kunyomi="とな.る、となり",
     )
     test(
         test_name="Is able to match the same kanji occuring twice",
