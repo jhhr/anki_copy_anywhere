@@ -24,19 +24,22 @@ class KanaHighlightProcess(TypedDict):
     kanji_field: str
 
 
+class CopyFieldToField(TypedDict):
+    copy_into_note_field: str
+    copy_from_field: str
+    copy_if_empty: bool
+    process_chain: list[KanaHighlightProcess]
+
 class CopyDefinition(TypedDict):
     definition_name: str
     copy_into_note_type: str
-    copy_into_note_field: str
+    field_to_field_defs: list[CopyFieldToField]
     search_with_field: str
     only_copy_into_decks: str
     copy_from_cards_query: str
-    copy_from_field: str
-    copy_if_empty: bool
     select_card_by: str
     select_card_count: int
     select_card_separator: str
-    process_chain: list[KanaHighlightProcess]
 
 
 class Config:

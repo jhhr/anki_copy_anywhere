@@ -19,7 +19,7 @@ from aqt.qt import (
 )
 from aqt.utils import tooltip
 
-from .configuration import CopyDefinition, KanaHighlightProcess, Config
+from .configuration import CopyFieldToField, KanaHighlightProcess
 from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME
 
 if qtmajor > 5:
@@ -112,14 +112,15 @@ class KanaHighlightProcessDialog(QDialog):
 
 
 class EditExtraProcessingWidget(QWidget):
-    def __init__(self, parent, copydefinition: CopyDefinition):
+    def __init__(self, parent, copy_definition, field_to_field_def: CopyFieldToField):
         super().__init__(parent)
-        self.copydefinition = copydefinition
+        self.field_to_field_def = field_to_field_def
+        self.copy_definition = copy_definition
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
         self.process_dialogs = []
         try:
-            self.process_chain = copydefinition["process_chain"]
+            self.process_chain = field_to_field_def["process_chain"]
         except KeyError:
             self.process_chain = []
 
@@ -162,14 +163,11 @@ class EditExtraProcessingWidget(QWidget):
         self.update_process_chain()
 
     def update_process_chain(self, ):
-        self.copydefinition["process_chain"] = self.process_chain
-
+        self.field_to_field_def["process_chain"] = self.process_chain
         self.init_options_to_process_combobox()
 
-        config = Config()
-        config.load()
-        config.update_definition_by_name(self.copydefinition["definition_name"], self.copydefinition)
-        config.save()
+    def get_process_chain(self):
+        return self.process_chain
 
     def add_process_row(self, index, process):
         process_dialog, process_name = self.get_process_dialog_and_name(process)
@@ -237,7 +235,7 @@ class EditExtraProcessingWidget(QWidget):
             return None, ""
         if process_name == KANA_HIGHLIGHT_PROCESS_NAME:
             with suppress(KeyError):
-                note_type = self.copydefinition["copy_into_note_type"]
+                note_type = self.copy_definition["copy_into_note_type"]
             return KanaHighlightProcessDialog(
                 self,
                 process,

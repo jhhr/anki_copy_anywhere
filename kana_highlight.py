@@ -334,7 +334,7 @@ def main():
         kunyomi="とな.る、となり",
     )
     test(
-        test_name="Is able to match the same kanji occuring twice",
+        test_name="Is able to match the same kanji occurring twice",
         expected_result="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
         sentence="新[しん] 内閣[ないかく]の 組閣[そかく]が 発表[はっぴょう]された。",
         kanji="閣",
