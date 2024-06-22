@@ -6,7 +6,7 @@ from operator import itemgetter
 from typing import Callable
 
 from anki.cards import Card
-from anki.decks import DeckManager
+from anki.notes import Note
 from aqt import mw
 from aqt.operations import CollectionOp
 from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox
@@ -97,29 +97,25 @@ def copy_fields_in_backgrounds(
     """
     (
         copy_into_note_type,
-        copy_into_note_field,
         search_with_field,
+        field_to_field_defs,
         only_copy_into_decks,
         copy_from_cards_query,
-        copy_from_field,
-        copy_if_empty,
         select_card_by,
         select_card_count,
         select_card_separator,
-        process_chain,
     ) = itemgetter(
         "copy_into_note_type",
-        "copy_into_note_field",
         "search_with_field",
+        "field_to_field_defs",
         "only_copy_into_decks",
         "copy_from_cards_query",
-        "copy_from_field",
-        "copy_if_empty",
         "select_card_by",
         "select_card_count",
         "select_card_separator",
-        "process_chain",
     )(copy_definition)
+
+    print("copy_definition", copy_definition)
 
     undo_text = "Copy fields"
     if card_ids:
@@ -190,64 +186,82 @@ def copy_fields_in_backgrounds(
                 search_value = field_value
                 break
 
-        result_val = copy_fields_for_card(
+        extra_state = {}
+
+        # Step 1: get notes to copy from for this card
+        notes_to_copy_from = get_notes_to_copy_from(
             search_value=search_value,
-            copy_from_field=copy_from_field,
             copy_from_cards_query=copy_from_cards_query,
             card=card,
             is_cache=True,
-            extra_state={},
+            extra_state=extra_state,
             only_copy_into_decks=only_copy_into_decks,
             select_card_by=select_card_by,
             select_card_count=select_card_count,
-            select_card_separator=select_card_separator,
             show_error_message=show_error_message,
         )
-        # If we have further processing steps, run them
-        show_error_message(result_val)
-        if process_chain is not None:
-            for process in process_chain:
-                if process["name"] == KANA_HIGHLIGHT_PROCESS_NAME:
-                    result_val = kana_highlight_process(
-                        text=result_val,
-                        onyomi_field=process["onyomi_field"],
-                        kunyomi_field=process["kunyomi_field"],
-                        kanji_field=process["kanji_field"],
-                        is_cache=True,
-                        note=copy_into_note,
-                        show_error_message=show_error_message,
+        if len(notes_to_copy_from) == 0:
+            show_error_message(f"Error in copy fields: No notes to copy from for card {card.id}")
+
+        # Step 2: Get value for each field we are copying into
+        for field_to_field_def in field_to_field_defs:
+            copy_from_field = field_to_field_def["copy_from_field"]
+            copy_into_note_field = field_to_field_def["copy_into_note_field"]
+            copy_if_empty = field_to_field_def["copy_if_empty"]
+            process_chain = field_to_field_def.get("process_chain", None)
+
+            # Step 2.1: Get the value from the notes, usually it's just one note
+            result_val = get_field_values_from_notes(
+                copy_from_field=copy_from_field,
+                notes=notes_to_copy_from,
+                extra_state=extra_state,
+                select_card_separator=select_card_separator,
+                show_error_message=show_error_message,
+            )
+            # Step 2.2: If we have further processing steps, run them
+            if process_chain is not None:
+                for process in process_chain:
+                    if process["name"] == KANA_HIGHLIGHT_PROCESS_NAME:
+                        result_val = kana_highlight_process(
+                            text=result_val,
+                            onyomi_field=process["onyomi_field"],
+                            kunyomi_field=process["kunyomi_field"],
+                            kanji_field=process["kanji_field"],
+                            is_cache=True,
+                            note=copy_into_note,
+                            show_error_message=show_error_message,
+                        )
+                        show_error_message(result_val)
+
+            # Step 2.3: Set the value into the target note's field
+            try:
+                cache_field_ord = copy_into_note.keys().index(copy_into_note_field)
+
+                # only_empty can override the functionality of ignore_if_cached causing the card to be updated
+                # that's why the default only_empty is False and ignore_if_cached is True
+                if copy_if_empty and copy_into_note.fields[cache_field_ord] != "":
+                    break
+                copy_into_note.fields[cache_field_ord] = result_val
+                mw.col.update_note(copy_into_note)
+                # Set cache time into card.custom_data
+                write_custom_data(card, "fc", math.floor(time.time()))
+                mw.col.update_card(card)
+
+                mw.col.merge_undo_entries(undo_entry)
+                card_cnt += 1
+
+                if card_cnt % 10 == 0:
+                    mw.taskman.run_on_main(
+                        lambda: mw.progress.update(
+                            label=f"{card_cnt}/{total_cards_count} notes copied into",
+                            value=card_cnt,
+                            max=total_cards_count,
+                        )
                     )
-                    show_error_message(result_val)
-
-        # Set the value into the target note
-        try:
-            cache_field_ord = copy_into_note.keys().index(copy_into_note_field)
-
-            # only_empty can override the functionality of ignore_if_cached causing the card to be updated
-            # that's why the default only_empty is False and ignore_if_cached is True
-            if copy_if_empty and copy_into_note.fields[cache_field_ord] != "":
-                break
-            copy_into_note.fields[cache_field_ord] = result_val
-            mw.col.update_note(copy_into_note)
-            # Set cache time into card.custom_data
-            write_custom_data(card, "fc", math.floor(time.time()))
-            mw.col.update_card(card)
-
-            mw.col.merge_undo_entries(undo_entry)
-            card_cnt += 1
-
-            if card_cnt % 10 == 0:
-                mw.taskman.run_on_main(
-                    lambda: mw.progress.update(
-                        label=f"{card_cnt}/{total_cards_count} notes copied into",
-                        value=card_cnt,
-                        max=total_cards_count,
-                    )
-                )
-            if mw.progress.want_cancel():
-                break
-        except ValueError:
-            show_error_message(f"Error copy fields: a field '{copy_into_note_field}' was not found in note")
+                if mw.progress.want_cancel():
+                    break
+            except ValueError:
+                show_error_message(f"Error copy fields: a field '{copy_into_note_field}' was not found in note")
 
     return CacheResults(
         result_text=f"{result_text + '<br>' if result_text != '' else ''}{card_cnt} cards' copied into",
@@ -255,9 +269,8 @@ def copy_fields_in_backgrounds(
     )
 
 
-def copy_fields_for_card(
+def get_notes_to_copy_from(
         search_value: str,
-        copy_from_field: str,
         copy_from_cards_query: str,
         select_card_by: str,
         card: Card,
@@ -265,27 +278,38 @@ def copy_fields_for_card(
         extra_state: dict,
         only_copy_into_decks: str = None,
         select_card_count: str = '1',
-        select_card_separator: str = ', ',
         show_error_message: Callable[[str], None] = None,
-) -> str:
+) -> list[Note]:
+    """
+    Get the notes to copy from based on the search value and the query.
+    :param search_value: The value to include in copy_from_cards_query if it contains the
+            $SEARCH_FIELD_VALUE_PLACEHOLDER$ placeholder
+    :param copy_from_cards_query: The query to find the cards to copy from
+    :param select_card_by: How to select the card to copy from, if we get multiple results using the
+            the query
+    :param card: The card we are copying into
+    :param is_cache: Whether this is a cache operation or not.
+    :param extra_state: A dictionary to store cached values to re-use in subsequent calls of this function
+    :param only_copy_into_decks: A comma separated whitelist of deck names. Limits the cards to copy from
+            to only those in the decks in the whitelist
+    :param select_card_count: How many cards to select from the query. Default is 1
+    :param show_error_message: A function to show error messages, used for storing all messages until the
+            end of the whole operation to show them in a GUI element at the end
+    :return: A list of notes to copy from
+    """
     if not show_error_message:
         def show_error_message(message: str):
             print(message)
 
-    if copy_from_field is None:
-        show_error_message(
-            "Error in copy fields: Required value 'copy_from_field' was missing.",
-        )
-        return ''
-
     if select_card_by is None:
-        show_error_message(f"Error in copy fields: Required value 'select_card_by' was missing.")
-        return ''
-    elif select_card_by not in PICK_CARD_BY_VALID_VALUES:
+        show_error_message("Error in copy fields: Required value 'select_card_by' was missing.")
+        return []
+
+    if select_card_by not in PICK_CARD_BY_VALID_VALUES:
         show_error_message(
             f"Error in copy fields: incorrect 'select_card_by' value '{select_card_by}'. It must be one of {PICK_CARD_BY_VALID_VALUES}",
         )
-        return ''
+        return []
 
     if select_card_count:
         try:
@@ -296,13 +320,11 @@ def copy_fields_for_card(
             show_error_message(
                 f"Error in copy fields: Incorrect 'select_card_count' value '{select_card_count}' value must be a positive integer"
             )
-            return ''
+            return []
     else:
         select_card_count = 1
 
-    DM = DeckManager(mw.col)
-
-    if only_copy_into_decks is not None:
+    if only_copy_into_decks not in [None, "-"]:
         # Check if the current deck is in the white list, otherwise we don't fetch
         cur_deck_id = card.odid or card.did
         # whitelist deck is a list of deck or sub deck names
@@ -315,10 +337,7 @@ def copy_fields_for_card(
         ]
         whitelist_dids = set(whitelist_dids)
         if cur_deck_id not in whitelist_dids:
-            return ''
-
-    if select_card_separator is None:
-        select_card_separator = ", "
+            return []
 
     # Check for cached result again
     if SEARCH_FIELD_VALUE_PLACEHOLDER in copy_from_cards_query:
@@ -338,31 +357,21 @@ def copy_fields_for_card(
             # Set cache time into card.customData, so we don't keep querying this again
             write_custom_data(card, "fc", math.floor(time.time()))
             mw.col.update_card(card)
-        return ''
+        return []
 
     # select a card or cards based on the select_card_by value
-    selected_card_ids = []
-    result_val = ""
+    selected_notes = []
     for i in range(select_card_count):
-        # remove already selected cards from cards
         selected_card_id = None
-        selected_value = ""
-        # We don't make this key entirely unique as we want to cache the selected card for the same deck_id and
-        # from_note_type_id combination, so that getting a different field from the same card type will still return the same card
+        # We don't make this key entirely unique as we want to cache the selected card for the same
+        # deck_id and from_note_type_id combination, so that getting a different field from the same
+        # card type will still return the same card
         card_select_key = base64.b64encode(
             f"selected_card{copy_from_cards_query}{select_card_by}{i}".encode()).decode()
 
         if select_card_by == 'Random':
             # We don't want to cache this as it should in fact be different each time
             selected_card_id = random.choice(card_ids)
-        elif select_card_by == 'Random_stable':
-            # pick the same random card for the same deck_id and from_note_type_id combination
-            # this will still work for select_card_count as we're caching the selected card by the index too
-            try:
-                selected_card_id = extra_state[card_select_key]
-            except KeyError:
-                selected_card_id = random.choice(card_ids)
-                extra_state[card_select_key] = selected_card_id
         elif select_card_by == 'Least_reps':
             # Loop through cards and find the one with the least reviews
             # Check cache first
@@ -377,30 +386,75 @@ def copy_fields_for_card(
             show_error_message("Error in copy fields: could not select card")
             break
 
-        selected_card_ids.append(selected_card_id)
         # Remove selected card so it can't be picked again
         card_ids = [c for c in card_ids if c != selected_card_id]
         selected_note_id = mw.col.get_card(selected_card_id).nid
 
+        selected_note = mw.col.get_note(selected_note_id)
+        selected_notes.append(selected_note)
+
+        # If we've run out of cards, stop and return what we got
+        if len(card_ids) == 0:
+            break
+
+    return selected_notes
+
+
+def get_field_values_from_notes(
+        copy_from_field: str,
+        notes: list[Note],
+        extra_state: dict,
+        select_card_separator: str = ', ',
+        show_error_message: Callable[[str], None] = None,
+) -> str:
+    """
+    Get the value from the field in the selected notes gotten with get_notes_to_copy_from.
+    :param copy_from_field: The field to get the value from
+    :param notes: The selected notes to get the value from
+    :param extra_state: A dictionary to store cached values to re-use in subsequent calls of this function
+    :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
+            if there is only one note
+    :param show_error_message: A function to show error messages, used for storing all messages until the
+            end of the whole operation to show them in a GUI element at the end
+    :return: String with the values from the field in the notes
+    """
+    if not show_error_message:
+        def show_error_message(message: str):
+            print(message)
+
+    if copy_from_field is None:
+        show_error_message(
+            "Error in copy fields: Required value 'copy_from_field' was missing.",
+        )
+        return ""
+
+    if select_card_separator is None:
+        select_card_separator = ", "
+
+    result_val = ""
+    for i, note in enumerate(notes):
+        selected_note_id = note.id
+
         show_error_message(f"copy_from_field: {copy_from_field}, selected_note_id: {selected_note_id}")
-        # And finally, return the value from the field in the note
+
+        # Return the value from the field in the note
         # Check for cached result again
         result_val_key = base64.b64encode(f"{selected_note_id}{copy_from_field}{i}".encode()).decode()
         try:
             selected_value = extra_state[result_val_key]
         except KeyError:
             selected_value = ""
-            selected_note = mw.col.get_note(selected_note_id)
-            for field_name, field_value in selected_note.items():
+            for field_name, field_value in note.items():
                 # THe copy_from_field comes from a combox which apparently adds some extra whitespace chars
                 if field_name == copy_from_field.strip():
                     selected_value = field_value
                     break
+            if selected_value == "":
+                show_error_message(
+                    f"Error in copy fields: Field '{copy_from_field}' not found in note with id {selected_note_id}")
+            extra_state[result_val_key] = selected_value
+
 
         result_val += f"{select_card_separator if i > 0 else ''}{selected_value}"
-
-        # If we've run out of cards, stop and return what we got
-        if len(card_ids) == 0:
-            break
 
     return result_val
