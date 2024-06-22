@@ -263,6 +263,8 @@ def copy_fields_in_backgrounds(
             except ValueError:
                 show_error_message(f"Error copy fields: a field '{copy_into_note_field}' was not found in note")
 
+        card_cnt += 1
+
     return CacheResults(
         result_text=f"{result_text + '<br>' if result_text != '' else ''}{card_cnt} cards' copied into",
         changes=mw.col.merge_undo_entries(undo_entry),
