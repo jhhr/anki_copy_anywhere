@@ -115,8 +115,6 @@ def copy_fields_in_backgrounds(
         "select_card_separator",
     )(copy_definition)
 
-    print("copy_definition", copy_definition)
-
     undo_text = "Copy fields"
     if card_ids:
         undo_text += f" for selected {len(card_ids)} cards"
@@ -248,7 +246,6 @@ def copy_fields_in_backgrounds(
                 mw.col.update_card(card)
 
                 mw.col.merge_undo_entries(undo_entry)
-                card_cnt += 1
 
                 if card_cnt % 10 == 0:
                     mw.taskman.run_on_main(
