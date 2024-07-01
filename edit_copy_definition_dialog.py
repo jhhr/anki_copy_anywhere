@@ -213,8 +213,6 @@ class CopyFieldToFieldEditor(QWidget):
         self.copy_field_inputs.append(copy_field_inputs_dict)
 
         def remove_row():
-            self.field_target_cboxes.remove(field_target_cbox)
-            self.copy_from_field_cboxes.remove(copy_from_field_cbox)
             for widget in [
                 field_target_cbox,
                 copy_from_field_cbox,
@@ -225,7 +223,7 @@ class CopyFieldToFieldEditor(QWidget):
                 widget.deleteLater()
                 row_form.removeWidget(widget)
                 widget = None
-            self.middle_grid.removeWidget(row_form)
+            self.middle_grid.removeWidget(frame)
             self.remove_definition(index)
 
         remove_button.clicked.connect(remove_row)
