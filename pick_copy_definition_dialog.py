@@ -189,6 +189,7 @@ class PickCopyDefinitionDialog(QDialog):
                 "select_card_by": dialog.card_select_cbox.currentText(),
                 "select_card_count": dialog.card_select_count.text(),
                 "select_card_separator": dialog.card_select_separator.text(),
+                "copy_on_sync": dialog.copy_on_sync.isChecked(),
             }
             if index is None:
                 config.add_definition(copy_definition)

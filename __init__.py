@@ -13,6 +13,7 @@ from .on_fetch_filter import on_fetch_filter
 from .on_kana_highlight_filter import on_kana_highlight_filter
 from .pick_copy_definition_dialog import show_copy_dialog
 from .reset_custom_data import reset_custom_data
+from .sync_hook import init_sync_hook
 
 hooks.field_filter.append(on_fetch_filter)
 hooks.field_filter.append(on_cache_filter)
@@ -120,3 +121,5 @@ def setup_copy_fields_menu(browser):
 
 
 browser_menus_did_init.append(setup_copy_fields_menu)
+
+init_sync_hook()

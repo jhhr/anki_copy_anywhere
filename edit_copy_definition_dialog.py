@@ -9,6 +9,7 @@ from aqt.qt import (
     QDialog,
     QComboBox,
     QScrollArea,
+    QGuiApplication,
     QFormLayout,
     QLineEdit,
     QPushButton,
@@ -37,8 +38,6 @@ else:
     WindowModal = Qt.WindowModal
     QFrameStyledPanel = QFrame.StyledPanel
     QFrameShadowRaised = QFrame.Raised
-
-from PyQt6.QtGui import QGuiApplication
 
 
 class ScrollableQDialog(QDialog):
@@ -360,6 +359,10 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.card_select_separator.setText(", ")
         self.form.addRow("Separator for multiple values (optional)", self.card_select_separator)
 
+        self.copy_on_sync = QCheckBox()
+        self.copy_on_sync.setChecked(False)
+        self.form.addRow("Copy fields on sync for reviewed cards", self.copy_on_sync)
+
         self.bottom_vbox = QVBoxLayout()
         self.main_layout.addLayout(self.bottom_vbox)
         self.copy_fields_label = QLabel("Fields to copy from and to")
@@ -378,6 +381,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             with suppress(KeyError): self.card_select_cbox.setCurrentText(copy_definition["select_card_by"])
             with suppress(KeyError): self.card_select_count.setText(copy_definition["select_card_count"])
             with suppress(KeyError): self.card_select_separator.setText(copy_definition["select_card_separator"])
+            with suppress(KeyError): self.copy_on_sync.setChecked(copy_definition["copy_on_sync"])
 
         # Connect signals
         self.note_type_target_cbox.currentTextChanged.connect(

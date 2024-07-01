@@ -32,6 +32,7 @@ class CopyFieldToField(TypedDict):
 
 class CopyDefinition(TypedDict):
     definition_name: str
+    copy_on_sync: bool
     copy_into_note_type: str
     field_to_field_defs: list[CopyFieldToField]
     search_with_field: str

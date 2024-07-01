@@ -7,9 +7,10 @@ from typing import Callable
 
 from anki.cards import Card
 from anki.notes import Note
+from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
-from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox
+from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiApplication
 from aqt.utils import tooltip
 
 from .configuration import CopyDefinition
@@ -32,7 +33,11 @@ class ScrollMessageBox(QMessageBox):
         for item in l:
             lay.addWidget(QLabel(item, self))
         self.layout().addWidget(scroll, 0, 0, 1, self.layout().columnCount())
-        self.setStyleSheet("QScrollArea{min-width:300 px; min-height: 400px}")
+        # Get the screen size
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+
+        # Set the initial size to a percentage of the screen size
+        self.resize(screen.width() * 0.6, screen.height() * 0.95)
 
 
 def get_ord_from_model(model, fld_name):
@@ -50,6 +55,7 @@ def copy_fields(
         card_ids=None,
         result_text: str = "",
         parent=None,
+        is_sync: bool = False,
 ):
     start_time = time.time()
     debug_text = ""
@@ -62,17 +68,19 @@ def copy_fields(
     def on_done(copy_results):
         mw.progress.finish()
         tooltip(f"{copy_results.result_text} in {time.time() - start_time:.2f} seconds", parent=parent, period=5000)
-        # For finding sentences to debug
-        ScrollMessageBox.information(parent, "Debug results", debug_text)
+        if not is_sync:
+            # For finding sentences to debug
+            ScrollMessageBox.information(parent, "Debug results", debug_text)
 
     return (
         CollectionOp(
             parent=parent,
-            op=lambda col: copy_fields_in_backgrounds(
+            op=lambda col: copy_fields_in_background(
                 copy_definition=copy_definition,
                 card_ids=card_ids,
                 result_text=result_text,
                 show_message=show_error_message,
+                is_sync=is_sync,
             ),
         )
         .success(on_done)
@@ -80,11 +88,12 @@ def copy_fields(
     )
 
 
-def copy_fields_in_backgrounds(
+def copy_fields_in_background(
         copy_definition: CopyDefinition,
         card_ids=None,
         result_text: str = "",
         show_message: Callable[[str], None] = None,
+        is_sync: bool = False,
 ):
     """
     Function run to copy stuff into many notes at once.
@@ -93,7 +102,8 @@ def copy_fields_in_backgrounds(
        the copy_definition
     :param result_text: Text to be appended to and shown in the final result tooltip
     :param show_message: Function to show error messages
-    :return:
+    :param is_sync: Whether this is a sync operation or not
+    :return: CacheResults object
     """
     (
         copy_into_note_type,
@@ -121,6 +131,11 @@ def copy_fields_in_backgrounds(
 
     undo_entry = mw.col.add_custom_undo_entry(undo_text)
 
+    results = CacheResults(
+        result_text="",
+        changes=mw.col.merge_undo_entries(undo_entry),
+    )
+
     mw.taskman.run_on_main(
         lambda: mw.progress.start(
             label="Copying into fields", max=0, immediate=False
@@ -140,29 +155,52 @@ def copy_fields_in_backgrounds(
 
     if search_with_field is None:
         show_error_message("Error in copy fields: Required 'search_with_field' value was missing")
-        return ''
+        return results
 
     # Get from_note_type_id either directly or through copy_into_note_type
     if copy_into_note_type is None:
         show_error_message(
             f"Error in copy fields: Note type for copy_into_note_type '{copy_into_note_type}' not found, check your spelling",
         )
-        return ''
+        return results
     elif card_ids is None:
         show_error_message(
             "Error in copy fields: Both 'card_ids' and 'copy_into_note_type' were missing. Either one is required")
-        return ''
+        return results
 
-    # Get all cards of the target note type
+    # Get cards of the target note type
     if card_ids is not None:
-        cards = [mw.col.get_card(card_id) for card_id in card_ids]
+        # If we received a list of ids, we need to filter them by the note type
+        # as this could include cards of different note types
+        # We'll need to all note_ids as mid is not available in the card object, only in the note
+        note_ids = mw.col.find_notes(f'"note:{copy_into_note_type}"')
+        if len(note_ids) == 0:
+            show_error_message(
+                f"Error in copy fields: Did not find any notes of note type '{copy_into_note_type}'")
+            return results
+
+        note_ids_str = ids2str(note_ids)
+        card_ids_str = ids2str(card_ids)
+
+        filtered_card_ids = mw.col.db.list(f"""
+            SELECT id
+            FROM cards
+            WHERE nid IN {note_ids_str}
+            {f"AND id IN {card_ids_str}" if len(card_ids) > 0 else ""}
+            {"AND json_extract(json_extract(data, '$.cd'), '$.fc') == 0" if is_sync else ""}
+        """)
+
+        cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
     else:
-        card_ids = mw.col.find_cards(f'"note:{copy_into_note_type}"')
-        cards = [mw.col.get_card(card_id) for card_id in card_ids]
-        if len(cards) == 0:
+        # Otherwise, get all cards of the note type
+        card_ids = mw.col.find_cards(f'"note:{copy_into_note_type}" {"prop:cdn:fc=0" if is_sync else ""}')
+        if not is_sync and len(card_ids) == 0:
             show_error_message(
                 f"Error in copy fields: Did not find any cards of note type '{copy_into_note_type}'")
-            return ''
+            return results
+
+        cards = [mw.col.get_card(card_id) for card_id in card_ids]
+
 
     total_cards_count = len(cards)
 
@@ -262,10 +300,8 @@ def copy_fields_in_backgrounds(
 
         card_cnt += 1
 
-    return CacheResults(
-        result_text=f"{result_text + '<br>' if result_text != '' else ''}{card_cnt} cards' copied into",
-        changes=mw.col.merge_undo_entries(undo_entry),
-    )
+    results.set_result_text(f"{result_text + '<br>' if result_text != '' else ''}{card_cnt} cards' copied into")
+    return results
 
 
 def get_notes_to_copy_from(
@@ -433,8 +469,6 @@ def get_field_values_from_notes(
     result_val = ""
     for i, note in enumerate(notes):
         selected_note_id = note.id
-
-        show_error_message(f"copy_from_field: {copy_from_field}, selected_note_id: {selected_note_id}")
 
         # Return the value from the field in the note
         # Check for cached result again

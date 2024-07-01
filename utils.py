@@ -8,6 +8,9 @@ class CacheResults:
     def __init__(self, result_text: str, changes):
         self.result_text = result_text
         self.changes = changes
+
+    def set_result_text(self, result_text):
+        self.result_text = result_text
 def write_custom_data(card: Card, key, value):
     if card.custom_data != "":
         custom_data = json.loads(card.custom_data)
