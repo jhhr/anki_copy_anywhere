@@ -8,6 +8,7 @@ from aqt.qt import (
     QLabel,
     QDialog,
     QComboBox,
+    QScrollArea,
     QFormLayout,
     QLineEdit,
     QPushButton,
@@ -37,6 +38,30 @@ else:
     QFrameStyledPanel = QFrame.StyledPanel
     QFrameShadowRaised = QFrame.Raised
 
+from PyQt6.QtGui import QGuiApplication
+
+
+class ScrollableQDialog(QDialog):
+    def __init__(self, parent=None, footer_layout=None):
+        super().__init__(parent)
+        self.layout = QVBoxLayout(self)
+
+        self.scrollArea = QScrollArea(self)
+        self.layout.addWidget(self.scrollArea)
+        self.scrollArea.setWidgetResizable(True)
+
+        self.innerWidget = QWidget()
+        self.scrollArea.setWidget(self.innerWidget)
+
+        # Get the screen size
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+
+        # Set the initial size to a percentage of the screen size
+        self.resize(screen.width() * 0.6, screen.height() * 0.95)
+
+        # Add footer to the main layout
+        if footer_layout:
+            self.layout.addLayout(footer_layout)
 
 class GroupedComboBox(QComboBox):
     def __init__(self, parent=None):
@@ -253,14 +278,29 @@ class CopyFieldToFieldEditor(QWidget):
             field_target_cbox.setCurrentText(previous_text)
 
 
-class EditCopyDefinitionDialog(QDialog):
+class EditCopyDefinitionDialog(ScrollableQDialog):
     """
     Class for the dialog box to choose decks and note fields, has to be in a class so that the functions that update
     the dropdown boxes can access the text chosen in the other dropdown boxes.
     """
 
     def __init__(self, parent, copy_definition):
-        super().__init__(parent)
+        # Define Ok and Cancel buttons as QPushButtons
+        self.ok_button = QPushButton("Save")
+        self.close_button = QPushButton("Cancel")
+
+        self.ok_button.clicked.connect(self.check_fields)
+        self.close_button.clicked.connect(self.reject)
+
+        self.bottom_grid = QGridLayout()
+        self.bottom_grid.setColumnMinimumWidth(0, 150)
+        self.bottom_grid.setColumnMinimumWidth(1, 150)
+        self.bottom_grid.setColumnMinimumWidth(2, 150)
+
+        self.bottom_grid.addWidget(self.ok_button, 0, 0)
+        self.bottom_grid.addWidget(self.close_button, 0, 2)
+
+        super().__init__(parent, footer_layout=self.bottom_grid)
         self.copy_definition = copy_definition
 
         # Get the names of all the decks
@@ -276,7 +316,7 @@ class EditCopyDefinitionDialog(QDialog):
 
         # Build form layout
         self.setWindowModality(WindowModal)
-        self.main_layout = QVBoxLayout()
+        self.main_layout = QVBoxLayout(self.innerWidget)
         self.setLayout(self.main_layout)
         self.form = QFormLayout()
         self.main_layout.addLayout(self.form)
@@ -345,21 +385,6 @@ class EditCopyDefinitionDialog(QDialog):
         self.note_type_target_cbox.currentTextChanged.connect(
             self.update_note_target_field_items_and_target_limit_decks)
 
-        # Add Ok and Cancel buttons as QPushButtons
-        self.ok_button = QPushButton("Save")
-        self.close_button = QPushButton("Cancel")
-
-        self.ok_button.clicked.connect(self.check_fields)
-        self.close_button.clicked.connect(self.reject)
-
-        self.bottom_grid = QGridLayout()
-        self.bottom_grid.setColumnMinimumWidth(0, 150)
-        self.bottom_grid.setColumnMinimumWidth(1, 150)
-        self.bottom_grid.setColumnMinimumWidth(2, 150)
-        self.main_layout.addLayout(self.bottom_grid)
-
-        self.bottom_grid.addWidget(self.ok_button, 0, 0)
-        self.bottom_grid.addWidget(self.close_button, 0, 2)
 
     def check_fields(self):
         show_error = False
