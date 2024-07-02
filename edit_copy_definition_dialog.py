@@ -62,6 +62,7 @@ class ScrollableQDialog(QDialog):
         if footer_layout:
             self.layout.addLayout(footer_layout)
 
+
 class GroupedComboBox(QComboBox):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -192,9 +193,9 @@ class CopyFieldToFieldEditor(QWidget):
         with suppress(KeyError):
             copy_from_field_cbox.setCurrentText(copy_field_to_field_definition["copy_from_field"])
 
-        copy_if_empty = QCheckBox()
+        copy_if_empty = QCheckBox("Only copy into field, if it's empty")
         copy_field_inputs_dict["copy_if_empty"] = copy_if_empty
-        row_form.addRow("Only copy into field, if it's empty", copy_if_empty)
+        row_form.addRow("", copy_if_empty)
         with suppress(KeyError):
             copy_if_empty.setChecked(copy_field_to_field_definition["copy_if_empty"])
 
@@ -359,15 +360,14 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.card_select_separator.setText(", ")
         self.form.addRow("Separator for multiple values (optional)", self.card_select_separator)
 
-        self.copy_on_sync = QCheckBox()
+        self.copy_on_sync = QCheckBox("Copy fields on sync for reviewed cards")
         self.copy_on_sync.setChecked(False)
-        self.form.addRow("Copy fields on sync for reviewed cards", self.copy_on_sync)
+        self.form.addRow("", self.copy_on_sync)
 
         self.bottom_vbox = QVBoxLayout()
         self.main_layout.addLayout(self.bottom_vbox)
-        self.copy_fields_label = QLabel("Fields to copy from and to")
+        self.bottom_vbox.addWidget(QLabel("Fields to copy from and to"))
         self.field_to_field_editor = CopyFieldToFieldEditor(self, copy_definition)
-        self.bottom_vbox.addWidget(self.copy_fields_label)
         self.bottom_vbox.addWidget(self.field_to_field_editor)
 
         # Set the current text in the combo boxes to what we had in memory in the configuration (if we had something)
@@ -386,7 +386,6 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         # Connect signals
         self.note_type_target_cbox.currentTextChanged.connect(
             self.update_note_target_field_items_and_target_limit_decks)
-
 
     def check_fields(self):
         show_error = False
