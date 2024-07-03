@@ -13,7 +13,11 @@ from aqt.operations import CollectionOp
 from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiApplication
 from aqt.utils import tooltip
 
-from .configuration import CopyDefinition
+from .configuration import (
+    CopyDefinition,
+    COPY_MODE_WITHIN_NOTE,
+    COPY_MODE_ACROSS_NOTES,
+)
 from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME, kana_highlight_process
 from .utils import write_custom_data, CacheResults
 
@@ -114,6 +118,7 @@ def copy_fields_in_background(
         select_card_by,
         select_card_count,
         select_card_separator,
+        copy_mode,
     ) = itemgetter(
         "copy_into_note_type",
         "search_with_field",
@@ -123,6 +128,7 @@ def copy_fields_in_background(
         "select_card_by",
         "select_card_count",
         "select_card_separator",
+        "copy_mode"
     )(copy_definition)
 
     undo_text = "Copy fields"
@@ -153,7 +159,7 @@ def copy_fields_in_background(
         def show_error_message(message: str):
             show_message(f"\n{card_cnt}--{message}")
 
-    if search_with_field is None:
+    if search_with_field is None and copy_mode == COPY_MODE_ACROSS_NOTES:
         show_error_message("Error in copy fields: Required 'search_with_field' value was missing")
         return results
 
@@ -225,17 +231,25 @@ def copy_fields_in_background(
         extra_state = {}
 
         # Step 1: get notes to copy from for this card
-        notes_to_copy_from = get_notes_to_copy_from(
-            search_value=search_value,
-            copy_from_cards_query=copy_from_cards_query,
-            card=card,
-            is_cache=True,
-            extra_state=extra_state,
-            only_copy_into_decks=only_copy_into_decks,
-            select_card_by=select_card_by,
-            select_card_count=select_card_count,
-            show_error_message=show_error_message,
-        )
+        notes_to_copy_from = []
+        if copy_mode == COPY_MODE_WITHIN_NOTE:
+            notes_to_copy_from = [copy_into_note]
+        elif copy_mode == COPY_MODE_ACROSS_NOTES:
+            notes_to_copy_from = get_notes_to_copy_from(
+                search_value=search_value,
+                copy_from_cards_query=copy_from_cards_query,
+                card=card,
+                is_cache=True,
+                extra_state=extra_state,
+                only_copy_into_decks=only_copy_into_decks,
+                select_card_by=select_card_by,
+                select_card_count=select_card_count,
+                show_error_message=show_error_message,
+            )
+        else:
+            show_error_message(f"Error in copy fields: missing copy mode value")
+            return results
+
         if len(notes_to_copy_from) == 0:
             show_error_message(f"Error in copy fields: No notes to copy from for card {card.id}")
 
@@ -477,16 +491,17 @@ def get_field_values_from_notes(
             selected_value = extra_state[result_val_key]
         except KeyError:
             selected_value = ""
+            found_match = False
             for field_name, field_value in note.items():
                 # THe copy_from_field comes from a combox which apparently adds some extra whitespace chars
                 if field_name == copy_from_field.strip():
                     selected_value = field_value
+                    found_match = True
                     break
-            if selected_value == "":
+            if not found_match:
                 show_error_message(
                     f"Error in copy fields: Field '{copy_from_field}' not found in note with id {selected_note_id}")
             extra_state[result_val_key] = selected_value
-
 
         result_val += f"{select_card_separator if i > 0 else ''}{selected_value}"
 

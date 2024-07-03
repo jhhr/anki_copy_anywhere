@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Optional
 
 from aqt import mw
 
@@ -30,17 +30,22 @@ class CopyFieldToField(TypedDict):
     copy_if_empty: bool
     process_chain: list[KanaHighlightProcess]
 
+
+COPY_MODE_WITHIN_NOTE = "Within note"
+COPY_MODE_ACROSS_NOTES = "Across notes"
+
 class CopyDefinition(TypedDict):
     definition_name: str
     copy_on_sync: bool
+    copy_mode: str
     copy_into_note_type: str
     field_to_field_defs: list[CopyFieldToField]
-    search_with_field: str
     only_copy_into_decks: str
-    copy_from_cards_query: str
-    select_card_by: str
-    select_card_count: int
-    select_card_separator: str
+    search_with_field: Optional[str]
+    copy_from_cards_query: Optional[str]
+    select_card_by: Optional[str]
+    select_card_count: Optional[str]
+    select_card_separator: Optional[str]
 
 
 class Config:

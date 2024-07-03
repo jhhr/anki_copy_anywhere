@@ -179,18 +179,7 @@ class PickCopyDefinitionDialog(QDialog):
         dialog = EditCopyDefinitionDialog(self, definition)
 
         if dialog.exec():
-            copy_definition: CopyDefinition = {
-                "definition_name": dialog.definition_name.text(),
-                "copy_into_note_type": dialog.note_type_target_cbox.currentText(),
-                "field_to_field_defs": dialog.field_to_field_editor.get_field_to_field_defs(),
-                "search_with_field": dialog.search_field_cbox.currentText(),
-                "only_copy_into_decks": dialog.decks_limit_multibox.currentText(),
-                "copy_from_cards_query": dialog.card_query_text.text(),
-                "select_card_by": dialog.card_select_cbox.currentText(),
-                "select_card_count": dialog.card_select_count.text(),
-                "select_card_separator": dialog.card_select_separator.text(),
-                "copy_on_sync": dialog.copy_on_sync.isChecked(),
-            }
+            copy_definition = dialog.get_copy_definition()
             if index is None:
                 config.add_definition(copy_definition)
                 self.add_definition_row(len(self.copy_definitions), copy_definition)
