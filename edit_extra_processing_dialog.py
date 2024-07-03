@@ -1,3 +1,4 @@
+import re
 from contextlib import suppress
 
 from aqt import mw
@@ -9,18 +10,29 @@ from aqt.qt import (
     QDialog,
     QHBoxLayout,
     QPushButton,
+    QLineEdit,
     QGridLayout,
     QVBoxLayout,
     QFont,
     QToolTip,
     QPoint,
-    qtmajor,
     Qt,
+    qtmajor,
 )
 from aqt.utils import tooltip
 
-from .configuration import CopyFieldToField, KanaHighlightProcess
+if qtmajor > 5:
+    from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
+else:
+    from aqt.qt import QComboBox as MultiComboBox
+
+from .configuration import (
+    CopyFieldToField,
+    KanaHighlightProcess,
+    RegexProcess,
+)
 from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME
+from .regex_process import REGEX_PROCESS
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
@@ -37,6 +49,81 @@ class ClickableLabel(QLabel):
     def mousePressEvent(self, event):
         # Show tooltip near the label when clicked
         QToolTip.showText(self.mapToGlobal(QPoint(0, self.height())), self.tooltip_text)
+
+
+class BasicRegexProcessDialog(QDialog):
+    def __init__(self, parent, process: RegexProcess):
+        super().__init__(parent)
+        self.process = process
+
+        self.description = """
+        Basic regex processing step that replaces the text that matches the regex with the replacement.
+        """
+        self.form = QFormLayout()
+        self.setWindowModality(WindowModal)
+        self.setLayout(self.form)
+
+        self.top_label = QLabel(self.description)
+        self.form.addRow(self.top_label)
+
+        self.regex_field = QLineEdit()
+        self.form.addRow("Regex", self.regex_field)
+        self.regex_field.textChanged.connect(self.validate_regex)
+
+        self.regex_error_display = QLabel()
+        self.regex_error_display.setStyleSheet("color: red;")
+        self.form.addRow("", self.regex_error_display)
+
+        self.replacement_field = QLineEdit()
+        self.form.addRow("Replacement", self.replacement_field)
+
+        self.flags_field = MultiComboBox()
+        self.flags_field.addItems([
+            "ASCII",
+            "IGNORECASE",
+            "VERBOSE",
+            "MULTILINE",
+            "DOTALL",
+        ])
+        self.form.addRow("Flags", self.flags_field)
+
+        with suppress(KeyError): self.regex_field.setText(self.process["regex"])
+        with suppress(KeyError): self.replacement_field.setText(self.process["replacement"])
+        with suppress(KeyError): self.flags_field.setCurrentText(self.process["flags"])
+
+        # Add Ok and Cancel buttons as QPushButtons
+        self.ok_button = QPushButton("OK")
+        self.close_button = QPushButton("Cancel")
+
+        self.ok_button.clicked.connect(self.save_process)
+        self.close_button.clicked.connect(self.reject)
+
+        self.bottom_grid = QGridLayout()
+        self.bottom_grid.setColumnMinimumWidth(0, 150)
+        self.bottom_grid.setColumnMinimumWidth(1, 150)
+        self.bottom_grid.setColumnMinimumWidth(2, 150)
+        self.form.addRow(self.bottom_grid)
+
+        self.bottom_grid.addWidget(self.ok_button, 0, 0)
+        self.bottom_grid.addWidget(self.close_button, 0, 2)
+
+    def save_process(self):
+        self.process = {
+            "name": REGEX_PROCESS,
+            "regex": self.regex_field.text(),
+            "replacement": self.replacement_field.text(),
+            "flags": self.flags_field.currentText(),
+        }
+        self.accept()
+
+    def validate_regex(self):
+        try:
+            re.compile(self.regex_field.text())
+            self.regex_error_display.setText("")
+        except re.error as e:
+            self.regex_error_display.setText(f"Error: {e}")
+            return False
+        return True
 
 
 KANA_HIGHLIGHT_DESCRIPTION = """
@@ -152,7 +239,10 @@ class EditExtraProcessingWidget(QWidget):
         self.add_process_chain_button.clear()
         self.add_process_chain_button.addItem("-")
         # Add options not currently active to the combobox
-        for process in [KANA_HIGHLIGHT_PROCESS_NAME]:
+        for process in [
+            KANA_HIGHLIGHT_PROCESS_NAME,
+            REGEX_PROCESS,
+        ]:
             if process not in currently_active_processes:
                 self.add_process_chain_button.addItem(process)
 
@@ -215,6 +305,7 @@ class EditExtraProcessingWidget(QWidget):
     def add_process(self, process_name):
         if process_name in ["-", "", None]:
             return
+        new_process = None
         if process_name == KANA_HIGHLIGHT_PROCESS_NAME:
             new_process = {
                 "name": process_name,
@@ -222,16 +313,25 @@ class EditExtraProcessingWidget(QWidget):
                 "kunyomi_field": '',
                 "kanji_field": '',
             }
-            self.add_process_row(len(self.process_chain), new_process)
-            # Append after calling add row, since this increases the length of the process chain!
-            self.process_chain.append(new_process)
+        if process_name == REGEX_PROCESS:
+            new_process = {
+                "name": process_name,
+                "regex": '',
+                "replacement": '',
+                "flags": '',
+            }
+        if new_process is None:
+            return
+        self.add_process_row(len(self.process_chain), new_process)
+        # Append after calling add row, since this increases the length of the process chain!
+        self.process_chain.append(new_process)
         self.update_process_chain()
 
     def get_process_dialog_and_name(self, process):
         try:
             process_name = process["name"]
         except KeyError:
-            tooltip(f"Error:Process name not found in process: {process}")
+            tooltip(f"Error: Process name not found in process: {process}")
             return None, ""
         if process_name == KANA_HIGHLIGHT_PROCESS_NAME:
             with suppress(KeyError):
@@ -241,4 +341,7 @@ class EditExtraProcessingWidget(QWidget):
                 process,
                 note_type
             ), KANA_HIGHLIGHT_PROCESS_NAME
+        if process_name == REGEX_PROCESS:
+            return BasicRegexProcessDialog(self, process), REGEX_PROCESS
+
         return None, ""

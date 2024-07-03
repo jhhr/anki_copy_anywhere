@@ -17,6 +17,12 @@ def run_on_configuration_change(function):
     mw.addonManager.setConfigUpdatadAction(__name__, lambda *_: function())
 
 
+class RegexProcess(TypedDict):
+    name: str
+    regex: str
+    replacement: str
+    flags: Optional[str]
+
 class KanaHighlightProcess(TypedDict):
     name: str
     onyomi_field: str

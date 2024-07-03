@@ -14,7 +14,6 @@ def kana_highlight_process(
         onyomi_field: str,
         kunyomi_field: str,
         kanji_field: str,
-        is_cache: bool,
         note: Note,
         show_error_message: Callable[[str], None] = None
 ) -> str:

@@ -19,6 +19,7 @@ from .configuration import (
     COPY_MODE_ACROSS_NOTES,
 )
 from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME, kana_highlight_process
+from .regex_process import REGEX_PROCESS, regex_process
 from .utils import write_custom_data, CacheResults
 
 SEARCH_FIELD_VALUE_PLACEHOLDER = "$SEARCH_FIELD_VALUE$"
@@ -274,14 +275,21 @@ def copy_fields_in_background(
                     if process["name"] == KANA_HIGHLIGHT_PROCESS_NAME:
                         result_val = kana_highlight_process(
                             text=result_val,
-                            onyomi_field=process["onyomi_field"],
-                            kunyomi_field=process["kunyomi_field"],
-                            kanji_field=process["kanji_field"],
-                            is_cache=True,
+                            onyomi_field=process.get("onyomi_field", None),
+                            kunyomi_field=process.get("kunyomi_field", None),
+                            kanji_field=process.get("kanji_field", None),
                             note=copy_into_note,
                             show_error_message=show_error_message,
                         )
                         show_error_message(result_val)
+                    if process["name"] == REGEX_PROCESS:
+                        result_val = regex_process(
+                            text=result_val,
+                            regex=process.get("regex", None),
+                            replacement=process.get("replacement", None),
+                            flags=process.get("flags", None),
+                            show_error_message=show_error_message,
+                        )
 
             # Step 2.3: Set the value into the target note's field
             try:
