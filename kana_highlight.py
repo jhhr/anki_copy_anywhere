@@ -203,8 +203,8 @@ def kana_highlight(
                 debug_print(f"\nonyomi_reading: {onyomi_reading}")
                 return replace_onyomi_match(onyomi_reading)
             # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
-            # This only applies to the first kana in the reading
-            if onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
+            # This only applies to the first kana in the reading and if the reading isn't a single kana
+            if len(onyomi_reading) != 1 and onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
                 for kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
                     converted_onyomi = onyomi_reading.replace(onyomi_reading[0], kana, 1)
                     if converted_onyomi in target_furigana_section:
@@ -340,6 +340,15 @@ def main():
         kanji="閣",
         onyomi="カク(呉)",
         kunyomi="たかどの、たな",
+    )
+    test(
+        test_name="Is able to pick the right reading when there is multiple matches",
+        # ながぐつ　has が (onyomi か match) and ぐつ (kunyomi くつ) as matches
+        expected_result="お まえいつも なガ<b>ぐつ</b>に かささしてキメーんだよ！！",
+        sentence="お 前[まえ]いつも 長靴[ながぐつ]に 傘[かさ]さしてキメーんだよ！！",
+        kanji="靴",
+        onyomi="カ(漢)、ケ(呉)",
+        kunyomi="くつ",
     )
     print("Ok.")
 
