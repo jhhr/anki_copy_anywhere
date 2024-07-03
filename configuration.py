@@ -43,6 +43,7 @@ COPY_MODE_ACROSS_NOTES = "Across notes"
 class CopyDefinition(TypedDict):
     definition_name: str
     copy_on_sync: bool
+    copy_on_add: bool
     copy_mode: str
     copy_into_note_type: str
     field_to_field_defs: list[CopyFieldToField]

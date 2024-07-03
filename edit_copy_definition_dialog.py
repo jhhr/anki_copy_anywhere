@@ -486,9 +486,13 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.decks_limit_multibox = MultiComboBox()
         self.form.addRow("Deck to limit copying to (optional)", self.decks_limit_multibox)
 
-        self.copy_on_sync = QCheckBox("Copy fields on sync for reviewed cards")
-        self.copy_on_sync.setChecked(False)
-        self.form.addRow("", self.copy_on_sync)
+        self.copy_on_sync_checkbox = QCheckBox("Run on sync for reviewed cards")
+        self.copy_on_sync_checkbox.setChecked(False)
+        self.form.addRow("", self.copy_on_sync_checkbox)
+
+        self.copy_on_add_checkbox = QCheckBox("Run when adding new note")
+        self.copy_on_add_checkbox.setChecked(False)
+        self.form.addRow("", self.copy_on_add_checkbox)
 
         # Both the across and within note editors will share the same field-to-field editor
 
@@ -518,7 +522,10 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             with suppress(KeyError): self.note_type_target_cbox.setCurrentText(copy_definition["copy_into_note_type"])
             with suppress(KeyError):
                 self.definition_name.setText(copy_definition["definition_name"])
-            with suppress(KeyError): self.copy_on_sync.setChecked(copy_definition["copy_on_sync"])
+            with suppress(KeyError):
+                self.copy_on_sync_checkbox.setChecked(copy_definition["copy_on_sync"])
+            with suppress(KeyError):
+                self.copy_on_add_checkbox.setChecked(copy_definition["copy_on_add"])
             with suppress(KeyError):
                 self.decks_limit_multibox.setCurrentText(copy_definition["only_copy_into_decks"])
             with suppress(KeyError):
@@ -628,7 +635,8 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "select_card_by": self.across_notes_editor_tab.card_select_cbox.currentText(),
                 "select_card_count": self.across_notes_editor_tab.card_select_count.text(),
                 "select_card_separator": self.across_notes_editor_tab.card_select_separator.text(),
-                "copy_on_sync": self.copy_on_sync.isChecked(),
+                "copy_on_sync": self.copy_on_sync_checkbox.isChecked(),
+                "copy_on_add": self.copy_on_add_checkbox.isChecked(),
                 "copy_mode": self.selected_editor_type,
             }
             return copy_definition
@@ -638,7 +646,8 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_into_note_type": self.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": self.decks_limit_multibox.currentText(),
                 "field_to_field_defs": self.within_note_editor_tab.get_field_to_field_editor().get_field_to_field_defs(),
-                "copy_on_sync": self.copy_on_sync.isChecked(),
+                "copy_on_sync": self.copy_on_sync_checkbox.isChecked(),
+                "copy_on_add": self.copy_on_add_checkbox.isChecked(),
                 "copy_mode": self.selected_editor_type,
                 "search_with_field": None,
                 "copy_from_cards_query": None,

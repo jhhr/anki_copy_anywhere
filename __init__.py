@@ -8,6 +8,7 @@ from aqt.qt import QAction, qconnect, QMenu
 from .cache_fetches import cache_fetches
 from .configuration import Config
 from .copy_fields import copy_fields
+from .note_hooks import init_note_hooks
 from .on_cache_filter import on_cache_filter
 from .on_fetch_filter import on_fetch_filter
 from .on_kana_highlight_filter import on_kana_highlight_filter
@@ -123,3 +124,4 @@ def setup_copy_fields_menu(browser):
 browser_menus_did_init.append(setup_copy_fields_menu)
 
 init_sync_hook()
+init_note_hooks()
