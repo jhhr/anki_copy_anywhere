@@ -33,9 +33,7 @@ KATAKANA_CONVERSION_DICT = {
     for k, vs in HIRAGANA_CONVERSION_DICT.items()
 }
 
-SMALL_TSU_POSSIBLE_KATAKANA = [to_katakana(k) for k in [
-    "ぱ", "ぴ", "ぷ", "ぺ", "ぽ", "こ", "か", "く", "き"
-]]
+SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
@@ -205,19 +203,19 @@ def kana_highlight(
             # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
             # This only applies to the first kana in the reading and if the reading isn't a single kana
             if len(onyomi_reading) != 1 and onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
-                for kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
-                    converted_onyomi = onyomi_reading.replace(onyomi_reading[0], kana, 1)
+                for onyomi_kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
+                    converted_onyomi = onyomi_reading.replace(onyomi_reading[0], onyomi_kana, 1)
                     if converted_onyomi in target_furigana_section:
                         debug_print(f"\nconverted_onyomi: {converted_onyomi}")
                         return replace_onyomi_match(converted_onyomi)
-        # Then also check for small tsu conversion of some consonants
-        # this only happens in the last kana of the reading
-        for kana in SMALL_TSU_POSSIBLE_KATAKANA:
-            if onyomi[-1] == kana:
-                converted_onyomi = onyomi[:-1] + "っ"
-                if converted_onyomi in target_furigana_section:
-                    debug_print(f"\nconverted_onyomi: {converted_onyomi}")
-                    return replace_onyomi_match(converted_onyomi)
+            # Then also check for small tsu conversion of some consonants
+            # this only happens in the last kana of the reading
+            for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
+                if onyomi_reading[-1] == tsu_kana:
+                    converted_onyomi = onyomi_reading[:-1] + "っ"
+                    if converted_onyomi in target_furigana_section:
+                        debug_print(f"\nconverted_onyomi: {converted_onyomi}")
+                        return replace_onyomi_match(converted_onyomi)
 
         def replace_kunyomi_match(kunyomi_that_matched):
             nonlocal furigana
@@ -241,8 +239,8 @@ def kana_highlight(
                 return replace_kunyomi_match(kunyomi_stem)
             # Also check for changed kana
             if kunyomi_stem[0] in HIRAGANA_CONVERSION_DICT:
-                for kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
-                    converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kana, 1)
+                for kunyomi_kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
+                    converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kunyomi_kana, 1)
                     if converted_kunyomi in target_furigana_section:
                         debug_print(f"\nconverted_kunyomi: {converted_kunyomi}")
                         return replace_kunyomi_match(converted_kunyomi)
@@ -344,11 +342,19 @@ def main():
     test(
         test_name="Is able to pick the right reading when there is multiple matches",
         # ながぐつ　has が (onyomi か match) and ぐつ (kunyomi くつ) as matches
-        expected_result="お まえいつも なガ<b>ぐつ</b>に かささしてキメーんだよ！！",
+        expected_result="お まえいつも なが<b>ぐつ</b>に かささしてキメーんだよ！！",
         sentence="お 前[まえ]いつも 長靴[ながぐつ]に 傘[かさ]さしてキメーんだよ！！",
         kanji="靴",
         onyomi="カ(漢)、ケ(呉)",
         kunyomi="くつ",
+    )
+    test(
+        test_name="Should match reading in 4 kanji compound word",
+        expected_result="けんてき<b>ヒッ</b>さつの しじもないのに せんとうは ふしぜん。",
+        sentence="見敵必殺[けんてきひっさつ]の 指示[しじ]もないのに 戦闘[せんとう]は 不自然[ふしぜん]。",
+        kanji="必",
+        onyomi="ヒツ(漢)、ヒチ(呉)",
+        kunyomi="かなら.ず",
     )
     print("Ok.")
 
