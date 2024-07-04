@@ -1,7 +1,9 @@
 import re
 from contextlib import suppress
 
+# noinspection PyUnresolvedReferences
 from aqt import mw
+# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QWidget,
     QFormLayout,
@@ -19,20 +21,21 @@ from aqt.qt import (
     Qt,
     qtmajor,
 )
+# noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
 else:
-    from aqt.qt import QComboBox as MultiComboBox
+    from .multi_combo_box import MultiComboBoxQt5 as MultiComboBox
 
-from .configuration import (
+from ..configuration import (
     CopyFieldToField,
     KanaHighlightProcess,
     RegexProcess,
 )
-from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME
-from .regex_process import REGEX_PROCESS
+from ..logic.kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME
+from ..logic.regex_process import REGEX_PROCESS
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
@@ -51,7 +54,7 @@ class ClickableLabel(QLabel):
         QToolTip.showText(self.mapToGlobal(QPoint(0, self.height())), self.tooltip_text)
 
 
-class BasicRegexProcessDialog(QDialog):
+class RegexProcessDialog(QDialog):
     def __init__(self, parent, process: RegexProcess):
         super().__init__(parent)
         self.process = process
@@ -342,6 +345,6 @@ class EditExtraProcessingWidget(QWidget):
                 note_type
             ), KANA_HIGHLIGHT_PROCESS_NAME
         if process_name == REGEX_PROCESS:
-            return BasicRegexProcessDialog(self, process), REGEX_PROCESS
+            return RegexProcessDialog(self, process), REGEX_PROCESS
 
         return None, ""

@@ -4,8 +4,8 @@ from anki.utils import ids2str
 from aqt import mw
 from aqt.gui_hooks import sync_will_start, sync_did_finish
 
-from .configuration import Config
-from .copy_fields import copy_fields
+from ..configuration import Config
+from ..logic.copy_fields import copy_fields
 
 
 def create_comparelog(local_rids: List[int], texts: List[str]) -> None:

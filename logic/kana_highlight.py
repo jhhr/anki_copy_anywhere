@@ -3,7 +3,7 @@ import re
 try:
     from .kana_conv import to_katakana, to_hiragana
 except ImportError:
-    from kana_conv import to_katakana, to_hiragana
+    from .kana_conv import to_katakana, to_hiragana
 
 HIRAGANA_CONVERSION_DICT = {
     "か": ["が"],

@@ -12,14 +12,14 @@ from aqt.operations import CollectionOp
 from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiApplication
 from aqt.utils import tooltip
 
-from .configuration import (
+from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME, kana_highlight_process
+from .regex_process import REGEX_PROCESS, regex_process
+from ..configuration import (
     CopyDefinition,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
 )
-from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME, kana_highlight_process
-from .regex_process import REGEX_PROCESS, regex_process
-from .utils import write_custom_data, CacheResults
+from ..utils import write_custom_data, CacheResults
 
 SEARCH_FIELD_VALUE_PLACEHOLDER = "$SEARCH_FIELD_VALUE$"
 

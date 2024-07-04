@@ -1,7 +1,7 @@
 from anki import hooks
 
-from .configuration import Config
-from .copy_fields import copy_for_single_note
+from ..configuration import Config
+from ..logic.copy_fields import copy_for_single_note
 
 
 def run_copy_fields_on_add(note, deck_id):

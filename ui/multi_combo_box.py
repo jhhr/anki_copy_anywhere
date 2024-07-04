@@ -1,3 +1,4 @@
+# noinspection PyUnresolvedReferences
 from aqt.qt import *
 
 

@@ -1,5 +1,6 @@
 from typing import TypedDict, Optional
 
+# noinspection PyUnresolvedReferences
 from aqt import mw
 
 tag = mw.addonManager.addonFromModule(__name__)
@@ -34,7 +35,7 @@ class CopyFieldToField(TypedDict):
     copy_into_note_field: str
     copy_from_field: str
     copy_if_empty: bool
-    process_chain: list[KanaHighlightProcess]
+    process_chain: list
 
 
 COPY_MODE_WITHIN_NOTE = "Within note"

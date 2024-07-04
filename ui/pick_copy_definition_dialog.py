@@ -1,5 +1,6 @@
+# noinspection PyUnresolvedReferences
 from aqt import mw
-# import all of the Qt GUI library
+# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QDialog,
     QVBoxLayout,
@@ -12,14 +13,14 @@ from aqt.qt import (
     qtmajor,
 )
 
-from .configuration import (
+from .edit_copy_definition_dialog import EditCopyDefinitionDialog
+from ..configuration import (
     Config,
     CopyDefinition,
 )
-from .copy_fields import (
+from ..logic.copy_fields import (
     copy_fields,
 )
-from .edit_copy_definition_dialog import EditCopyDefinitionDialog
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
