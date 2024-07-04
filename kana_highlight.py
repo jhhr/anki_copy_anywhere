@@ -39,7 +39,8 @@ HIRAGANA_RE = "([ぁ-ん])"
 
 # Regex matching any kanji characters
 # Include the kanji repeater punctuation as something that will be cleaned off
-KANJI_RE = "([々\u4e00-\u9faf\u3400-\u4dbf]+)"
+# Also include numbers as they are sometimes used in furigana
+KANJI_RE = "([\d々\u4e00-\u9faf\u3400-\u4dbf]+)"
 KANJI_REC = re.compile(rf"{KANJI_RE}")
 
 # Regex matching any furigana
@@ -47,7 +48,7 @@ FURIGANA_RE = " ?([^ >]+?)\[(.+?)\]"
 FURIGANA_REC = re.compile(rf"{FURIGANA_RE}")
 
 # Regex matching any kanji and furigana
-KANJI_AND_FURIGANA_RE = "([々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]"
+KANJI_AND_FURIGANA_RE = "([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]"
 KANJI_AND_FURIGANA_REC = re.compile(rf"{KANJI_AND_FURIGANA_RE}")
 
 
@@ -306,35 +307,35 @@ def test(test_name, expected_result, sentence, kanji, onyomi, kunyomi):
 def main():
     test(
         test_name="Should not incorrectly match onyomi twice",
-        expected_result="<b>シ</b>ちょうしゃ",
         # しちょうしゃ　has し in it twice but only the first one should be highlighted
         sentence="視聴者[しちょうしゃ]",
+        expected_result="<b>シ</b>ちょうしゃ",
         kanji="視",
         onyomi="シ(漢)、ジ(呉)",
         kunyomi="み.る"
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 1/2",
-        expected_result="<b>ダン</b>ごが きえさった。",
         # 消え去[きえさ]った　has え　in the middle of the kanji but った at the end is not included in the furigana
         sentence="団子[だんご]が 消え去[きえさ]った。",
+        expected_result="<b>ダン</b>ごが きえさった。",
         kanji="団",
         onyomi="ダン(呉)、トン(唐)、タン(漢)",
         kunyomi="かたまり、まる.い",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 2/2",
-        expected_result="<b>とな</b>りあわせのまち。",
         # 隣り合わせ[となりあわせ]のまち　has り　in the middle and わせ　at the end of the group
         sentence="隣り合わせ[となりあわせ]の町[まち]。",
+        expected_result="<b>とな</b>りあわせのまち。",
         kanji="隣",
         onyomi="リン(呉)",
         kunyomi="とな.る、となり",
     )
     test(
         test_name="Is able to match the same kanji occurring twice",
-        expected_result="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
         sentence="新[しん] 内閣[ないかく]の 組閣[そかく]が 発表[はっぴょう]された。",
+        expected_result="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
         kanji="閣",
         onyomi="カク(呉)",
         kunyomi="たかどの、たな",
@@ -342,19 +343,27 @@ def main():
     test(
         test_name="Is able to pick the right reading when there is multiple matches",
         # ながぐつ　has が (onyomi か match) and ぐつ (kunyomi くつ) as matches
-        expected_result="お まえいつも なが<b>ぐつ</b>に かささしてキメーんだよ！！",
         sentence="お 前[まえ]いつも 長靴[ながぐつ]に 傘[かさ]さしてキメーんだよ！！",
+        expected_result="お まえいつも なが<b>ぐつ</b>に かささしてキメーんだよ！！",
         kanji="靴",
         onyomi="カ(漢)、ケ(呉)",
         kunyomi="くつ",
     )
     test(
         test_name="Should match reading in 4 kanji compound word",
-        expected_result="けんてき<b>ヒッ</b>さつの しじもないのに せんとうは ふしぜん。",
         sentence="見敵必殺[けんてきひっさつ]の 指示[しじ]もないのに 戦闘[せんとう]は 不自然[ふしぜん]。",
+        expected_result="けんてき<b>ヒッ</b>さつの しじもないのに せんとうは ふしぜん。",
         kanji="必",
         onyomi="ヒツ(漢)、ヒチ(呉)",
         kunyomi="かなら.ず",
+    )
+    test(
+        test_name="Should match furigana for romaji numbers",
+        sentence="海賊[かいぞく]たちは ７[なな]つの 海[うみ]を 航海[こうかい]した。",
+        expected_result="かい<b>ゾク</b>たちは ななつの うみを こうかいした。",
+        kanji="賊",
+        onyomi="ゾク(呉)、ソク(漢)",
+        kunyomi="わるもの、そこ.なう",
     )
     print("Ok.")
 
