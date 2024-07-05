@@ -12,6 +12,7 @@ from aqt.operations import CollectionOp
 from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiApplication
 from aqt.utils import tooltip
 
+from .interpolate_fields import interpolate_from_text
 from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME, kana_highlight_process
 from .regex_process import REGEX_PROCESS, regex_process
 from ..configuration import (
@@ -19,7 +20,10 @@ from ..configuration import (
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
 )
-from ..utils import write_custom_data, CacheResults
+from ..utils import (
+    write_custom_data,
+    CacheResults
+)
 
 SEARCH_FIELD_VALUE_PLACEHOLDER = "$SEARCH_FIELD_VALUE$"
 
@@ -311,14 +315,14 @@ def copy_for_single_note(
 
     # Step 2: Get value for each field we are copying into
     for field_to_field_def in field_to_field_defs:
-        copy_from_field = field_to_field_def["copy_from_field"]
+        copy_from_text = field_to_field_def["copy_from_text"]
         copy_into_note_field = field_to_field_def["copy_into_note_field"]
         copy_if_empty = field_to_field_def["copy_if_empty"]
         process_chain = field_to_field_def.get("process_chain", None)
 
         # Step 2.1: Get the value from the notes, usually it's just one note
         result_val = get_field_values_from_notes(
-            copy_from_field=copy_from_field,
+            copy_from_text=copy_from_text,
             notes=notes_to_copy_from,
             extra_state=extra_state,
             select_card_separator=select_card_separator,
@@ -487,7 +491,7 @@ def get_notes_to_copy_from(
 
 
 def get_field_values_from_notes(
-        copy_from_field: str,
+        copy_from_text: str,
         notes: list[Note],
         extra_state: dict,
         select_card_separator: str = ', ',
@@ -495,7 +499,9 @@ def get_field_values_from_notes(
 ) -> str:
     """
     Get the value from the field in the selected notes gotten with get_notes_to_copy_from.
-    :param copy_from_field: The field to get the value from
+    :param copy_from_text: Text defining the content to copy into the note's target field. Contains
+            text and field names and special values enclosed in double curly braces that need to be
+            replaced with the actual values from the notes.
     :param notes: The selected notes to get the value from
     :param extra_state: A dictionary to store cached values to re-use in subsequent calls of this function
     :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
@@ -508,9 +514,9 @@ def get_field_values_from_notes(
         def show_error_message(message: str):
             print(message)
 
-    if copy_from_field is None:
+    if copy_from_text is None:
         show_error_message(
-            "Error in copy fields: Required value 'copy_from_field' was missing.",
+            "Error in copy fields: Required value 'copy_from_text' was missing.",
         )
         return ""
 
@@ -519,27 +525,12 @@ def get_field_values_from_notes(
 
     result_val = ""
     for i, note in enumerate(notes):
-        selected_note_id = note.id
+        # Return the interpolated value using the note
+        interpolated_value, invalid_fields = interpolate_from_text(copy_from_text, note)
+        if len(invalid_fields) > 0:
+            show_error_message(
+                f"Error in copy fields: Invalid fields in copy_from_text: {', '.join(invalid_fields)}")
 
-        # Return the value from the field in the note
-        # Check for cached result again
-        result_val_key = base64.b64encode(f"{selected_note_id}{copy_from_field}{i}".encode()).decode()
-        try:
-            selected_value = extra_state[result_val_key]
-        except KeyError:
-            selected_value = ""
-            found_match = False
-            for field_name, field_value in note.items():
-                # THe copy_from_field comes from a combox which apparently adds some extra whitespace chars
-                if field_name == copy_from_field.strip():
-                    selected_value = field_value
-                    found_match = True
-                    break
-            if not found_match:
-                show_error_message(
-                    f"Error in copy fields: Field '{copy_from_field}' not found in note with id {selected_note_id}")
-            extra_state[result_val_key] = selected_value
-
-        result_val += f"{select_card_separator if i > 0 else ''}{selected_value}"
+        result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
 
     return result_val

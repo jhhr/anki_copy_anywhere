@@ -1,4 +1,4 @@
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Union
 
 # noinspection PyUnresolvedReferences
 from aqt import mw
@@ -33,7 +33,7 @@ class KanaHighlightProcess(TypedDict):
 
 class CopyFieldToField(TypedDict):
     copy_into_note_field: str
-    copy_from_field: str
+    copy_from_text: str
     copy_if_empty: bool
     process_chain: list
 
@@ -114,11 +114,12 @@ class Config:
         self.data["copy_definitions"].pop(index)
         self.save()
 
-    def update_definition_by_name(self, name: str, definition: dict):
+    def update_definition_by_name(self, name: str, new_definition: dict) -> Union[int, None]:
         for index, definition in enumerate(self.data["copy_definitions"]):
             if definition["definition_name"] == name:
-                self.update_definition_by_index(index, definition)
-                break
+                self.update_definition_by_index(index, new_definition)
+                return index
+        return None
 
     def update_definition_by_index(self, index: int, definition: dict):
         self.data["copy_definitions"][index] = definition

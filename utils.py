@@ -1,4 +1,5 @@
 import json
+from typing import Dict, Any
 
 from anki.cards import Card
 from aqt.utils import tooltip
@@ -11,6 +12,8 @@ class CacheResults:
 
     def set_result_text(self, result_text):
         self.result_text = result_text
+
+
 def write_custom_data(card: Card, key, value):
     if card.custom_data != "":
         custom_data = json.loads(card.custom_data)
@@ -83,3 +86,8 @@ def filter_init(filter_prefix, valid_args, filter_str, context):
             return None
 
     return {key: check_key(key) for key in valid_args}, is_cache, show_error_message
+
+
+def to_lowercase_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+    """Converts a dictionary to lowercase keys"""
+    return {k.lower(): v for k, v in d.items()}

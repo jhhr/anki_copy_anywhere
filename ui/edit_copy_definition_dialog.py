@@ -282,8 +282,8 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             if field_to_field_definition["copy_into_note_field"] == "":
                 missing_copy_into_error = "Copy into field cannot be empty."
                 show_error = True
-            if field_to_field_definition["copy_from_field"] == "":
-                missing_copy_from_error = "Copy from field cannot be empty."
+            if field_to_field_definition["copy_from_text"] == "":
+                missing_copy_from_error = "Copy from text cannot be empty."
                 show_error = True
 
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
@@ -305,7 +305,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             config = Config()
             config.load()
             name_match_count = 0
-            for index, definition in enumerate(config.copy_definitions):
+            for definition in config.copy_definitions:
                 if definition["definition_name"] == definition_name:
                     name_match_count += 1
             if name_match_count > 1:
