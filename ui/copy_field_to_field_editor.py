@@ -25,12 +25,16 @@ else:
     QFrameStyledPanel = QFrame.StyledPanel
     QFrameShadowRaised = QFrame.Raised
 
-from ..configuration import COPY_MODE_WITHIN_NOTE
+from ..configuration import COPY_MODE_WITHIN_NOTE, COPY_MODE_ACROSS_NOTES
 from .pasteable_paste_text_edit import PasteableTextEdit
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
 from ..utils import to_lowercase_dict
-from ..logic.interpolate_fields import get_fields_from_text, DEFAULT_SPECIAL_FIELDS_DICT, \
-    SPECIAL_FIELDS_VALUES_DICT
+from ..logic.interpolate_fields import (
+    get_fields_from_text,
+    DEFAULT_SPECIAL_FIELDS_DICT,
+    SPECIAL_FIELDS_VALUES_DICT,
+    CURRENT_TARGET_VALUE,
+)
 
 
 class CopyFieldToFieldEditor(QWidget):
@@ -122,8 +126,10 @@ class CopyFieldToFieldEditor(QWidget):
         copy_from_text_layout = QVBoxLayout()
         copy_from_text_label = QLabel("Define content that will replace the field")
         copy_from_text_description = QLabel(
-            """Write any text you want to go into the target field.
-Reference other fields like you do in card templates; with {{Field Name}}. This includes the target field too.
+            f"""Write any text you want to go into the target field.
+Reference other fields like you do in card templates; with {{{{Field Name}}}}.
+The target field is in {{{{{CURRENT_TARGET_VALUE}}}}}.
+{"Referencing the target field by name will use the value from other notes!" if self.copy_mode == COPY_MODE_ACROSS_NOTES else ""}
 Right-click to show a list of possible fields to copy from.
 There are additional non-field values you can use, such as the note ID
             """

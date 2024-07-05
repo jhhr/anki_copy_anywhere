@@ -324,7 +324,7 @@ def copy_for_single_note(
         result_val = get_field_values_from_notes(
             copy_from_text=copy_from_text,
             notes=notes_to_copy_from,
-            extra_state=extra_state,
+            current_target_value=note[copy_into_note_field],
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
         )
@@ -352,8 +352,6 @@ def copy_for_single_note(
 
         # Step 2.3: Set the value into the target note's field
         try:
-            # cache_field_ord = copy_into_note.keys().index(copy_into_note_field)
-
             # only_empty can override the functionality of ignore_if_cached causing the card to be updated
             # that's why the default only_empty is False and ignore_if_cached is True
             if copy_if_empty and note[copy_into_note_field] != "":
@@ -493,7 +491,7 @@ def get_notes_to_copy_from(
 def get_field_values_from_notes(
         copy_from_text: str,
         notes: list[Note],
-        extra_state: dict,
+        current_target_value: str = "",
         select_card_separator: str = ', ',
         show_error_message: Callable[[str], None] = None,
 ) -> str:
@@ -503,7 +501,6 @@ def get_field_values_from_notes(
             text and field names and special values enclosed in double curly braces that need to be
             replaced with the actual values from the notes.
     :param notes: The selected notes to get the value from
-    :param extra_state: A dictionary to store cached values to re-use in subsequent calls of this function
     :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
             if there is only one note
     :param show_error_message: A function to show error messages, used for storing all messages until the
@@ -526,7 +523,7 @@ def get_field_values_from_notes(
     result_val = ""
     for i, note in enumerate(notes):
         # Return the interpolated value using the note
-        interpolated_value, invalid_fields = interpolate_from_text(copy_from_text, note)
+        interpolated_value, invalid_fields = interpolate_from_text(copy_from_text, note, current_target_value)
         if len(invalid_fields) > 0:
             show_error_message(
                 f"Error in copy fields: Invalid fields in copy_from_text: {', '.join(invalid_fields)}")
