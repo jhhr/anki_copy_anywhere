@@ -141,17 +141,17 @@ class CopyFieldToFieldEditor(QWidget):
                 row_form.removeWidget(widget)
                 widget = None
             self.middle_grid.removeWidget(frame)
-            self.remove_definition(index)
+            self.remove_definition(copy_field_to_field_definition, copy_field_inputs_dict)
 
         remove_button.clicked.connect(remove_row)
         row_form.addRow("", remove_button)
 
-    def remove_definition(self, index):
+    def remove_definition(self, definition, inputs_dict):
         """
         Removes the selected field-to-field definition and input dict.
         """
-        self.field_to_field_defs.pop(index)
-        self.copy_field_inputs.pop(index)
+        self.field_to_field_defs.remove(definition)
+        self.copy_field_inputs.remove(inputs_dict)
 
     def get_field_to_field_defs(self):
         """

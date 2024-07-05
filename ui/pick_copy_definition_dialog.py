@@ -40,6 +40,7 @@ class PickCopyDefinitionDialog(QDialog):
         self.copy_definitions = copy_definitions
         self.selected_definitions_applicable_cards = []
         self.selected_copy_definitions = []
+        self.remove_row_funcs = []
         self.models = []
         self.checkboxes = []
         self.browser_card_ids = browser_card_ids
@@ -62,8 +63,7 @@ class PickCopyDefinitionDialog(QDialog):
         self.top_grid.addWidget(self.add_new_button, 1, 3, 1, 1)
 
         self.middle_grid = self.make_grid()
-        for index, definition in enumerate(copy_definitions):
-            self.add_definition_row(index, definition)
+        self.add_all_definition_rows()
 
         self.bottom_grid = self.make_grid()
         self.apply_button = QPushButton("Apply")
@@ -74,6 +74,10 @@ class PickCopyDefinitionDialog(QDialog):
 
         self.bottom_grid.addWidget(self.apply_button, 0, 0)
         self.bottom_grid.addWidget(self.close_button, 0, 4, 0, -1)
+
+    def add_all_definition_rows(self):
+        for index, definition in enumerate(self.copy_definitions):
+            self.add_definition_row(index, definition)
 
     def make_grid(self):
         grid = QGridLayout()
@@ -115,20 +119,21 @@ class PickCopyDefinitionDialog(QDialog):
         # Remove
         remove_button = QPushButton("Delete")
 
-        def remove_row():
+        def remove_row_ui():
             self.checkboxes.remove(checkbox)
             for widget in [checkbox, edit_button, duplicate_button, remove_button]:
                 widget.deleteLater()
                 self.middle_grid.removeWidget(widget)
-                widget = None
+
+        self.remove_row_funcs.append(remove_row_ui)
+        def remove_row():
+            for func in self.remove_row_funcs:
+                func()
+            self.remove_row_funcs = []
             self.remove_definition(index)
 
         remove_button.clicked.connect(remove_row)
         self.middle_grid.addWidget(remove_button, index, 4)
-
-    def update_definition_row(self, index, definition):
-        checkbox = self.checkboxes[index]
-        checkbox.setText(definition["definition_name"])
 
     def remove_definition(self, index: int):
         """
@@ -145,6 +150,7 @@ class PickCopyDefinitionDialog(QDialog):
             pass
         config.load()
         self.copy_definitions = config.copy_definitions
+        self.add_all_definition_rows()
         self.update_card_counts_for_all_cards()
 
     def duplicate_definition(self, index: int):
@@ -186,9 +192,12 @@ class PickCopyDefinitionDialog(QDialog):
                 self.add_definition_row(len(self.copy_definitions), copy_definition)
             else:
                 config.update_definition_by_index(index, copy_definition)
-                self.update_definition_row(index, copy_definition)
+                for func in self.remove_row_funcs:
+                    func()
+                self.remove_row_funcs = []
             config.load()
             self.copy_definitions = config.copy_definitions
+            self.add_all_definition_rows()
             self.update_card_counts_for_all_cards()
             return 0
         else:

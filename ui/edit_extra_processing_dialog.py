@@ -249,10 +249,10 @@ class EditExtraProcessingWidget(QWidget):
             if process not in currently_active_processes:
                 self.add_process_chain_button.addItem(process)
 
-    def remove_process(self, index):
-        self.process_chain.pop(index)
-        self.process_dialogs[index].deleteLater()
-        self.process_dialogs.pop(index)
+    def remove_process(self, process, process_dialog):
+        self.process_chain.remove(process)
+        process_dialog.deleteLater()
+        self.process_dialogs.remove(process_dialog)
         self.update_process_chain()
 
     def update_process_chain(self, ):
@@ -280,16 +280,18 @@ class EditExtraProcessingWidget(QWidget):
         hbox.addStretch(1)
         hbox.addWidget(process_label)
 
-        def process_dialog_exec(index):
-            if self.process_dialogs[index].exec():
-                self.process_chain[index] = process_dialog.process
+        def process_dialog_exec():
+            if process_dialog.exec():
+                for i, cur_process in enumerate(self.process_chain):
+                    if cur_process == process:
+                        self.process_chain[i] = process_dialog.process
                 self.update_process_chain()
                 return 0
             return -1
 
         # Edit
         edit_button = QPushButton("Edit")
-        edit_button.clicked.connect(lambda: process_dialog_exec(index))
+        edit_button.clicked.connect(lambda: process_dialog_exec())
         self.middle_grid.addWidget(edit_button, index, 2)
 
         # Remove
@@ -299,8 +301,7 @@ class EditExtraProcessingWidget(QWidget):
             for widget in [process_label, edit_button, remove_button]:
                 widget.deleteLater()
                 self.middle_grid.removeWidget(widget)
-                widget = None
-            self.remove_process(index)
+            self.remove_process(process, process_dialog)
 
         remove_button.clicked.connect(remove_row)
         self.middle_grid.addWidget(remove_button, index, 4)
