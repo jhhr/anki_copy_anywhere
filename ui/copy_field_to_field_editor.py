@@ -108,7 +108,7 @@ class CopyFieldToFieldEditor(QWidget):
         # Copy into field
         field_target_cbox = QComboBox()
         copy_field_inputs_dict["copy_into_note_field"] = field_target_cbox
-        row_form.addRow("Note field to copy into", field_target_cbox)
+        row_form.addRow("Destination note field", field_target_cbox)
         self.update_field_target_options(field_target_cbox)
         with suppress(KeyError):
             field_target_cbox.setCurrentText(copy_field_to_field_definition["copy_into_note_field"])
@@ -124,15 +124,15 @@ class CopyFieldToFieldEditor(QWidget):
         )
         copy_field_inputs_dict["copy_from_text"] = copy_from_text_edit
         copy_from_text_layout = QVBoxLayout()
-        copy_from_text_label = QLabel("Define content that will replace the field")
+        copy_from_text_label = QLabel("Source fields' content that will replace the field")
         copy_from_text_description = QLabel(
-            f"""Write any text you want to go into the target field.
-Reference other fields like you do in card templates; with {{{{Field Name}}}}.
-The target field is in {{{{{CURRENT_TARGET_VALUE}}}}}.
-{"Referencing the target field by name will use the value from other notes!" if self.copy_mode == COPY_MODE_ACROSS_NOTES else ""}
-Right-click to show a list of possible fields to copy from.
-There are additional non-field values you can use, such as the note ID
-            """
+            f"""<ul>
+<li>Reference the source notes' fields with {{{{Field Name}}}}.</li>
+<li>The destination field's content is in {{{{{CURRENT_TARGET_VALUE}}}}}.</li>
+{"<li>Referencing the destination field by name will use the value from the source notes!</li>" if self.copy_mode == COPY_MODE_ACROSS_NOTES else ""}
+<li>Right-click to show a list of all possible fields to copy from.</li>
+<li>There are additional special values you can use, such as the note ID</li>
+</ul>"""
         )
         # Set description font size smaller
         copy_from_text_description.setStyleSheet("font-size: 10px;")

@@ -83,15 +83,20 @@ class AcrossNotesCopyEditor(QWidget):
         self.main_layout.addLayout(self.form)
 
         self.search_field_cbox = QComboBox()
-        self.form.addRow("Note field to search with", self.search_field_cbox)
+        self.form.addRow("Destination field to search with", self.search_field_cbox)
 
         self.card_query_text = QLineEdit()
         self.card_query_text.setPlaceholderText(
             f"\"deck:Deck name\" note:\"Note type\" some_field:*{SEARCH_FIELD_VALUE_PLACEHOLDER}*"
         )
         self.form.addRow(
-            """Query to search for cards to copy from
-(use $SEARCH_FIELD_VALUE$ as the value from the note field to search with)""",
+            """<div>
+            Query to search for cards to copy from
+            <br/>
+            <span style="font-size: small;">
+            (use $SEARCH_FIELD_VALUE$ as the value from the note field to search with)
+            </span>
+            </div>""",
             self.card_query_text,
         )
 
@@ -197,30 +202,33 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         # Build form layout
         self.setWindowModality(WindowModal)
         self.main_layout = QVBoxLayout(self.inner_widget)
-        self.form = QFormLayout()
-        self.main_layout.addLayout(self.form)
+        self.top_form = QFormLayout()
+        self.main_layout.addLayout(self.top_form)
 
         self.definition_name = QLineEdit()
-        self.form.addRow("Name for this copy definition", self.definition_name)
+        self.top_form.addRow("Name for this copy definition", self.definition_name)
+
+        self.middle_form = QFormLayout()
+        self.main_layout.addLayout(self.middle_form)
 
         self.note_type_target_cbox = QComboBox()
         self.note_type_target_cbox.addItem("-")
         self.note_type_target_cbox.addItems(model_names_list)
-        self.form.addRow("Note type to copy into", self.note_type_target_cbox)
+        self.middle_form.addRow("Destination note type", self.note_type_target_cbox)
 
         self.decks_limit_multibox = MultiComboBox()
-        self.form.addRow("Deck to limit copying to (optional)", self.decks_limit_multibox)
+        self.middle_form.addRow("Destination deck limit (optional)", self.decks_limit_multibox)
 
         self.copy_on_sync_checkbox = QCheckBox("Run on sync for reviewed cards")
         self.copy_on_sync_checkbox.setChecked(False)
-        self.form.addRow("", self.copy_on_sync_checkbox)
+        self.middle_form.addRow("", self.copy_on_sync_checkbox)
 
         self.copy_on_add_checkbox = QCheckBox("Run when adding new note")
         self.copy_on_add_checkbox.setChecked(False)
-        self.form.addRow("", self.copy_on_add_checkbox)
+        self.middle_form.addRow("", self.copy_on_add_checkbox)
+
 
         # Both the across and within note editors will share the same field-to-field editor
-
         # Add tabs using QTabWidget to select between showing AcrossNotesCopyEditor and WithinNoteCopyEditor
         self.tabs_vbox = QVBoxLayout()
         self.main_layout.addLayout(self.tabs_vbox)
