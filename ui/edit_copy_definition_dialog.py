@@ -244,7 +244,8 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.editor_type_tabs.currentChanged.connect(self.update_editor_type)
 
         if copy_definition:
-            with suppress(KeyError): self.note_type_target_cbox.setCurrentText(copy_definition["copy_into_note_type"])
+            with suppress(KeyError):
+                self.note_type_target_cbox.setCurrentText(copy_definition["copy_into_note_type"])
             with suppress(KeyError):
                 self.definition_name.setText(copy_definition["definition_name"])
             with suppress(KeyError):
@@ -252,11 +253,11 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             with suppress(KeyError):
                 self.copy_on_add_checkbox.setChecked(copy_definition["copy_on_add"])
             with suppress(KeyError):
+                self.update_fields_by_target_note_type()
+            with suppress(KeyError):
                 self.decks_limit_multibox.setCurrentText(copy_definition["only_copy_into_decks"])
             with suppress(KeyError):
                 self.selected_editor_type = copy_definition["copy_mode"]
-            with suppress(KeyError):
-                self.update_fields_by_target_note_type()
             with suppress(KeyError):
                 self.selected_editor_type = copy_definition["copy_mode"]
                 # Set the initially opened tab according to copy_mode

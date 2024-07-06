@@ -122,6 +122,14 @@ class MultiComboBoxQt5(QComboBox):
                 res.append(self.model().item(i).data())
         return res
 
+    def setCurrentText(self, selected_text: str):
+        for text in selected_text.split(", "):
+            for i in range(self.model().rowCount()):
+                if self.model().item(i).text() == text:
+                    self.model().item(i).setCheckState(Qt.Checked)
+                    break
+        self.updateText()
+
 
 class MultiComboBoxQt6(QComboBox):
     """
@@ -173,3 +181,11 @@ class MultiComboBoxQt6(QComboBox):
             if check_box:
                 item.setCheckState(Qt.CheckState.Checked if check_box.isChecked() else Qt.CheckState.Unchecked)
         super().hidePopup()
+
+    def setCurrentText(self, selected_text: str):
+        for text in selected_text.split(", "):
+            for i in range(self.model().rowCount()):
+                if self.model().item(i).text() == text:
+                    self.model().item(i).setCheckState(Qt.CheckState.Checked)
+                    break
+        self.updateText()
