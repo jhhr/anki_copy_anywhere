@@ -34,7 +34,7 @@ KATAKANA_CONVERSION_DICT = {
     for k, vs in HIRAGANA_CONVERSION_DICT.items()
 }
 
-SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く"]
+SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
@@ -394,6 +394,38 @@ def main():
         # Both ゆ and ゆい are in the furigana but the correct match is ゆい
         sentence="彼女[かのじょ]は 由緒[ゆいしょ]ある 家柄[いえがら]の 出[で]だ。",
         expected_result="かのじょは <b>ユイ</b>しょある いえがらの でだ。",
+    )
+    test(
+        test_name="small tsu 1/",
+        kanji="剔",
+        onyomi="テキ(漢)、チャク(呉)",
+        kunyomi="えぐ.る、そ.る、のぞ.く",
+        sentence="剔抉[てっけつ]",
+        expected_result="<b>テッ</b>けつ",
+    )
+    test(
+        test_name="small tsu 2/",
+        kanji="一",
+        onyomi="イチ(漢)、イツ(呉)",
+        kunyomi="ひと、ひと.つ、はじ.め",
+        sentence="一見[いっけん]",
+        expected_result="<b>イッ</b>けん",
+    )
+    test(
+        test_name="small tsu 3/",
+        kanji="各",
+        onyomi="カク(漢)、カ(呉)",
+        kunyomi="おのおの",
+        sentence="各国[かっこく]",
+        expected_result="<b>カッ</b>こく",
+    )
+    test(
+        test_name="small tsu 4/",
+        kanji="吉",
+        onyomi="キチ(漢)、キツ(呉)",
+        kunyomi="よし",
+        sentence="吉兆[きっちょう]",
+        expected_result="<b>キッ</b>ちょう",
     )
     print("Ok.")
 
