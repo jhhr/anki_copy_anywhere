@@ -426,7 +426,7 @@ def get_notes_to_copy_from(
         card_ids = extra_state[cards_query_id]
     except KeyError:
         # Always exclude suspended cards
-        card_ids = mw.col.find_cards(f"{interpolated_cards_query} -is:suspended")
+        card_ids = mw.col.find_cards(interpolated_cards_query)
         extra_state[cards_query_id] = card_ids
 
     if len(invalid_fields) > 0:

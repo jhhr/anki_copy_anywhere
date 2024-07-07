@@ -43,13 +43,22 @@ class PasteableTextEdit(QTextEdit):
     selected from a right-click context menu.
     """
 
-    def __init__(self, parent=None, options_dict: dict = None, height: int = None):
+    def __init__(
+            self,
+            parent=None,
+            options_dict: dict = None,
+            height: int = None,
+            placeholder_text: str = None,
+    ):
         super().__init__(parent)
         # Define predefined options and their associated text
         self.options_dict = options_dict
         # Set the size of the text edit
         if height is not None:
             self.setFixedHeight(height)
+        # Set placeholder text if provided
+        if placeholder_text:
+            self.setPlaceholderText(placeholder_text)
 
     def contextMenuEvent(self, event: QContextMenuEvent):
         if not self.options_dict:

@@ -36,6 +36,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
             parent=None,
             description: str = None,
             height: int = None,
+            placeholder_text: str = None,
     ):
         super().__init__(parent)
         # options dict is a 2-level dict
@@ -46,7 +47,11 @@ class InterpolatedTextEditLayout(QVBoxLayout):
         # validation dict is 1-level dict with all possible fields as keys
         self.validate_dict = {}
 
-        self.text_edit = PasteableTextEdit(options_dict=options_dict, height=height)
+        self.text_edit = PasteableTextEdit(
+            options_dict=options_dict,
+            height=height,
+            placeholder_text=placeholder_text,
+        )
         self.error_label = QLabel()
         # Use red color for error label
         self.error_label.setStyleSheet("color: red;")

@@ -92,6 +92,11 @@ class AcrossNotesCopyEditor(QWidget):
             <li>Right-click to select a {{Field name}} to paste</li>
             </ul>""",
             height=100,
+            placeholder_text="""Examples:
+Get non-suspended cards from a specific whose field contains a value
+\"deck:My deck\" someField:*{{Field in destination note}}* -is:suspended
+Get specific cards types with a specific interval
+"card:My card 1" prop:ivl<5""",
         )
 
         self.form.addRow(self.card_query_text_layout)
