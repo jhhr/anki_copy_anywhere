@@ -26,14 +26,11 @@ else:
     QFrameShadowRaised = QFrame.Raised
 
 from ..configuration import COPY_MODE_WITHIN_NOTE, COPY_MODE_ACROSS_NOTES
-from .pasteable_paste_text_edit import PasteableTextEdit
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
-from ..utils import to_lowercase_dict
+from .interpolated_text_edit import InterpolatedTextEditLayout
 from ..logic.interpolate_fields import (
-    get_fields_from_text,
-    DEFAULT_SPECIAL_FIELDS_DICT,
-    SPECIAL_FIELDS_VALUES_DICT,
-    CURRENT_TARGET_VALUE,
+    SOURCE_SPECIAL_FIELDS_DICT,
+    DESTINATION_FIELD_VALUE,
 )
 
 
@@ -50,9 +47,8 @@ class CopyFieldToFieldEditor(QWidget):
         self.copy_mode = copy_mode
         self.selected_copy_into_model_name = copy_definition.get("copy_into_note_type")
 
-        self.copy_from_menu_options_dict = DEFAULT_SPECIAL_FIELDS_DICT.copy()
-        self.copy_from_menu_options_validation_dict = SPECIAL_FIELDS_VALUES_DICT.copy()
-        self.update_copy_from_options_dicts()
+        self.copy_from_menu_options_dict = SOURCE_SPECIAL_FIELDS_DICT.copy()
+        self.update_copy_from_options_dict()
 
         self.copy_definition = copy_definition
 
@@ -114,39 +110,24 @@ class CopyFieldToFieldEditor(QWidget):
             field_target_cbox.setCurrentText(copy_field_to_field_definition["copy_into_note_field"])
 
         # Copy from field
-        copy_from_text_edit = PasteableTextEdit()
-        copy_from_text_error_label = QLabel()
-        # Use red color for error label
-        copy_from_text_error_label.setStyleSheet("color: red;")
-        # Connect text changed to validation
-        copy_from_text_edit.textChanged.connect(
-            lambda: self.validate_copy_from_text(copy_from_text_edit.toPlainText(), copy_from_text_error_label)
+        copy_from_text_layout = InterpolatedTextEditLayout(
+            label="Source fields' content that will replace the field",
+            options_dict=SOURCE_SPECIAL_FIELDS_DICT,
+            description=f"""<ul>
+        <li>Reference the source notes' fields with {{{{Field Name}}}}.</li>
+        <li>The destination field's content is in {{{{{DESTINATION_FIELD_VALUE}}}}}.</li>
+        {"<li>Referencing the destination field by name will use the value from the source notes!</li>" if self.copy_mode == COPY_MODE_ACROSS_NOTES else ""}
+        <li>Right-click to select a {{{{Field name}}}} to paste</li>
+        <li>There are additional special values you can use, such as the note ID</li>
+        </ul>"""
         )
-        copy_field_inputs_dict["copy_from_text"] = copy_from_text_edit
-        copy_from_text_layout = QVBoxLayout()
-        copy_from_text_label = QLabel("Source fields' content that will replace the field")
-        copy_from_text_description = QLabel(
-            f"""<ul>
-<li>Reference the source notes' fields with {{{{Field Name}}}}.</li>
-<li>The destination field's content is in {{{{{CURRENT_TARGET_VALUE}}}}}.</li>
-{"<li>Referencing the destination field by name will use the value from the source notes!</li>" if self.copy_mode == COPY_MODE_ACROSS_NOTES else ""}
-<li>Right-click to show a list of all possible fields to copy from.</li>
-<li>There are additional special values you can use, such as the note ID</li>
-</ul>"""
-        )
-        # Set description font size smaller
-        copy_from_text_description.setStyleSheet("font-size: 10px;")
-
-        copy_from_text_layout.addWidget(copy_from_text_label)
-        copy_from_text_layout.addWidget(copy_from_text_description)
-        copy_from_text_layout.addWidget(copy_from_text_edit)
-        copy_from_text_layout.addWidget(copy_from_text_error_label)
+        copy_field_inputs_dict["copy_from_text"] = copy_from_text_layout
 
         row_form.addRow(copy_from_text_layout)
 
-        self.update_copy_from_text_options(copy_from_text_edit)
+        copy_from_text_layout.update_options(self.copy_from_menu_options_dict)
         with suppress(KeyError):
-            copy_from_text_edit.setText(copy_field_to_field_definition["copy_from_text"])
+            copy_from_text_layout.set_text(copy_field_to_field_definition["copy_from_text"])
 
         copy_if_empty = QCheckBox("Only copy into field, if it's empty")
         copy_field_inputs_dict["copy_if_empty"] = copy_if_empty
@@ -204,7 +185,7 @@ class CopyFieldToFieldEditor(QWidget):
         for copy_field_inputs in self.copy_field_inputs:
             copy_field_definition = {
                 "copy_into_note_field": copy_field_inputs["copy_into_note_field"].currentText(),
-                "copy_from_text": copy_field_inputs["copy_from_text"].toPlainText(),
+                "copy_from_text": copy_field_inputs["copy_from_text"].get_text(),
                 "copy_if_empty": copy_field_inputs["copy_if_empty"].isChecked(),
                 "process_chain": copy_field_inputs["process_chain"].get_process_chain(),
             }
@@ -216,8 +197,8 @@ class CopyFieldToFieldEditor(QWidget):
         for copy_field_inputs in self.copy_field_inputs:
             self.update_field_target_options(copy_field_inputs["copy_into_note_field"])
             if self.copy_mode == COPY_MODE_WITHIN_NOTE:
-                self.update_copy_from_options_dicts()
-                self.update_copy_from_text_options(copy_field_inputs["copy_from_text"])
+                self.update_copy_from_options_dict()
+                copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
 
     def update_field_target_options(self, field_target_cbox):
         """
@@ -241,20 +222,18 @@ class CopyFieldToFieldEditor(QWidget):
         if previous_text_in_new_options:
             field_target_cbox.setCurrentText(previous_text)
 
-    def update_copy_from_options_dicts(self):
+    def update_copy_from_options_dict(self):
         """
         Updates the raw options dict used for the "Define what to copy from" TextEdit right-click menu.
         The raw dict is used for validating the text in the TextEdit.
         """
-        field_names_by_model_dict = DEFAULT_SPECIAL_FIELDS_DICT.copy()
-        field_names_only_dict = SPECIAL_FIELDS_VALUES_DICT.copy()
+        field_names_by_model_dict = SOURCE_SPECIAL_FIELDS_DICT.copy()
 
         def add_model_field_names(model_name, model_id):
             nonlocal field_names_by_model_dict
             field_names_by_model_dict[model_name] = []
             for field_name in mw.col.models.field_names(mw.col.models.get(model_id)):
                 field_names_by_model_dict[model_name].append(field_name)
-                field_names_only_dict[field_name] = True
 
         if self.copy_mode == COPY_MODE_WITHIN_NOTE:
             if not self.selected_copy_into_model_name:
@@ -271,35 +250,3 @@ class CopyFieldToFieldEditor(QWidget):
                 add_model_field_names(model.name, model.id)
 
         self.copy_from_menu_options_dict = field_names_by_model_dict
-        self.copy_from_menu_options_validation_dict = to_lowercase_dict(field_names_only_dict)
-
-    def update_copy_from_text_options(self, copy_from_text_edit):
-        """
-        Updates the options in the "Define what to copy from" TextEdit right-click menu.
-        """
-        copy_from_text_edit.clear_options()
-
-        for note_type_name, field_names in self.copy_from_menu_options_dict.items():
-            for field_name in field_names:
-                copy_from_text_edit.add_option_to_group(note_type_name, field_name, f"{{{{{field_name}}}}}")
-
-    def validate_copy_from_text(self, from_text: str, error_label: QLabel):
-        """
-         Validates text that's using {{}} syntax for note fields.
-         Returns none if a source field is empty.
-        """
-        # Regex to pull out any words enclosed in double curly braces
-        fields = get_fields_from_text(from_text)
-
-        invalid_fields = []
-        # Validate that all fields are present in the dict
-        for field in fields:
-            try:
-                self.copy_from_menu_options_validation_dict[field.lower()]
-            except KeyError:
-                invalid_fields.append(field)
-
-        if len(invalid_fields) > 0:
-            error_label.setText(f"Invalid fields: {', '.join(invalid_fields)}")
-        else:
-            error_label.setText("")

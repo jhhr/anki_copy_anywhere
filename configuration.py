@@ -49,7 +49,6 @@ class CopyDefinition(TypedDict):
     copy_into_note_type: str
     field_to_field_defs: list[CopyFieldToField]
     only_copy_into_decks: str
-    search_with_field: Optional[str]
     copy_from_cards_query: Optional[str]
     select_card_by: Optional[str]
     select_card_count: Optional[str]

@@ -8,21 +8,20 @@ from ..utils import to_lowercase_dict
 # Regex to find all fields in a text that uses double curly brace syntax
 FROM_TEXT_FIELD_REGEX = re.compile(r"{{(.+?)}}")
 
-# Special fields that can be used in the "Define what to copy from" TextEdit
-# Prefix them with __ to avoid conflicts with actual note field names
+# General special fields value
 SPECIAL_FIELDS_KEY = "__Special fields"
 NOTE_ID_FIELD = "__Note ID"
-CURRENT_TARGET_VALUE = "__Current target value"
+
+# Special fields that can be used in the "Define what to copy from" PasteableTextEdit
+# Prefix them with __ to avoid conflicts with actual note field names
+DESTINATION_FIELD_VALUE = "__Current target value"
 # Dict for the right-click menu to show the special fields in the from_text TextEdit
-DEFAULT_SPECIAL_FIELDS_DICT = {
+SOURCE_SPECIAL_FIELDS_DICT = {
     SPECIAL_FIELDS_KEY: [
         NOTE_ID_FIELD,
-        CURRENT_TARGET_VALUE,
+        DESTINATION_FIELD_VALUE,
     ]
 }
-SPECIAL_FIELDS_VALUES_DICT = {}
-for special_field_name in DEFAULT_SPECIAL_FIELDS_DICT[SPECIAL_FIELDS_KEY]:
-    SPECIAL_FIELDS_VALUES_DICT[special_field_name] = True
 
 
 def get_special_field_value_for_note(note: Note, field_name: str) -> Union[str, None]:
@@ -34,7 +33,7 @@ def get_special_field_value_for_note(note: Note, field_name: str) -> Union[str, 
     return None
 
 
-def interpolate_from_text(from_text: str, note: Note, current_field_value: str = "") -> Tuple[
+def interpolate_from_text(text: str, note: Note, current_field_value: str = None) -> Tuple[
     Union[str, None], List[str]]:
     """
     Interpolates a text that uses curly brace syntax.
@@ -43,13 +42,13 @@ def interpolate_from_text(from_text: str, note: Note, current_field_value: str =
     # Bunch of extra logic to make this whole process case.insensitive
 
     # Regex to pull out any words enclosed in double curly braces
-    fields = get_fields_from_text(from_text)
+    fields = get_fields_from_text(text)
 
     # field.lower() -> value map
     all_note_fields = to_lowercase_dict(note)
 
     # Lowercase the characters inside {{}} in the from_text
-    from_text = FROM_TEXT_FIELD_REGEX.sub(lambda x: "{{" + x.group(1).lower() + "}}", from_text)
+    text = FROM_TEXT_FIELD_REGEX.sub(lambda x: "{{" + x.group(1).lower() + "}}", text)
 
     # Sub values in text
     invalid_fields = []
@@ -58,11 +57,13 @@ def interpolate_from_text(from_text: str, note: Note, current_field_value: str =
         value = all_note_fields.get(field_lower, None)
         if not value:
             value = get_special_field_value_for_note(note, field_lower)
-        if not value and field_lower == CURRENT_TARGET_VALUE.lower():
+        if (not value
+                and current_field_value is not None
+                and field_lower == DESTINATION_FIELD_VALUE.lower()):
             value = current_field_value
-        from_text = from_text.replace("{{" + field_lower + "}}", str(value))
+        text = text.replace("{{" + field_lower + "}}", str(value))
 
-    return from_text, invalid_fields
+    return text, invalid_fields
 
 
 def get_fields_from_text(from_text: str) -> List[str]:

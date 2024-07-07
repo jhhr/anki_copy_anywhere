@@ -259,7 +259,6 @@ def copy_for_single_note(
             print(message)
 
     (
-        search_with_field,
         field_to_field_defs,
         only_copy_into_decks,
         copy_from_cards_query,
@@ -268,7 +267,6 @@ def copy_for_single_note(
         select_card_separator,
         copy_mode,
     ) = itemgetter(
-        "search_with_field",
         "field_to_field_defs",
         "only_copy_into_decks",
         "copy_from_cards_query",
@@ -278,17 +276,6 @@ def copy_for_single_note(
         "copy_mode"
     )(copy_definition)
 
-    if search_with_field is None and copy_mode == COPY_MODE_ACROSS_NOTES:
-        show_error_message("Error in copy fields: Required 'search_with_field' value was missing")
-        return False
-
-    # Get the field value from the note
-    search_value = ""
-    for field_name, field_value in note.items():
-        if field_name == search_with_field:
-            search_value = field_value
-            break
-
     extra_state = {}
 
     # Step 1: get notes to copy from for this card
@@ -297,8 +284,8 @@ def copy_for_single_note(
         notes_to_copy_from = [note]
     elif copy_mode == COPY_MODE_ACROSS_NOTES:
         notes_to_copy_from = get_notes_to_copy_from(
-            search_value=search_value,
             copy_from_cards_query=copy_from_cards_query,
+            copy_into_note=note,
             deck_id=deck_id,
             extra_state=extra_state,
             only_copy_into_decks=only_copy_into_decks,
@@ -365,8 +352,8 @@ def copy_for_single_note(
 
 
 def get_notes_to_copy_from(
-        search_value: str,
         copy_from_cards_query: str,
+        copy_into_note: Note,
         select_card_by: str,
         deck_id,
         extra_state: dict,
@@ -376,9 +363,8 @@ def get_notes_to_copy_from(
 ) -> list[Note]:
     """
     Get the notes to copy from based on the search value and the query.
-    :param search_value: The value to include in copy_from_cards_query if it contains the
-            $SEARCH_FIELD_VALUE_PLACEHOLDER$ placeholder
-    :param copy_from_cards_query: The query to find the cards to copy from
+    :param copy_from_cards_query: The query to find the cards to copy from.
+            Uses {{}} syntax for note fields and special values
     :param select_card_by: How to select the card to copy from, if we get multiple results using the
             the query
     :param deck_id: The current deck id, used to filter the cards to copy from
@@ -431,21 +417,27 @@ def get_notes_to_copy_from(
         if deck_id not in whitelist_dids:
             return []
 
-    # Check for cached result again
-    if SEARCH_FIELD_VALUE_PLACEHOLDER in copy_from_cards_query:
-        copy_from_cards_query = copy_from_cards_query.replace(SEARCH_FIELD_VALUE_PLACEHOLDER, search_value)
-    cards_query_id = base64.b64encode(f"cards{copy_from_cards_query}".encode()).decode()
+    interpolated_cards_query, invalid_fields = interpolate_from_text(
+        copy_from_cards_query,
+        note=copy_into_note,
+    )
+    cards_query_id = base64.b64encode(f"cards{interpolated_cards_query}".encode()).decode()
     try:
         card_ids = extra_state[cards_query_id]
     except KeyError:
         # Always exclude suspended cards
-        card_ids = mw.col.find_cards(f"{copy_from_cards_query} -is:suspended")
+        card_ids = mw.col.find_cards(f"{interpolated_cards_query} -is:suspended")
         extra_state[cards_query_id] = card_ids
+
+    if len(invalid_fields) > 0:
+        show_error_message(
+            f"Error in copy fields: Invalid fields in copy_from_cards_query: {', '.join(invalid_fields)}")
 
     if (len(card_ids) == 0):
         show_error_message(
-            f"Error in copy fields: Did not find any non-suspended cards with copy_from_cards_query'{copy_from_cards_query}'")
+            f"Error in copy fields: Did not find any non-suspended cards with copy_from_cards_query='{interpolated_cards_query}'")
         return []
+
 
     # select a card or cards based on the select_card_by value
     selected_notes = []
@@ -454,8 +446,9 @@ def get_notes_to_copy_from(
         # We don't make this key entirely unique as we want to cache the selected card for the same
         # deck_id and from_note_type_id combination, so that getting a different field from the same
         # card type will still return the same card
+
         card_select_key = base64.b64encode(
-            f"selected_card{copy_from_cards_query}{select_card_by}{i}".encode()).decode()
+            f"selected_card{interpolated_cards_query}{select_card_by}{i}".encode()).decode()
 
         if select_card_by == 'Random':
             # We don't want to cache this as it should in fact be different each time
@@ -523,7 +516,11 @@ def get_field_values_from_notes(
     result_val = ""
     for i, note in enumerate(notes):
         # Return the interpolated value using the note
-        interpolated_value, invalid_fields = interpolate_from_text(copy_from_text, note, current_target_value)
+        interpolated_value, invalid_fields = interpolate_from_text(
+            copy_from_text,
+            note,
+            current_target_value
+        )
         if len(invalid_fields) > 0:
             show_error_message(
                 f"Error in copy fields: Invalid fields in copy_from_text: {', '.join(invalid_fields)}")

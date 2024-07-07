@@ -39,13 +39,17 @@ class GroupedQMenu(QMenu):
 
 class PasteableTextEdit(QTextEdit):
     """
-    Custom QTextEdit that allows for pasting predefined text options selected from a right-click context menu.
+    Custom QTextEdit that allows for pasting predefined text options
+    selected from a right-click context menu.
     """
 
-    def __init__(self, parent=None, options_dict: dict = None):
+    def __init__(self, parent=None, options_dict: dict = None, height: int = None):
         super().__init__(parent)
         # Define predefined options and their associated text
         self.options_dict = options_dict
+        # Set the size of the text edit
+        if height is not None:
+            self.setFixedHeight(height)
 
     def contextMenuEvent(self, event: QContextMenuEvent):
         if not self.options_dict:

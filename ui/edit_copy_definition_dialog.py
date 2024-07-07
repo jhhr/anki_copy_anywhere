@@ -25,6 +25,7 @@ from aqt.qt import (
 from aqt.utils import showInfo
 
 from .copy_field_to_field_editor import CopyFieldToFieldEditor
+from .interpolated_text_edit import InterpolatedTextEditLayout
 from .scrollable_dialog import ScrollableQDialog
 from ..configuration import (
     Config,
@@ -32,7 +33,6 @@ from ..configuration import (
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
 )
-from ..logic.copy_fields import SEARCH_FIELD_VALUE_PLACEHOLDER
 
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
@@ -82,23 +82,19 @@ class AcrossNotesCopyEditor(QWidget):
         self.form = QFormLayout()
         self.main_layout.addLayout(self.form)
 
-        self.search_field_cbox = QComboBox()
-        self.form.addRow("Destination field to search with", self.search_field_cbox)
+        self.card_query_text_layout = InterpolatedTextEditLayout(
+            label="Search query to get source cards",
+            # No special fields for search, just the destination note fields will be used
+            options_dict={},
+            description="""<ul>
+            <li>Use the same query syntax as in the card browser</li> 
+            <li>Reference the destination notes' fields with {{Field Name}}.</li>
+            <li>Right-click to select a {{Field name}} to paste</li>
+            </ul>""",
+            height=100,
+        )
 
-        self.card_query_text = QLineEdit()
-        self.card_query_text.setPlaceholderText(
-            f"\"deck:Deck name\" note:\"Note type\" some_field:*{SEARCH_FIELD_VALUE_PLACEHOLDER}*"
-        )
-        self.form.addRow(
-            """<div>
-            Query to search for cards to copy from
-            <br/>
-            <span style="font-size: small;">
-            (use $SEARCH_FIELD_VALUE$ as the value from the note field to search with)
-            </span>
-            </div>""",
-            self.card_query_text,
-        )
+        self.form.addRow(self.card_query_text_layout)
 
         self.card_select_cbox = QComboBox()
         self.card_select_cbox.addItem("Random")
@@ -123,21 +119,23 @@ class AcrossNotesCopyEditor(QWidget):
 
         # Set the current text in the combo boxes to what we had in memory in the configuration (if we had something)
         if copy_definition:
-            with suppress(KeyError): self.search_field_cbox.setCurrentText(copy_definition["search_with_field"])
-            with suppress(KeyError): self.card_query_text.setText(copy_definition["copy_from_cards_query"])
-            with suppress(KeyError): self.card_select_cbox.setCurrentText(copy_definition["select_card_by"])
-            with suppress(KeyError): self.card_select_count.setText(copy_definition["select_card_count"])
-            with suppress(KeyError): self.card_select_separator.setText(copy_definition["select_card_separator"])
+            with suppress(KeyError):
+                self.card_query_text_layout.set_text(copy_definition["copy_from_cards_query"])
+            with suppress(KeyError):
+                self.card_select_cbox.setCurrentText(copy_definition["select_card_by"])
+            with suppress(KeyError):
+                self.card_select_count.setText(copy_definition["select_card_count"])
+            with suppress(KeyError):
+                self.card_select_separator.setText(copy_definition["select_card_separator"])
 
     def update_fields_by_target_note_type(self, model):
-        self.search_field_cbox.clear()
-        self.search_field_cbox.addItem("-")
-        for field_name in mw.col.models.field_names(model):
-            self.search_field_cbox.addItem(field_name)
-            if field_name == self.copy_definition.get("search_with_field"):
-                self.search_field_cbox.setCurrentText(field_name)
-
         self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model["name"])
+
+        new_options_dict = {
+            model["name"]: [field for field in mw.col.models.field_names(model)]
+        }
+        self.card_query_text_layout.update_options(new_options_dict)
+        self.card_query_text_layout.validate_text()
 
     def get_field_to_field_editor(self):
         return self.fields_vbox.field_to_field_editor
@@ -227,7 +225,6 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.copy_on_add_checkbox.setChecked(False)
         self.middle_form.addRow("", self.copy_on_add_checkbox)
 
-
         # Both the across and within note editors will share the same field-to-field editor
         # Add tabs using QTabWidget to select between showing AcrossNotesCopyEditor and WithinNoteCopyEditor
         self.tabs_vbox = QVBoxLayout()
@@ -254,14 +251,13 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         if copy_definition:
             with suppress(KeyError):
                 self.note_type_target_cbox.setCurrentText(copy_definition["copy_into_note_type"])
+            self.update_fields_by_target_note_type()
             with suppress(KeyError):
                 self.definition_name.setText(copy_definition["definition_name"])
             with suppress(KeyError):
                 self.copy_on_sync_checkbox.setChecked(copy_definition["copy_on_sync"])
             with suppress(KeyError):
                 self.copy_on_add_checkbox.setChecked(copy_definition["copy_on_add"])
-            with suppress(KeyError):
-                self.update_fields_by_target_note_type()
             with suppress(KeyError):
                 self.decks_limit_multibox.setCurrentText(copy_definition["only_copy_into_decks"])
             with suppress(KeyError):
@@ -275,7 +271,6 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
                     self.editor_type_tabs.setCurrentIndex(1)
                     self.active_field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
-
 
         # Connect signals
         self.note_type_target_cbox.currentTextChanged.connect(
@@ -296,7 +291,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 show_error = True
 
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
-            if self.across_notes_editor_tab.card_query_text.text() == "":
+            if self.across_notes_editor_tab.card_query_text_layout.get_text() == "":
                 show_error = True
                 missing_card_query_error = "Search query cannot be empty"
             if self.across_notes_editor_tab.card_select_cbox.currentText() == "-":
@@ -305,9 +300,9 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         if (show_error):
             showInfo(f"""Some required required fields are missing:
                 {missing_copy_into_error if missing_copy_into_error else ""}
-                {missing_copy_from_error if missing_copy_into_error else ""}
+                {missing_copy_from_error if missing_copy_from_error else ""}
                 {missing_card_query_error if missing_card_query_error else ""}
-                {missing_card_select_error if missing_card_query_error else ""}
+                {missing_card_select_error if missing_card_select_error else ""}
                 """)
         else:  # Check that name is unique
             definition_name = self.definition_name.text()
@@ -364,8 +359,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_into_note_type": self.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": self.decks_limit_multibox.currentText(),
                 "field_to_field_defs": self.across_notes_editor_tab.get_field_to_field_editor().get_field_to_field_defs(),
-                "search_with_field": self.across_notes_editor_tab.search_field_cbox.currentText(),
-                "copy_from_cards_query": self.across_notes_editor_tab.card_query_text.text(),
+                "copy_from_cards_query": self.across_notes_editor_tab.card_query_text_layout.get_text(),
                 "select_card_by": self.across_notes_editor_tab.card_select_cbox.currentText(),
                 "select_card_count": self.across_notes_editor_tab.card_select_count.text(),
                 "select_card_separator": self.across_notes_editor_tab.card_select_separator.text(),
@@ -383,7 +377,6 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_on_sync": self.copy_on_sync_checkbox.isChecked(),
                 "copy_on_add": self.copy_on_add_checkbox.isChecked(),
                 "copy_mode": self.selected_editor_type,
-                "search_with_field": None,
                 "copy_from_cards_query": None,
                 "select_card_by": None,
                 "select_card_count": None,
