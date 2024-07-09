@@ -1,10 +1,6 @@
 import re
 from typing import Callable, Optional
 
-# Name to use for detecting the process in the
-# and also the GUI
-REGEX_PROCESS = "Regex replace"
-
 
 def regex_process(
         text: str,

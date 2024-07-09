@@ -13,12 +13,16 @@ from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiA
 from aqt.utils import tooltip
 
 from .interpolate_fields import interpolate_from_text
-from .kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME, kana_highlight_process
-from .regex_process import REGEX_PROCESS, regex_process
+from .kana_highlight_process import kana_highlight_process
+from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
+from .regex_process import regex_process
 from ..configuration import (
     CopyDefinition,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
+    KANA_HIGHLIGHT_PROCESS,
+    REGEX_PROCESS,
+    KANJIUM_TO_JAVDEJONG_PROCESS,
 )
 from ..utils import (
     write_custom_data,
@@ -318,7 +322,7 @@ def copy_for_single_note(
         # Step 2.2: If we have further processing steps, run them
         if process_chain is not None:
             for process in process_chain:
-                if process["name"] == KANA_HIGHLIGHT_PROCESS_NAME:
+                if process["name"] == KANA_HIGHLIGHT_PROCESS:
                     result_val = kana_highlight_process(
                         text=result_val,
                         onyomi_field=process.get("onyomi_field", None),
@@ -334,6 +338,12 @@ def copy_for_single_note(
                         regex=process.get("regex", None),
                         replacement=process.get("replacement", None),
                         flags=process.get("flags", None),
+                        show_error_message=show_error_message,
+                    )
+                if process["name"] == KANJIUM_TO_JAVDEJONG_PROCESS:
+                    result_val = kanjium_to_javdejong_process(
+                        text=result_val,
+                        delimiter=process.get("delimiter", None),
                         show_error_message=show_error_message,
                     )
 

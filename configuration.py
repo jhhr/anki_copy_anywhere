@@ -18,18 +18,54 @@ def run_on_configuration_change(function):
     mw.addonManager.setConfigUpdatadAction(__name__, lambda *_: function())
 
 
+KANJIUM_TO_JAVDEJONG_PROCESS = "Pitch accent conversion: Kanjium to Javdejong"
+
+
+class KanjiumToJavdejongProcess(TypedDict):
+    name: str
+    delimiter: str
+
+
+REGEX_PROCESS = "Regex replace"
 class RegexProcess(TypedDict):
     name: str
     regex: str
     replacement: str
     flags: Optional[str]
 
+
+KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
 class KanaHighlightProcess(TypedDict):
     name: str
     onyomi_field: str
     kunyomi_field: str
     kanji_field: str
 
+
+ALL_PROCESS_NAMES = [
+    KANJIUM_TO_JAVDEJONG_PROCESS,
+    REGEX_PROCESS,
+    KANA_HIGHLIGHT_PROCESS,
+]
+
+NEW_PROCESS_DEFAULTS = {
+    KANJIUM_TO_JAVDEJONG_PROCESS: {
+        "name": KANJIUM_TO_JAVDEJONG_PROCESS,
+        "delimiter": "・",
+    },
+    REGEX_PROCESS: {
+        "name": REGEX_PROCESS,
+        "regex": "",
+        "replacement": "",
+        "flags": "",
+    },
+    KANA_HIGHLIGHT_PROCESS: {
+        "name": KANA_HIGHLIGHT_PROCESS,
+        "onyomi_field": "",
+        "kunyomi_field": "",
+        "kanji_field": "",
+    },
+}
 
 class CopyFieldToField(TypedDict):
     copy_into_note_field: str

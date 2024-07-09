@@ -4,10 +4,6 @@ from anki.notes import Note
 
 from .kana_highlight import kana_highlight, kana_filter
 
-# Name to use for detecting the process in the
-# and also the GUI
-KANA_HIGHLIGHT_PROCESS_NAME = "Kana Highlight"
-
 
 def kana_highlight_process(
         text: str,

@@ -33,9 +33,13 @@ from ..configuration import (
     CopyFieldToField,
     KanaHighlightProcess,
     RegexProcess,
+    KanjiumToJavdejongProcess,
+    ALL_PROCESS_NAMES,
+    NEW_PROCESS_DEFAULTS,
+    KANJIUM_TO_JAVDEJONG_PROCESS,
+    REGEX_PROCESS,
+    KANA_HIGHLIGHT_PROCESS,
 )
-from ..logic.kana_highlight_process import KANA_HIGHLIGHT_PROCESS_NAME
-from ..logic.regex_process import REGEX_PROCESS
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
@@ -52,6 +56,51 @@ class ClickableLabel(QLabel):
     def mousePressEvent(self, event):
         # Show tooltip near the label when clicked
         QToolTip.showText(self.mapToGlobal(QPoint(0, self.height())), self.tooltip_text)
+
+
+class KanjiumToJavdejongProcessDialog(QDialog):
+    def __init__(self, parent, process: KanjiumToJavdejongProcess):
+        super().__init__(parent)
+        self.process = process
+
+        self.description = """
+        Convert a field containing pitch accents in the Kanjium format into to the JavdeJong format.
+        If the field doesn't contain Kanjium format pitch accents, nothing is done.
+        """
+        self.form = QFormLayout()
+        self.setWindowModality(WindowModal)
+        self.setLayout(self.form)
+
+        self.top_label = QLabel(self.description)
+        self.form.addRow(self.top_label)
+
+        self.delimiter_field = QLineEdit()
+        self.form.addRow("Delimiter between multiple pitch accents", self.delimiter_field)
+
+        with suppress(KeyError): self.delimiter_field.setText(self.process["delimiter"])
+
+        # Add Ok and Cancel buttons as QPushButtons
+        self.ok_button = QPushButton("OK")
+        self.close_button = QPushButton("Cancel")
+
+        self.ok_button.clicked.connect(self.save_process)
+        self.close_button.clicked.connect(self.reject)
+
+        self.bottom_grid = QGridLayout()
+        self.bottom_grid.setColumnMinimumWidth(0, 150)
+        self.bottom_grid.setColumnMinimumWidth(1, 150)
+        self.bottom_grid.setColumnMinimumWidth(2, 150)
+        self.form.addRow(self.bottom_grid)
+
+        self.bottom_grid.addWidget(self.ok_button, 0, 0)
+        self.bottom_grid.addWidget(self.close_button, 0, 2)
+
+    def save_process(self):
+        self.process = {
+            "name": KANJIUM_TO_JAVDEJONG_PROCESS,
+            "delimiter": self.delimiter_field.text(),
+        }
+        self.accept()
 
 
 class RegexProcessDialog(QDialog):
@@ -187,7 +236,7 @@ class KanaHighlightProcessDialog(QDialog):
 
     def save_process(self):
         self.process = {
-            "name": KANA_HIGHLIGHT_PROCESS_NAME,
+            "name": KANA_HIGHLIGHT_PROCESS,
             "onyomi_field": self.onyomi_field_cbox.currentText(),
             "kunyomi_field": self.kunyomi_field_cbox.currentText(),
             "kanji_field": self.kanji_field_cbox.currentText(),
@@ -242,10 +291,7 @@ class EditExtraProcessingWidget(QWidget):
         self.add_process_chain_button.clear()
         self.add_process_chain_button.addItem("-")
         # Add options not currently active to the combobox
-        for process in [
-            KANA_HIGHLIGHT_PROCESS_NAME,
-            REGEX_PROCESS,
-        ]:
+        for process in ALL_PROCESS_NAMES:
             if process not in currently_active_processes:
                 self.add_process_chain_button.addItem(process)
 
@@ -309,21 +355,7 @@ class EditExtraProcessingWidget(QWidget):
     def add_process(self, process_name):
         if process_name in ["-", "", None]:
             return
-        new_process = None
-        if process_name == KANA_HIGHLIGHT_PROCESS_NAME:
-            new_process = {
-                "name": process_name,
-                "onyomi_field": '',
-                "kunyomi_field": '',
-                "kanji_field": '',
-            }
-        if process_name == REGEX_PROCESS:
-            new_process = {
-                "name": process_name,
-                "regex": '',
-                "replacement": '',
-                "flags": '',
-            }
+        new_process = NEW_PROCESS_DEFAULTS[process_name]
         if new_process is None:
             return
         self.add_process_row(len(self.process_chain), new_process)
@@ -337,15 +369,17 @@ class EditExtraProcessingWidget(QWidget):
         except KeyError:
             tooltip(f"Error: Process name not found in process: {process}")
             return None, ""
-        if process_name == KANA_HIGHLIGHT_PROCESS_NAME:
+        if process_name == KANA_HIGHLIGHT_PROCESS:
             with suppress(KeyError):
                 note_type = self.copy_definition["copy_into_note_type"]
             return KanaHighlightProcessDialog(
                 self,
                 process,
                 note_type
-            ), KANA_HIGHLIGHT_PROCESS_NAME
+            ), KANA_HIGHLIGHT_PROCESS
         if process_name == REGEX_PROCESS:
             return RegexProcessDialog(self, process), REGEX_PROCESS
+        if process_name == KANJIUM_TO_JAVDEJONG_PROCESS:
+            return KanjiumToJavdejongProcessDialog(self, process), KANJIUM_TO_JAVDEJONG_PROCESS
 
         return None, ""
