@@ -375,6 +375,7 @@ def get_notes_to_copy_from(
     Get the notes to copy from based on the search value and the query.
     :param copy_from_cards_query: The query to find the cards to copy from.
             Uses {{}} syntax for note fields and special values
+    :param copy_into_note: The note to copy into, used to interpolate the query
     :param select_card_by: How to select the card to copy from, if we get multiple results using the
             the query
     :param deck_id: The current deck id, used to filter the cards to copy from
@@ -445,7 +446,7 @@ def get_notes_to_copy_from(
 
     if (len(card_ids) == 0):
         show_error_message(
-            f"Error in copy fields: Did not find any non-suspended cards with copy_from_cards_query='{interpolated_cards_query}'")
+            f"Error in copy fields: Did not find any cards with copy_from_cards_query='{interpolated_cards_query}'")
         return []
 
 
