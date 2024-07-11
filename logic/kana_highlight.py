@@ -34,7 +34,8 @@ KATAKANA_CONVERSION_DICT = {
     for k, vs in HIRAGANA_CONVERSION_DICT.items()
 }
 
-SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き"]
+# Include う just for the special case of 秘蔵[ひぞ]っ子[こ]
+SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "う"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
@@ -297,6 +298,8 @@ def kana_highlight(
     clean_text = re.sub(r"<b>(.+?)</b>", r"\1", text)
     # Then clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, clean_text)
+    # Special case 秘蔵[ひぞ]っ子[こ] needs to be converted to 秘蔵[ひぞっ]子[こ]
+    clean_text = clean_text.replace("秘蔵[ひぞ]っ", "秘蔵[ひぞっ]")
     return KANJI_AND_FURIGANA_REC.sub(furigana_replacer, clean_text)
 
 
@@ -426,6 +429,14 @@ def main():
         kunyomi="よし",
         sentence="吉兆[きっちょう]",
         expected_result="<b>キッ</b>ちょう",
+    )
+    test(
+        test_name="small tsu 5/",
+        kanji="蔵",
+        onyomi="ゾウ(漢)、ソウ(呉)",
+        kunyomi="くら",
+        sentence="秘蔵っ子[ひぞっこ]",
+        expected_result="ひ<b>ゾッ</b>こ",
     )
     print("Ok.")
 
