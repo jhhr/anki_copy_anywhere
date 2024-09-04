@@ -48,12 +48,13 @@ def test(test_name: str, text: str, regex: str, replacement: str, flags: Optiona
 Expected: {expected}
 Got: {result}
 """)
+        raise
 
 
 def main():
     test(
         test_name="Replacement with groups",
-        text="<i>abc123</i>def456",
+        text="<i>abc123</i>def456<i>ghi789</i>",
         regex=r"<i>(.*)</i>",
         replacement=r"\1",
         flags=None,

@@ -303,10 +303,8 @@ def kana_highlight(
         elif kanji_in_middle:
             return process_readings(furigana, middle=True)
 
-    # First clean any existing <b> tags from the text, as we don't want to nest them
-    clean_text = re.sub(r"<b>(.+?)</b>", r"\1", text)
-    # Then clean any potential mixed okurigana cases, turning them normal
-    clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, clean_text)
+    # Clean any potential mixed okurigana cases, turning them normal
+    clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)
     # Special case 秘蔵[ひぞ]っ子[こ] needs to be converted to 秘蔵[ひぞっ]子[こ]
     clean_text = clean_text.replace("秘蔵[ひぞ]っ", "秘蔵[ひぞっ]")
     return KANJI_AND_FURIGANA_REC.sub(furigana_replacer, clean_text)
