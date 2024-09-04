@@ -37,3 +37,30 @@ def regex_process(
     regex = re.compile(regex, piped_flags)
 
     return regex.sub(replacement, text)
+
+
+def test(test_name: str, text: str, regex: str, replacement: str, flags: Optional[str], expected: str):
+    result = regex_process(text, regex, replacement, flags, None)
+    try:
+        assert result == expected
+    except AssertionError:
+        print(f"""{test_name}
+Expected: {expected}
+Got: {result}
+""")
+
+
+def main():
+    test(
+        test_name="Replacement with groups",
+        text="<i>abc123</i>def456",
+        regex=r"<i>(.*)</i>",
+        replacement=r"\1",
+        flags=None,
+        expected="abc123def456",
+    )
+    print("Ok.")
+
+
+if __name__ == "__main__":
+    main()

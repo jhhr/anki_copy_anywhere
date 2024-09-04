@@ -312,7 +312,7 @@ def kana_highlight(
     return KANJI_AND_FURIGANA_REC.sub(furigana_replacer, clean_text)
 
 
-def test(test_name, expected_result, sentence, kanji, onyomi, kunyomi):
+def test(test_name, expected, sentence, kanji, onyomi, kunyomi):
     result = kana_highlight(
         kanji,
         onyomi,
@@ -320,11 +320,12 @@ def test(test_name, expected_result, sentence, kanji, onyomi, kunyomi):
         sentence,
     )
     try:
-        assert result == expected_result
+        assert result == expected
     except AssertionError:
-        print(test_name)
-        print(f"Expected: {expected_result}")
-        print(f"Got: {result}")
+        print(f"""{test_name}
+Expected: {expected}
+Got: {result}
+""")
         raise
 
 
@@ -336,7 +337,7 @@ def main():
         kunyomi="み.る",
         # しちょうしゃ　has し in it twice but only the first one should be highlighted
         sentence="視聴者[しちょうしゃ]",
-        expected_result="<b>シ</b>ちょうしゃ",
+        expected="<b>シ</b>ちょうしゃ",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 1/",
@@ -345,7 +346,7 @@ def main():
         kunyomi="かたまり、まる.い",
         # 消え去[きえさ]った　has え　in the middle of the kanji but った at the end is not included in the furigana
         sentence="団子[だんご]が 消え去[きえさ]った。",
-        expected_result="<b>ダン</b>ごが きえさった。",
+        expected="<b>ダン</b>ごが きえさった。",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 2/",
@@ -354,7 +355,7 @@ def main():
         kunyomi="とな.る、となり",
         # 隣り合わせ[となりあわせ]のまち　has り　in the middle and わせ　at the end of the group
         sentence="隣り合わせ[となりあわせ]の町[まち]。",
-        expected_result="<b>とな</b>りあわせのまち。",
+        expected="<b>とな</b>りあわせのまち。",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 3/",
@@ -363,7 +364,7 @@ def main():
         kunyomi="よわい、は、よわ.い、よわい.する",
         # A third edge case: there is only okurigana at the end
         sentence="歯止め[はどめ]",
-        expected_result="<b>は</b>どめ",
+        expected="<b>は</b>どめ",
     )
     test(
         test_name="Is able to match the same kanji occurring twice",
@@ -371,7 +372,7 @@ def main():
         onyomi="カク(呉)",
         kunyomi="たかどの、たな",
         sentence="新[しん] 内閣[ないかく]の 組閣[そかく]が 発表[はっぴょう]された。",
-        expected_result="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
+        expected="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
     )
     test(
         test_name="Is able to pick the right reading when there is multiple matches",
@@ -380,7 +381,7 @@ def main():
         kunyomi="くつ",
         # ながぐつ　has が (onyomi か match) and ぐつ (kunyomi くつ) as matches
         sentence="お 前[まえ]いつも 長靴[ながぐつ]に 傘[かさ]さしてキメーんだよ！！",
-        expected_result="お まえいつも なが<b>ぐつ</b>に かささしてキメーんだよ！！",
+        expected="お まえいつも なが<b>ぐつ</b>に かささしてキメーんだよ！！",
     )
     test(
         test_name="Should match reading in 4 kanji compound word",
@@ -388,7 +389,7 @@ def main():
         onyomi="ヒツ(漢)、ヒチ(呉)",
         kunyomi="かなら.ず",
         sentence="見敵必殺[けんてきひっさつ]の 指示[しじ]もないのに 戦闘[せんとう]は 不自然[ふしぜん]。",
-        expected_result="けんてき<b>ヒッ</b>さつの しじもないのに せんとうは ふしぜん。",
+        expected="けんてき<b>ヒッ</b>さつの しじもないのに せんとうは ふしぜん。",
     )
     test(
         test_name="Should match furigana for romaji numbers",
@@ -396,7 +397,7 @@ def main():
         onyomi="ゾク(呉)、ソク(漢)",
         kunyomi="わるもの、そこ.なう",
         sentence="海賊[かいぞく]たちは ７[なな]つの 海[うみ]を 航海[こうかい]した。",
-        expected_result="かい<b>ゾク</b>たちは ななつの うみを こうかいした。",
+        expected="かい<b>ゾク</b>たちは ななつの うみを こうかいした。",
     )
     test(
         test_name="Should match the full reading match when there are multiple",
@@ -405,7 +406,7 @@ def main():
         kunyomi="よし、よ.る、なお",
         # Both ゆ and ゆい are in the furigana but the correct match is ゆい
         sentence="彼女[かのじょ]は 由緒[ゆいしょ]ある 家柄[いえがら]の 出[で]だ。",
-        expected_result="かのじょは <b>ユイ</b>しょある いえがらの でだ。",
+        expected="かのじょは <b>ユイ</b>しょある いえがらの でだ。",
     )
     test(
         test_name="small tsu 1/",
@@ -413,7 +414,7 @@ def main():
         onyomi="テキ(漢)、チャク(呉)",
         kunyomi="えぐ.る、そ.る、のぞ.く",
         sentence="剔抉[てっけつ]",
-        expected_result="<b>テッ</b>けつ",
+        expected="<b>テッ</b>けつ",
     )
     test(
         test_name="small tsu 2/",
@@ -421,7 +422,7 @@ def main():
         onyomi="イチ(漢)、イツ(呉)",
         kunyomi="ひと、ひと.つ、はじ.め",
         sentence="一見[いっけん]",
-        expected_result="<b>イッ</b>けん",
+        expected="<b>イッ</b>けん",
     )
     test(
         test_name="small tsu 3/",
@@ -429,7 +430,7 @@ def main():
         onyomi="カク(漢)、カ(呉)",
         kunyomi="おのおの",
         sentence="各国[かっこく]",
-        expected_result="<b>カッ</b>こく",
+        expected="<b>カッ</b>こく",
     )
     test(
         test_name="small tsu 4/",
@@ -437,7 +438,7 @@ def main():
         onyomi="キチ(漢)、キツ(呉)",
         kunyomi="よし",
         sentence="吉兆[きっちょう]",
-        expected_result="<b>キッ</b>ちょう",
+        expected="<b>キッ</b>ちょう",
     )
     test(
         test_name="small tsu 5/",
@@ -445,7 +446,7 @@ def main():
         onyomi="ゾウ(漢)、ソウ(呉)",
         kunyomi="くら",
         sentence="秘蔵っ子[ひぞっこ]",
-        expected_result="ひ<b>ゾッ</b>こ",
+        expected="ひ<b>ゾッ</b>こ",
     )
     test(
         test_name="small tsu 6/",
@@ -453,7 +454,7 @@ def main():
         onyomi="コウ(呉)",
         kunyomi="しり",
         sentence="尻尾[しっぽ]",
-        expected_result="<b>シッ</b>ぽ",
+        expected="<b>シッ</b>ぽ",
     )
     test(
         test_name="Single kana reading conversion",
@@ -462,7 +463,7 @@ def main():
         onyomi="ソ(呉)、ゾ",
         kunyomi="おや、じじ、はじ.め",
         sentence="先祖[せんぞ]",
-        expected_result="せん<b>ゾ</b>",
+        expected="せん<b>ゾ</b>",
     )
     print("Ok.")
 
