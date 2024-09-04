@@ -218,18 +218,18 @@ def kana_highlight(
             # This only applies to the first kana in the reading and if the reading isn't a single kana
             if len(onyomi_reading) != 1 and onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
                 for onyomi_kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
-                    converted_onyomi = onyomi_reading.replace(onyomi_reading[0], onyomi_kana, 1)
-                    if converted_onyomi in target_furigana_section:
-                        debug_print(f"\nconverted_onyomi: {converted_onyomi}")
-                        return replace_onyomi_match(converted_onyomi)
+                    converted_kunyomi = onyomi_reading.replace(onyomi_reading[0], onyomi_kana, 1)
+                    if converted_kunyomi in target_furigana_section:
+                        debug_print(f"\nconverted_onyomi: {converted_kunyomi}")
+                        return replace_onyomi_match(converted_kunyomi)
             # Then also check for small tsu conversion of some consonants
             # this only happens in the last kana of the reading
             for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
                 if onyomi_reading[-1] == tsu_kana:
-                    converted_onyomi = onyomi_reading[:-1] + "っ"
-                    if converted_onyomi in target_furigana_section:
-                        debug_print(f"\nconverted_onyomi: {converted_onyomi}")
-                        return replace_onyomi_match(converted_onyomi)
+                    converted_kunyomi = onyomi_reading[:-1] + "っ"
+                    if converted_kunyomi in target_furigana_section:
+                        debug_print(f"\nconverted_onyomi: {converted_kunyomi}")
+                        return replace_onyomi_match(converted_kunyomi)
 
         def replace_kunyomi_match(kunyomi_that_matched):
             nonlocal furigana
@@ -258,6 +258,15 @@ def kana_highlight(
                     if converted_kunyomi in target_furigana_section:
                         debug_print(f"\nconverted_kunyomi: {converted_kunyomi}")
                         return replace_kunyomi_match(converted_kunyomi)
+
+            # Then also check for small tsu conversion of some consonants
+            # this only happens in the last kana of the reading
+            for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
+                if kunyomi_stem[-1] == tsu_kana:
+                    converted_kunyomi = kunyomi_stem[:-1] + "っ"
+                    if converted_kunyomi in target_furigana_section:
+                        debug_print(f"\nconverted_kunyomi: {converted_kunyomi}")
+                        return replace_onyomi_match(converted_kunyomi)
         # No onyomi or kunyomi reading matched the furigana
         show_error_message(
             f"Error in kana_highlight[]: No reading found for furigana ({furigana}) among onyomi ({onyomi}) and kunyomi ({kunyomi})")
@@ -437,6 +446,14 @@ def main():
         kunyomi="くら",
         sentence="秘蔵っ子[ひぞっこ]",
         expected_result="ひ<b>ゾッ</b>こ",
+    )
+    test(
+        test_name="small tsu 6/",
+        kanji="尻",
+        onyomi="コウ(呉)",
+        kunyomi="しり",
+        sentence="尻尾[しっぽ]",
+        expected_result="<b>シッ</b>ぽ",
     )
     test(
         test_name="Single kana reading conversion",
