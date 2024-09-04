@@ -35,7 +35,7 @@ KATAKANA_CONVERSION_DICT = {
 }
 
 # Include う just for the special case of 秘蔵[ひぞ]っ子[こ]
-SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "う"]
+SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "う", "り"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
