@@ -67,6 +67,10 @@ NEW_PROCESS_DEFAULTS = {
     },
 }
 
+MULTIPLE_ALLOWED_PROCESS_NAMES = [
+    REGEX_PROCESS,
+]
+
 class CopyFieldToField(TypedDict):
     copy_into_note_field: str
     copy_from_text: str

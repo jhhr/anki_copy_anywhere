@@ -39,6 +39,7 @@ from ..configuration import (
     KANJIUM_TO_JAVDEJONG_PROCESS,
     REGEX_PROCESS,
     KANA_HIGHLIGHT_PROCESS,
+    MULTIPLE_ALLOWED_PROCESS_NAMES,
 )
 
 if qtmajor > 5:
@@ -292,7 +293,7 @@ class EditExtraProcessingWidget(QWidget):
         self.add_process_chain_button.addItem("-")
         # Add options not currently active to the combobox
         for process in ALL_PROCESS_NAMES:
-            if process not in currently_active_processes:
+            if process not in currently_active_processes or process in MULTIPLE_ALLOWED_PROCESS_NAMES:
                 self.add_process_chain_button.addItem(process)
 
     def remove_process(self, process, process_dialog):
