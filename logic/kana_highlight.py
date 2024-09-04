@@ -438,6 +438,15 @@ def main():
         sentence="秘蔵っ子[ひぞっこ]",
         expected_result="ひ<b>ゾッ</b>こ",
     )
+    test(
+        test_name="Single kana reading conversion",
+        kanji="祖",
+        # 祖 usually only lists ソ as the only onyomi
+        onyomi="ソ(呉)、ゾ",
+        kunyomi="おや、じじ、はじ.め",
+        sentence="先祖[せんぞ]",
+        expected_result="せん<b>ゾ</b>",
+    )
     print("Ok.")
 
 
