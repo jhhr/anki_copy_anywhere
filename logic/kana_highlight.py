@@ -463,6 +463,14 @@ def main():
         sentence="先祖[せんぞ]",
         expected="せん<b>ゾ</b>",
     )
+    test(
+        test_name="Numbers before word",
+        kanji="国",
+        onyomi="コク(呉)",
+        kunyomi="くに",
+        sentence="その2 国[こく]は 国交[こっこう]を 断絶[だんぜつ]した。",
+        expected="その2 <b>こく</b>は こっこうを だんぜつした。",
+    )
     print("Ok.")
 
 
