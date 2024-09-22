@@ -172,12 +172,22 @@ def kana_highlight(
     # Function that processes a furigana by checking all possible onyomi and kunyomi readings on it
     # Either returns the furigana as-is when there is no match or modifies the furigana by
     # adding <b> tags around the part that matches the reading
-    def process_readings(furigana, right_edge=False, left_edge=False, middle=False,
-                         show_error_message=print):
+    def process_readings(
+            furigana,
+            whole=False,
+            right_edge=False,
+            left_edge=False,
+            middle=False,
+            return_on_or_kun_match_only=False,
+            show_error_message=print
+    ):
         # We'll loop through all onyomi and kunyomi readings and find the one that has a match in the furigana
         # If we find a match, we'll highlight that part of the furigana
         target_furigana_section = None
-        if left_edge:
+        if whole:
+            # Highlight the whole furigana
+            target_furigana_section = furigana
+        elif left_edge:
             # Leave out the last character of the furigana
             target_furigana_section = furigana[:-1]
         elif right_edge:
@@ -191,7 +201,12 @@ def kana_highlight(
                 "Error in kana_highlight[]: process_readings() called with no edge specified")
             return None
 
+        debug_print(f"\ntarget_furigana_section: {target_furigana_section}")
+
         def replace_onyomi_match(onyomi_that_matched):
+            if return_on_or_kun_match_only:
+                return [True, False]
+
             nonlocal furigana
 
             if right_edge:
@@ -232,6 +247,9 @@ def kana_highlight(
                         return replace_onyomi_match(converted_kunyomi)
 
         def replace_kunyomi_match(kunyomi_that_matched):
+            if return_on_or_kun_match_only:
+                return [False, True]
+
             nonlocal furigana
 
             if right_edge:
@@ -266,7 +284,7 @@ def kana_highlight(
                     converted_kunyomi = kunyomi_stem[:-1] + "っ"
                     if converted_kunyomi in target_furigana_section:
                         debug_print(f"\nconverted_kunyomi: {converted_kunyomi}")
-                        return replace_onyomi_match(converted_kunyomi)
+                        return replace_kunyomi_match(converted_kunyomi)
         # No onyomi or kunyomi reading matched the furigana
         show_error_message(
             f"Error in kana_highlight[]: No reading found for furigana ({furigana}) among onyomi ({onyomi}) and kunyomi ({kunyomi})")
@@ -282,6 +300,11 @@ def kana_highlight(
             # to a sound tag?) so we'll just leave it out anyway
             return furigana
         if word in (kanji_to_highlight, f"{kanji_to_highlight}々"):
+            [onyomi_match, kunyomi_match] = process_readings(furigana, whole=True, return_on_or_kun_match_only=True)
+            if onyomi_match:
+                # For onyomi matches the furigana should be in katakana
+                return f"<b>{to_katakana(furigana)}</b>"
+            # For kunyomi matches keep in hiragana
             return f"<b>{furigana}</b>"
         kanji_pos = word.find(kanji_to_highlight)
         if kanji_pos == -1:
@@ -322,7 +345,7 @@ def test(test_name, expected, sentence, kanji, onyomi, kunyomi):
     except AssertionError:
         print(f"""{test_name}
 Expected: {expected}
-Got: {result}
+Got:      {result}
 """)
         raise
 
@@ -356,6 +379,30 @@ def main():
         expected="<b>とな</b>りあわせのまち。",
     )
     test(
+        test_name="Matches word that uses the repeater 々 with rendaku 1/",
+        kanji="国",
+        onyomi="コク(呉)",
+        kunyomi="くに",
+        sentence="国々[くにぐに]の 関係[かんけい]が 深い[ふかい]。",
+        expected="<b>くにぐに</b>の かんけいが ふかい。",
+    )
+    test(
+        test_name="Matches word that uses the repeater 々 with rendaku 2/",
+        kanji="時",
+        onyomi="ジ(呉)、シ(漢)",
+        kunyomi="とき",
+        sentence="時々[ときどき] 雨[あめ]が 降る[ふる]。",
+        expected="<b>ときどき</b> あめが ふる。",
+    )
+    test(
+        test_name="Matches word that uses the repeater 々 with small tsu",
+        kanji="刻",
+        onyomi="コク(呉)",
+        kunyomi="きざ.む、きざ.み、とき",
+        sentence="刻々[こっこく]と 変化[へんか]する。",
+        expected="<b>コッコク</b>と へんかする。",
+    )
+    test(
         test_name="Should be able to clean furigana that bridges over some okurigana 3/",
         kanji="歯",
         onyomi="シ(呉)",
@@ -371,6 +418,14 @@ def main():
         kunyomi="たかどの、たな",
         sentence="新[しん] 内閣[ないかく]の 組閣[そかく]が 発表[はっぴょう]された。",
         expected="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
+    )
+    test(
+        test_name="Is able to match the same kanji occurring twice with other using small tsu",
+        kanji="国",
+        onyomi="コク(呉)",
+        kunyomi="くに",
+        sentence="その2 国[こく]は 国交[こっこう]を 断絶[だんぜつ]した。",
+        expected="その2 <b>コク</b>は <b>コッ</b>こうを だんぜつした。",
     )
     test(
         test_name="Is able to pick the right reading when there is multiple matches",
@@ -452,7 +507,15 @@ def main():
         onyomi="コウ(呉)",
         kunyomi="しり",
         sentence="尻尾[しっぽ]",
-        expected="<b>シッ</b>ぽ",
+        expected="<b>しっ</b>ぽ",
+    )
+    test(
+        test_name="small tsu 7/",
+        kanji="呆",
+        onyomi="ホウ(漢)、ボウ(慣)、ホ(呉)、タイ(慣)、ガイ(呉)",
+        kunyomi="ほけ.る、ぼ.ける、あき.れる、おろか、おろ.か",
+        sentence="呆気[あっけ]ない",
+        expected="<b>あっ</b>けない",
     )
     test(
         test_name="Single kana reading conversion",
@@ -462,14 +525,6 @@ def main():
         kunyomi="おや、じじ、はじ.め",
         sentence="先祖[せんぞ]",
         expected="せん<b>ゾ</b>",
-    )
-    test(
-        test_name="Numbers before word",
-        kanji="国",
-        onyomi="コク(呉)",
-        kunyomi="くに",
-        sentence="その2 国[こく]は 国交[こっこう]を 断絶[だんぜつ]した。",
-        expected="その2 <b>こく</b>は こっこうを だんぜつした。",
     )
     print("Ok.")
 
