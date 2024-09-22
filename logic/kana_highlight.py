@@ -39,6 +39,36 @@ SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "う", "り"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
+ALL_MORA = [
+    # First the two kana mora, so that they are matched first
+    "くぃ", "きゃ", "きゅ", "きぇ", "きょ", "ぐぃ", "ご",
+    "ぎゃ", "ぎゅ", "ぎぇ", "ぎょ", "すぃ", "しゃ", "しゅ", "しぇ", "しょ",
+    "ずぃ", "じゃ", "じゅ", "じぇ", "じょ", "てぃ", "とぅ",
+    "ちゃ", "ちゅ", "ちぇ", "ちょ", "でぃ", "どぅ", "ぢゃ", "でゅ",
+    "ぢゅ", "ぢぇ", "ぢょ", "つぁ", "つぃ", "つぇ", "つぉ", "づぁ", "づぃ", "づぇ", "づぉ",
+    "ひぃ", "ほぅ", "ひゃ", "ひゅ", "ひぇ", "ひょ", "びぃ", "ぼ",
+    "びゃ", "びゅ", "びぇ", "びょ", "ぴぃ", "ぴゃ", "ぴゅ", "ぴぇ", "ぴょ",
+    "ふぁ", "ふぃ", "ふぇ", "ふぉ", "ゔぁ", "ゔぃ", "ゔ", "ゔぇ", "ゔぉ", "ぬぃ", "の",
+    "にゃ", "にゅ", "にぇ", "にょ", "むぃ", "みゃ", "みゅ", "みぇ", "みょ",
+    "るぃ", "りゃ", "りゅ", "りぇ", "りょ",
+    "いぇ",
+    # Then single kana mora
+    "か", "く", "け", "こ", "き", "が", "ぐ", "げ", "ご",
+    "ぎ", "さ", "す", "せ", "そ", "し",
+    "ざ", "ず", "づ", "ぜ", "ぞ", "じ", "ぢ", "た", "とぅ",
+    "て", "と", "ち", "だ", "で", "ど", "ぢ",
+    "つ", "づ", "は",
+    "へ", "ほ", "ひ", "ば", "ぶ", "べ", "ぼ", "ぼ",
+    "び", "ぱ", "ぷ", "べ", "ぽ", "ぴ",
+    "ふ", "ゔぃ", "ゔ", "な", "ぬ", "ね", "の",
+    "に", "ま", "む", "め", "も", "み",
+    "ら", "る", "れ", "ろ", "り", "あ", "い", "う", "え", "お", "や",
+    "ゆ", "よ", "わ", "ゐ", "ゑ", "を"
+]
+
+ALL_MORA_RE = "|".join(ALL_MORA)
+ALL_MORA_REC = re.compile(rf"({ALL_MORA_RE})")
+
 # Regex matching any kanji characters
 # Include the kanji repeater punctuation as something that will be cleaned off
 # Also include numbers as they are sometimes used in furigana
@@ -174,6 +204,8 @@ def kana_highlight(
     # adding <b> tags around the part that matches the reading
     def process_readings(
             furigana,
+            kanji_count=None,
+            kanji_pos=None,
             whole=False,
             right_edge=False,
             left_edge=False,
@@ -285,22 +317,60 @@ def kana_highlight(
                     if converted_kunyomi in target_furigana_section:
                         debug_print(f"\nconverted_kunyomi: {converted_kunyomi}")
                         return replace_kunyomi_match(converted_kunyomi)
+
+        if kanji_count is None or kanji_pos is None:
+            show_error_message(
+                "Error in kana_highlight[]: process_readings() called with no kanji_count or kanji_pos specified")
+            return furigana
+
         # No onyomi or kunyomi reading matched the furigana
-        show_error_message(
-            f"Error in kana_highlight[]: No reading found for furigana ({furigana}) among onyomi ({onyomi}) and kunyomi ({kunyomi})")
-        return furigana
+        # Assuming the word is a jukujigun, we'll highlight part of the furigana matching the kanji position
+        # First split the word into mora
+        mora_list = ALL_MORA_REC.findall(furigana)
+        # Divide the mora by the number of kanji in the word
+        mora_count = len(mora_list)
+        mora_per_kanji = mora_count // kanji_count
+        # Split the remainder evenly among the kanji, by adding one mora to each kanji until the remainder is 0
+        remainder = mora_count % kanji_count
+        new_furigana = ""
+        cur_mora_index = 0
+        for kanji_index in range(kanji_count):
+            cur_mora_range_max = cur_mora_index + mora_per_kanji
+            if remainder > 0:
+                cur_mora_range_max += 1
+                remainder -= 1
+            if kanji_index == kanji_pos:
+                new_furigana += "<b>"
+            elif kanji_index == kanji_pos + 1:
+                new_furigana += "</b>"
+
+            for mora_index in range(cur_mora_index, cur_mora_range_max):
+                new_furigana += mora_list[mora_index]
+
+            if kanji_index == kanji_pos and kanji_index == kanji_count - 1:
+                new_furigana += "</b>"
+            cur_mora_index = cur_mora_range_max
+
+        return new_furigana
 
     # Regex sub replacer function.
     def furigana_replacer(match):
         word = match.group(1)
         furigana = match.group(2)
+
         if furigana.startswith("sound:"):
             # This was something like 漢字[sound:...], we shouldn't modify the text in the brackets as it'd
             # break the audio tag. But we know the text to the right is kanji (what is it doing there next
             # to a sound tag?) so we'll just leave it out anyway
             return furigana
         if word in (kanji_to_highlight, f"{kanji_to_highlight}々"):
-            [onyomi_match, kunyomi_match] = process_readings(furigana, whole=True, return_on_or_kun_match_only=True)
+            [onyomi_match, kunyomi_match] = process_readings(
+                furigana,
+                kanji_count=1,
+                kanji_pos=0,
+                whole=True,
+                return_on_or_kun_match_only=True
+            )
             if onyomi_match:
                 # For onyomi matches the furigana should be in katakana
                 return f"<b>{to_katakana(furigana)}</b>"
@@ -319,12 +389,15 @@ def kana_highlight(
         # We've already ruled out case 3. so, the middle case
         # is 4. where the kanji is in the middle of the word
         kanji_in_middle = not kanji_in_left_edge and not kanji_in_right_edge
+
+        kanji_count = len(word)
+
         if kanji_in_left_edge:
-            return process_readings(furigana, left_edge=True)
+            return process_readings(furigana, kanji_count, kanji_pos, left_edge=True)
         elif kanji_in_right_edge:
-            return process_readings(furigana, right_edge=True)
+            return process_readings(furigana, kanji_count, kanji_pos, right_edge=True)
         elif kanji_in_middle:
-            return process_readings(furigana, middle=True)
+            return process_readings(furigana, kanji_count, kanji_pos, middle=True)
 
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)
@@ -525,6 +598,54 @@ def main():
         kunyomi="おや、じじ、はじ.め",
         sentence="先祖[せんぞ]",
         expected="せん<b>ゾ</b>",
+    )
+    test(
+        test_name="Jukujigun test 大人 1/",
+        kanji="大",
+        onyomi="ダイ(呉)、タイ(漢)、タ(漢)、ダ(呉)",
+        kunyomi="おお、おお.きい、おお.いに",
+        sentence="大人[おとな] 達[たち]は 大[おお]きい",
+        expected="<b>おと</b>な たちは <b>おお</b>きい",
+    )
+    test(
+        test_name="Jukujigun test 大人 2/",
+        kanji="人",
+        onyomi="ジン(漢)、ニン(呉)",
+        kunyomi="ひと",
+        sentence="大人[おとな] 達[たち]は 人々[ひとびと]の 中[なか]に いる。",
+        expected="おと<b>な</b> たちは <b>ひとびと</b>の なかに いる。",
+    )
+    test(
+        test_name="Jukujigun test 今日 1/",
+        kanji="今",
+        onyomi="コン(呉)、キン(漢)",
+        kunyomi="いま",
+        sentence="今日[きょう]は 今[いま]まで 一日[いちにち] 何[なに]も しなかった。",
+        expected="<b>きょ</b>うは <b>いま</b>まで いちにち なにも しなかった。",
+    )
+    test(
+        test_name="Jukujigun test 今日 2/",
+        kanji="日",
+        onyomi="ニチ(呉)、ジツ(漢)、ニ",
+        kunyomi="ひ、か",
+        sentence="今日[きょう]は 今[いま]まで 一日[いちにち] 何[なに]も しなかった。",
+        expected="きょ<b>う</b>は いままで いち<b>ニチ</b> なにも しなかった。",
+    )
+    test(
+        test_name="Jukijigun test　百合 1/",
+        kanji="百",
+        onyomi="ヒャク(呉)、ハク(漢)",
+        kunyomi="もも",
+        sentence="百人[ひゃくにん]の 百合[ゆり]オタクが 合体[がったい]した。",
+        expected="<b>ヒャク</b>にんの <b>ゆ</b>りオタクが がったいした。",
+    )
+    test(
+        test_name="Jukijigun test　百合 2/",
+        kanji="合",
+        onyomi="ガッ(慣)、カッ(慣)、ゴウ(呉)、コウ(漢)",
+        kunyomi="あ.う、あ.い、あい、あ.わす、あ.わせる",
+        sentence="百人[ひゃくにん]の 百合[ゆり]オタクが 合体[がったい]した。",
+        expected="ひゃくにんの ゆ<b>り</b>オタクが <b>ガッ</b>たいした。",
     )
     print("Ok.")
 
