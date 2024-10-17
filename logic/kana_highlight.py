@@ -599,13 +599,29 @@ def main():
         expected="<b>カッ</b>ちゅうの しちゃくをお ねがいします｡",
     )
     test(
-        test_name="Single kana reading conversion",
+        test_name="small tsu 9/",
+        kanji="百",
+        onyomi="ヒャク(呉)、ハク(漢)",
+        kunyomi="もも",
+        sentence="百貨店[ひゃっかてん]",
+        expected="<b>ヒャッ</b>かてん",
+    )
+    test(
+        test_name="Single kana reading conversion 1/",
         kanji="祖",
         # 祖 usually only lists ソ as the only onyomi
         onyomi="ソ(呉)、ゾ",
         kunyomi="おや、じじ、はじ.め",
         sentence="先祖[せんぞ]",
         expected="せん<b>ゾ</b>",
+    )
+    test(
+        test_name="Single kana reading conversion 2/",
+        kanji="来",
+        onyomi="ライ(呉)、タイ",
+        kunyomi="く.る、きた.る、きた.す、き.たす、き.たる、き、こ、こ.し、き.し",
+        sentence="それは 私[わたし]たちの 日常生活[にちじょうせいかつ]の 仕来[しき]たりの １[ひと]つだ。",
+        expected="それは わたしたちの にちじょうせいかつの し<b>き</b>たりの ひとつだ。",
     )
     test(
         test_name="Jukujigun test 大人 1/",
