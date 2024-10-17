@@ -35,7 +35,7 @@ KATAKANA_CONVERSION_DICT = {
 }
 
 # Include う just for the special case of 秘蔵[ひぞ]っ子[こ]
-SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "う", "り"]
+SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "う", "り", "ん"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
@@ -589,6 +589,14 @@ def main():
         kunyomi="ほけ.る、ぼ.ける、あき.れる、おろか、おろ.か",
         sentence="呆気[あっけ]ない",
         expected="<b>あっ</b>けない",
+    )
+    test(
+        test_name="small tsu 8/",
+        kanji="甲",
+        onyomi="コウ(漢)、カン(慣)、キョウ(呉)",
+        kunyomi="きのえ、かぶと、よろい、つめ",
+        sentence="甲冑[かっちゅう]の 試着[しちゃく]をお 願[ねが]いします｡",
+        expected="<b>カッ</b>ちゅうの しちゃくをお ねがいします｡",
     )
     test(
         test_name="Single kana reading conversion",
