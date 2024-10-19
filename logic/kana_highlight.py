@@ -425,13 +425,22 @@ Got:      {result}
 
 def main():
     test(
-        test_name="Should not incorrectly match onyomi twice",
+        test_name="Should not incorrectly match onyomi twice 1/",
         kanji="視",
         onyomi="シ(漢)、ジ(呉)",
         kunyomi="み.る",
         # しちょうしゃ　has し in it twice but only the first one should be highlighted
         sentence="視聴者[しちょうしゃ]",
         expected="<b>シ</b>ちょうしゃ",
+    )
+    test(
+        test_name="Should not incorrectly match onyomi twice 2/",
+        kanji="儀",
+        onyomi="ギ(呉)",
+        kunyomi="のり、よ.い",
+        # 　ぎょうぎ　has ぎ in it twice but only the first one should be highlighted
+        sentence="行儀[ぎょうぎ]",
+        expected="ぎょう<b>ギ</b>",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 1/",
