@@ -103,7 +103,7 @@ Get specific cards types with a specific interval
 
         self.card_select_cbox = QComboBox()
         self.card_select_cbox.addItem("Random")
-        self.card_select_cbox.addItem("Least reps")
+        self.card_select_cbox.addItem("Least_reps")
         self.card_select_cbox.setCurrentText("Random")
         self.form.addRow("How to select a card to copy from", self.card_select_cbox)
 
