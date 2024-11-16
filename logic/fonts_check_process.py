@@ -10,7 +10,7 @@ from aqt import mw
 def fonts_check_process(
         text: str,
         fonts_dict_file: str,
-        limit_to_fonts: Optional[str],
+        limit_to_fonts: Optional[list[str]],
         character_limit_regex: Optional[str],
         show_error_message: Callable[[str], None] = None,
         file_cache: dict = None
@@ -22,7 +22,7 @@ def fonts_check_process(
 
      :param text: The text to check
      :param fonts_dict_file: The path to the json file with the fonts dictionary
-     :param limit_to_fonts: A comma separated list of fonts to limit the output to
+     :param limit_to_fonts: A list of font file names to limit the output to
      :param character_limit_regex: A regex to limit the characters to check
      :param show_error_message: A function that takes a string and shows an error message
      :param file_cache: A dictionary to cache the open JSON file contents, to avoid opening the file multiple times
@@ -80,9 +80,6 @@ def fonts_check_process(
     valid_fonts = set()
     some_chars_found = False
     all_chars_excluded_by_regex = None
-
-    if limit_to_fonts is not None:
-        limit_to_fonts = set([font.strip() for font in limit_to_fonts.split(",")])
 
     for char in text:
         if character_limit_regex is not None:

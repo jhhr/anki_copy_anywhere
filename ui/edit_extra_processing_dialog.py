@@ -24,6 +24,8 @@ from aqt.qt import (
 # noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
+from .list_input import ListInputWidget
+
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
 else:
@@ -206,10 +208,12 @@ class FontsCheckProcess(QDialog):
         The content should be <code>{"char": ["font1", "font2", ...], "char2": ...}</code>
         </small>"""))
 
-        self.limit_to_fonts_field = QLineEdit()
+        self.limit_to_fonts_field = ListInputWidget()
         self.form.addRow("Limit to fonts", self.limit_to_fonts_field)
         self.form.addRow("", QLabel("""<small>
-        (Optional) A comma separated list of fonts to limit the output to.
+        (Optional) A list of font file names (without the file ending) to limit the output to.
+        <br/>
+        You can add multiple fonts at once inputting a single item of comma separated values
         </small>"""))
 
         self.regex_field = QLineEdit()
@@ -233,7 +237,9 @@ class FontsCheckProcess(QDialog):
         self.form.addRow("", self.regex_error_display)
 
         with suppress(KeyError): self.fonts_dict_file_field.setText(self.process["fonts_dict_file"])
-        with suppress(KeyError): self.limit_to_fonts_field.setText(self.process["limit_to_fonts"])
+        with suppress(KeyError):
+            for font in self.process["limit_to_fonts"]:
+                self.limit_to_fonts_field.add_item(font)
         with suppress(KeyError): self.regex_field.setText(self.process["character_limit_regex"])
 
         # Add Ok and Cancel buttons as QPushButtons
@@ -256,7 +262,7 @@ class FontsCheckProcess(QDialog):
         self.process = {
             "name": FONTS_CHECK_PROCESS,
             "fonts_dict_file": self.fonts_dict_file_field.text(),
-            "limit_to_fonts": self.limit_to_fonts_field.text(),
+            "limit_to_fonts": self.limit_to_fonts_field.get_items(),
             "character_limit_regex": self.regex_field.text(),
         }
         self.accept()
