@@ -12,6 +12,7 @@ from aqt.operations import CollectionOp
 from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiApplication
 from aqt.utils import tooltip
 
+from .fonts_check_process import fonts_check_process
 from .interpolate_fields import interpolate_from_text
 from .kana_highlight_process import kana_highlight_process
 from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
@@ -22,6 +23,7 @@ from ..configuration import (
     COPY_MODE_ACROSS_NOTES,
     KANA_HIGHLIGHT_PROCESS,
     REGEX_PROCESS,
+    FONTS_CHECK_PROCESS,
     KANJIUM_TO_JAVDEJONG_PROCESS,
 )
 from ..utils import (
@@ -205,6 +207,10 @@ def copy_fields_in_background(
         )
     )
 
+    # Cache any opened files, so process chains can use them instead of needing to open them again
+    # contents will be cached by file name
+    file_cache = {}
+
     for card in cards:
         card_cnt += 1
 
@@ -215,6 +221,7 @@ def copy_fields_in_background(
             note=copy_into_note,
             deck_id=card.odid or card.did,
             show_error_message=show_error_message,
+            file_cache=file_cache,
         )
 
         mw.col.update_note(copy_into_note)
@@ -249,6 +256,7 @@ def copy_for_single_note(
         note: Note,
         deck_id: int,
         show_error_message: Callable[[str], None] = None,
+        file_cache: dict = None,
 ):
     """
     Copy fields into a single note
@@ -256,6 +264,7 @@ def copy_for_single_note(
     :param note: Note to copy into
     :param deck_id: Deck ID where the cards are going into
     :param show_error_message: Optional function to show error messages
+    :param file_cache: A dictionary to cache opened files' content
     :return:
     """
     if not show_error_message:
@@ -339,6 +348,15 @@ def copy_for_single_note(
                         replacement=process.get("replacement", None),
                         flags=process.get("flags", None),
                         show_error_message=show_error_message,
+                    )
+                if process["name"] == FONTS_CHECK_PROCESS:
+                    result_val = fonts_check_process(
+                        text=result_val,
+                        fonts_dict_file=process.get("fonts_dict_file", None),
+                        limit_to_fonts=process.get("limit_to_fonts", None),
+                        character_limit_regex=process.get("character_limit_regex", None),
+                        show_error_message=show_error_message,
+                        file_cache=file_cache,
                     )
                 if process["name"] == KANJIUM_TO_JAVDEJONG_PROCESS:
                     result_val = kanjium_to_javdejong_process(

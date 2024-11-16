@@ -33,11 +33,13 @@ from ..configuration import (
     CopyFieldToField,
     KanaHighlightProcess,
     RegexProcess,
+    FontsCheckProcess,
     KanjiumToJavdejongProcess,
     ALL_PROCESS_NAMES,
     NEW_PROCESS_DEFAULTS,
     KANJIUM_TO_JAVDEJONG_PROCESS,
     REGEX_PROCESS,
+    FONTS_CHECK_PROCESS,
     KANA_HIGHLIGHT_PROCESS,
     MULTIPLE_ALLOWED_PROCESS_NAMES,
 )
@@ -104,6 +106,15 @@ class KanjiumToJavdejongProcessDialog(QDialog):
         self.accept()
 
 
+def validate_regex(dialog):
+    try:
+        re.compile(dialog.regex_field.text())
+        dialog.regex_error_display.setText("")
+    except re.error as e:
+        dialog.regex_error_display.setText(f"Error: {e}")
+        return False
+    return True
+
 class RegexProcessDialog(QDialog):
     def __init__(self, parent, process: RegexProcess):
         super().__init__(parent)
@@ -121,7 +132,7 @@ class RegexProcessDialog(QDialog):
 
         self.regex_field = QLineEdit()
         self.form.addRow("Regex", self.regex_field)
-        self.regex_field.textChanged.connect(self.validate_regex)
+        self.regex_field.textChanged.connect(lambda: validate_regex(self))
 
         self.regex_error_display = QLabel()
         self.regex_error_display.setStyleSheet("color: red;")
@@ -169,21 +180,93 @@ class RegexProcessDialog(QDialog):
         }
         self.accept()
 
-    def validate_regex(self):
-        try:
-            re.compile(self.regex_field.text())
-            self.regex_error_display.setText("")
-        except re.error as e:
-            self.regex_error_display.setText(f"Error: {e}")
-            return False
-        return True
+
+class FontsCheckProcess(QDialog):
+    def __init__(self, parent, process: FontsCheckProcess):
+        super().__init__(parent)
+        self.process = process
+
+        self.description = """
+        For the given text, go through all the characters and return the fonts for which every character has an entry in the JSON file for.
+        The JSON file is intended be something pre-generated from a script that checks which fonts support which characters.
+        """
+        self.form = QFormLayout()
+        self.setWindowModality(WindowModal)
+        self.setLayout(self.form)
+
+        self.top_label = QLabel(self.description)
+        self.form.addRow(self.top_label)
+
+        self.fonts_dict_file_field = QLineEdit()
+        self.form.addRow("Fonts dict JSON file", self.fonts_dict_file_field)
+        self.form.addRow("", QLabel("""<small>Provide the file name only, e.g. 'fonts_by_char.json'.
+        <br/>
+        The file is assumed to be in your Anki collection.media folder.
+        <br/>
+        The content should be <code>{"char": ["font1", "font2", ...], "char2": ...}</code>
+        </small>"""))
+
+        self.limit_to_fonts_field = QLineEdit()
+        self.form.addRow("Limit to fonts", self.limit_to_fonts_field)
+        self.form.addRow("", QLabel("""<small>
+        (Optional) A comma separated list of fonts to limit the output to.
+        </small>"""))
+
+        self.regex_field = QLineEdit()
+        self.form.addRow("Char limit", self.regex_field)
+        self.regex_field.textChanged.connect(lambda: validate_regex(self))
+        self.form.addRow("", QLabel("""<small>(Optional) Regex used to limit the characters checked.
+        <br/>
+        When using regex your dictionary should contain an "all_fonts" key that contains all possible fonts.
+        <br/>
+        When all characters are excluded, the output will either the limit_to_fonts or all_fonts.
+        <br/>
+        If neither are provided, an empty string is returned.
+        <br/>
+        You probably want this to be a character range
+        <br/>
+        e.g. <code>[a-z]</code> or <code>[\u4E00-\u9FFF]</code>.
+        </small>"""))
+
+        self.regex_error_display = QLabel()
+        self.regex_error_display.setStyleSheet("color: red;")
+        self.form.addRow("", self.regex_error_display)
+
+        with suppress(KeyError): self.fonts_dict_file_field.setText(self.process["fonts_dict_file"])
+        with suppress(KeyError): self.limit_to_fonts_field.setText(self.process["limit_to_fonts"])
+        with suppress(KeyError): self.regex_field.setText(self.process["character_limit_regex"])
+
+        # Add Ok and Cancel buttons as QPushButtons
+        self.ok_button = QPushButton("OK")
+        self.close_button = QPushButton("Cancel")
+
+        self.ok_button.clicked.connect(self.save_process)
+        self.close_button.clicked.connect(self.reject)
+
+        self.bottom_grid = QGridLayout()
+        self.bottom_grid.setColumnMinimumWidth(0, 150)
+        self.bottom_grid.setColumnMinimumWidth(1, 150)
+        self.bottom_grid.setColumnMinimumWidth(2, 150)
+        self.form.addRow(self.bottom_grid)
+
+        self.bottom_grid.addWidget(self.ok_button, 0, 0)
+        self.bottom_grid.addWidget(self.close_button, 0, 2)
+
+    def save_process(self):
+        self.process = {
+            "name": FONTS_CHECK_PROCESS,
+            "fonts_dict_file": self.fonts_dict_file_field.text(),
+            "limit_to_fonts": self.limit_to_fonts_field.text(),
+            "character_limit_regex": self.regex_field.text(),
+        }
+        self.accept()
 
 
 KANA_HIGHLIGHT_DESCRIPTION = """
 Kana highlight processing takes in kanji text that has furigana.
 It then bolds the furigana that corresponds to the kanji text, and removes the kanji
 leaving only the kana.
-The kanji, onyomi and kunyomi fields are gotten from the original note type you are copying into.
+The kanji, onyomi and kunyomi fields are gotten from the destination note type.
 """
 
 
@@ -380,6 +463,8 @@ class EditExtraProcessingWidget(QWidget):
             ), KANA_HIGHLIGHT_PROCESS
         if process_name == REGEX_PROCESS:
             return RegexProcessDialog(self, process), REGEX_PROCESS
+        if process_name == FONTS_CHECK_PROCESS:
+            return FontsCheckProcess(self, process), FONTS_CHECK_PROCESS
         if process_name == KANJIUM_TO_JAVDEJONG_PROCESS:
             return KanjiumToJavdejongProcessDialog(self, process), KANJIUM_TO_JAVDEJONG_PROCESS
 

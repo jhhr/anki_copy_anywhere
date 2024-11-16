@@ -24,7 +24,7 @@ class ScrollableQDialog(QDialog):
         screen = QGuiApplication.primaryScreen().availableGeometry()
 
         # Set the initial size to a percentage of the screen size
-        self.resize(screen.width() * 0.6, screen.height() * 0.95)
+        self.resize(int(screen.width() * 0.6), int(screen.height() * 0.95))
 
         # Add footer to the main layout
         if footer_layout:

@@ -1,7 +1,9 @@
-from aqt import gui_hooks
 from aqt.browser import Browser
-from aqt.gui_hooks import browser_menus_did_init
-from aqt.gui_hooks import deck_browser_will_show_options_menu
+from aqt.gui_hooks import (
+    browser_menus_did_init,
+    browser_will_show_context_menu,
+    deck_browser_will_show_options_menu
+)
 from aqt.qt import QAction, qconnect, QMenu
 
 from ..configuration import Config
@@ -93,7 +95,7 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
         copy_fields_menu.addAction(copy_fields_action)
 
 
-gui_hooks.browser_will_show_context_menu.append(on_browser_will_show_context_menu)
+browser_will_show_context_menu.append(on_browser_will_show_context_menu)
 
 
 def setup_copy_fields_menu(browser):

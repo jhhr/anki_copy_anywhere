@@ -34,6 +34,15 @@ class RegexProcess(TypedDict):
     flags: Optional[str]
 
 
+FONTS_CHECK_PROCESS = "Fonts check"
+
+
+class FontsCheckProcess(TypedDict):
+    name: str
+    fonts_dict_file: str
+    limit_to_fonts: Optional[str]
+    character_limit_regex: Optional[str]
+
 KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
 class KanaHighlightProcess(TypedDict):
     name: str
@@ -45,6 +54,7 @@ class KanaHighlightProcess(TypedDict):
 ALL_PROCESS_NAMES = [
     KANJIUM_TO_JAVDEJONG_PROCESS,
     REGEX_PROCESS,
+    FONTS_CHECK_PROCESS,
     KANA_HIGHLIGHT_PROCESS,
 ]
 
@@ -58,6 +68,12 @@ NEW_PROCESS_DEFAULTS = {
         "regex": "",
         "replacement": "",
         "flags": "",
+    },
+    FONTS_CHECK_PROCESS: {
+        "name": FONTS_CHECK_PROCESS,
+        "fonts_dict_file": "",
+        "limit_to_fonts": "",
+        "character_limit_regex": "",
     },
     KANA_HIGHLIGHT_PROCESS: {
         "name": KANA_HIGHLIGHT_PROCESS,

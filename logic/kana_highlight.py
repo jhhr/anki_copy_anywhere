@@ -231,7 +231,7 @@ def kana_highlight(
         if target_furigana_section is None:
             show_error_message(
                 "Error in kana_highlight[]: process_readings() called with no edge specified")
-            return None
+            return text
 
         debug_print(f"\ntarget_furigana_section: {target_furigana_section}")
 
