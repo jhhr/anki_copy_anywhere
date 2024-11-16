@@ -1,9 +1,12 @@
+# noinspection PyUnresolvedReferences
 from aqt.browser import Browser
+# noinspection PyUnresolvedReferences
 from aqt.gui_hooks import (
     browser_menus_did_init,
     browser_will_show_context_menu,
     deck_browser_will_show_options_menu
 )
+# noinspection PyUnresolvedReferences
 from aqt.qt import QAction, qconnect, QMenu
 
 from ..configuration import Config

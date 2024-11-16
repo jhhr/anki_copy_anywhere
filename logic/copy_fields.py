@@ -120,12 +120,14 @@ def copy_fields_in_background(
     :return: CacheResults object
     """
     (
-        copy_into_note_type
+        copy_into_note_type,
+        definition_name
     ) = itemgetter(
-        "copy_into_note_type"
+        "copy_into_note_type",
+        "definition_name"
     )(copy_definition)
 
-    undo_text = "Copy fields"
+    undo_text = f"Copy fields ({definition_name})"
     if card_ids:
         undo_text += f" for selected {len(card_ids)} cards"
 

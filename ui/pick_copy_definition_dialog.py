@@ -11,6 +11,7 @@ from aqt.qt import (
     QHBoxLayout,
     Qt,
     qtmajor,
+    QTimer,
 )
 
 from .edit_copy_definition_dialog import EditCopyDefinitionDialog
@@ -27,6 +28,7 @@ if qtmajor > 5:
 else:
     WindowModal = Qt.WindowModal
 
+DEFAULT_CARDS_SELECTED_LABEL = "Select some copy definitions to show what cards would apply."
 
 class PickCopyDefinitionDialog(QDialog):
     """
@@ -34,7 +36,7 @@ class PickCopyDefinitionDialog(QDialog):
     Includes a button start the edit dialog for a new copy definition.
     """
 
-    def __init__(self, parent, copy_definitions: [CopyDefinition], browser_card_ids):
+    def __init__(self, parent, copy_definitions: [CopyDefinition], browser_card_ids, browser_search):
         super().__init__(parent)
 
         self.copy_definitions = copy_definitions
@@ -43,17 +45,26 @@ class PickCopyDefinitionDialog(QDialog):
         self.remove_row_funcs = []
         self.models = []
         self.checkboxes = []
+        self.definition_card_ids = []
         self.browser_card_ids = browser_card_ids
+        self.browser_search = browser_search
 
         # Build textbox
         self.setWindowModality(WindowModal)
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
 
-        self.cards_selected_label = QLabel("No cards applicable.")
-        self.vbox.addWidget(self.cards_selected_label)
+        self.use_selected_cards_button = QPushButton(f"Use selected cards ({len(browser_card_ids)})")
+        self.use_selected_cards_button.clicked.connect(
+            lambda: self.toggle_card_selected_button(self.use_selected_cards_button))
+        self.use_all_cards_button = QPushButton("Use all cards from current search")
+        self.use_all_cards_button.clicked.connect(lambda: self.toggle_card_selected_button(self.use_all_cards_button))
+        self.vbox.addWidget(self.use_selected_cards_button)
+        self.vbox.addWidget(self.use_all_cards_button)
 
-        self.update_card_counts_from_browser_card_ids()
+        self.cards_selected_label = QLabel(DEFAULT_CARDS_SELECTED_LABEL)
+        self.vbox.addWidget(self.cards_selected_label)
+        self.toggle_card_selected_button(self.use_selected_cards_button)
 
         self.select_label = QLabel("Select copy definitions to apply")
         self.top_grid = self.make_grid()
@@ -67,6 +78,7 @@ class PickCopyDefinitionDialog(QDialog):
 
         self.bottom_grid = self.make_grid()
         self.apply_button = QPushButton("Apply")
+        self.apply_button.setEnabled(False)
         self.close_button = QPushButton("Close")
 
         self.apply_button.clicked.connect(self.accept)
@@ -98,11 +110,8 @@ class PickCopyDefinitionDialog(QDialog):
         checkbox = QCheckBox(definition["definition_name"])
         hbox.addWidget(checkbox, index)
         self.checkboxes.append(checkbox)
+        self.definition_card_ids.append([])
         checkbox.stateChanged.connect(self.update_card_counts_for_all_cards)
-        if self.browser_card_ids is not None and len(self.browser_card_ids):
-            # Check if the definition would apply to the selected cards
-            if definition["copy_into_note_type"] not in self.models:
-                checkbox.setEnabled(False)
 
         hbox.addStretch(1)
 
@@ -121,11 +130,13 @@ class PickCopyDefinitionDialog(QDialog):
 
         def remove_row_ui():
             self.checkboxes.remove(checkbox)
+            self.definition_card_ids.pop(index)
             for widget in [checkbox, edit_button, duplicate_button, remove_button]:
                 widget.deleteLater()
                 self.middle_grid.removeWidget(widget)
 
         self.remove_row_funcs.append(remove_row_ui)
+
         def remove_row():
             for func in self.remove_row_funcs:
                 func()
@@ -204,40 +215,37 @@ class PickCopyDefinitionDialog(QDialog):
             # "Cancel" was pressed
             return -1
 
-    def update_card_counts_from_browser_card_ids(self):
-        if self.browser_card_ids is not None and len(self.browser_card_ids):
-            self.models = []
-            self.selected_definitions_applicable_cards = []
-            definition_note_types = [defn["copy_into_note_type"] for defn in self.copy_definitions]
-            card_note_types = []
-            for card_id in self.browser_card_ids:
-                note = mw.col.get_card(card_id).note()
-                note_type = note.note_type()["name"]
-                if note_type not in card_note_types:
-                    card_note_types.append(note.note_type())
-                if note_type in definition_note_types:
-                    self.selected_definitions_applicable_cards.append(card_id)
-                    if note_type not in self.models:
-                        self.models.append(note_type)
-            self.cards_selected_label.setText(
-                f"""{len(self.selected_definitions_applicable_cards)} cards selected. {len(self.models)} different note types.
-            Copy definitions that would not apply are disabled.""")
-            return True
-        return False
+    def toggle_card_selected_button(self, selected_button):
+        # reset styles
+        self.use_selected_cards_button.setStyleSheet("")
+        self.use_all_cards_button.setStyleSheet("")
+        style = "background-color: #e0e0e0; color: black;"
+        if selected_button == self.use_selected_cards_button:
+            self.use_selected_cards = True
+            self.use_selected_cards_button.setStyleSheet(style)
+        else:
+            self.use_selected_cards = False
+            self.use_all_cards_button.setStyleSheet(style)
+        self.update_card_counts_for_all_cards()
 
     def update_card_counts_for_all_cards(self):
         """
         Sets the cards that would be applicable for the selected copy definitions
         """
-        # If the function handling only the cards selected in the browser returns True, that means
-        # we have those and shouldn't proceed with this
-        if self.update_card_counts_from_browser_card_ids():
-            return
+        browser_query = ""
+        if self.use_selected_cards and self.browser_card_ids is not None and len(self.browser_card_ids):
+            card_ids = self.browser_card_ids
+            browser_query = "(" + " OR ".join([f"cid:{cid}" for cid in card_ids]) + ")"
+        elif self.browser_search:
+            browser_query = self.browser_search
 
-        self.selected_definitions_applicable_cards = []
+        self.selected_definitions_applicable_cards = set()
+        total_applicable_cards = []
         self.models = []
+        nothing_checked = True
         for index, checkbox in enumerate(self.checkboxes):
             if checkbox.isChecked():
+                nothing_checked = False
                 checked_definition = self.copy_definitions[index]
                 limited_dids = []
                 if checked_definition["only_copy_into_decks"]:
@@ -252,16 +260,28 @@ class PickCopyDefinitionDialog(QDialog):
                 else:
                     did_query = ""
                 # Gotta wrap note in quotes, so it works with names containing spaces
-                def_card_ids = mw.col.find_cards(f'"note:{checked_definition["copy_into_note_type"]}" {did_query}')
-                self.selected_definitions_applicable_cards.extend(def_card_ids)
+                def_card_ids = mw.col.find_cards(
+                    f'"note:{checked_definition["copy_into_note_type"]}" {did_query} {browser_query}')
+
+                self.selected_definitions_applicable_cards.update(def_card_ids)
+                self.definition_card_ids[index] = def_card_ids
+                total_applicable_cards.extend(def_card_ids)
+                checkbox.setText(f"{checked_definition['definition_name']} ({len(def_card_ids)})")
                 if checked_definition["copy_into_note_type"] not in self.models:
                     self.models.append(checked_definition["copy_into_note_type"])
-        if (len(self.selected_definitions_applicable_cards) > 0):
+            else:
+                self.definition_card_ids[index] = []
+        if nothing_checked:
+            self.cards_selected_label.setText(DEFAULT_CARDS_SELECTED_LABEL)
+        elif len(self.selected_definitions_applicable_cards) > 0:
             self.cards_selected_label.setText(
-                f"""{len(self.selected_definitions_applicable_cards)} cards applicable. {len(self.models)} different note types.
+                f"""{len(self.selected_definitions_applicable_cards)} cards apply over {len(self.models)} different note types.
+            Total copy operations to be done: {len(total_applicable_cards)}.                
             Click apply to run the selected copy definitions on these cards.""")
+            self.apply_button.setEnabled(True)
         else:
-            self.cards_selected_label.setText("No cards applicable.")
+            self.cards_selected_label.setText("No cards applicable for the selected copy definitions.")
+            self.apply_button.setEnabled(False)
 
     def get_selected_definition_index(self):
         """
@@ -280,8 +300,11 @@ def show_copy_dialog(browser):
     """
     Shows a dialog for the user to select a copy definition to apply, edit or remove.
     """
+    card_ids = None
+    current_search = None
     if browser:
         card_ids = browser.selectedCards()
+        current_search = browser.current_search()
 
     # Put the saved configuration to show in the dialog box
     config = Config()
@@ -289,7 +312,7 @@ def show_copy_dialog(browser):
     copy_definitions = config.copy_definitions
 
     parent = mw.app.activeWindow()
-    d = PickCopyDefinitionDialog(parent, copy_definitions, card_ids)
+    d = PickCopyDefinitionDialog(parent, copy_definitions, card_ids, current_search)
     if d.exec():
         # Run all selected copy definitions according to the checkboxes
         config.load()
@@ -300,6 +323,6 @@ def show_copy_dialog(browser):
                 copy_definition = copy_definitions[index]
                 copy_fields(
                     copy_definition=copy_definition,
-                    card_ids=card_ids,
+                    card_ids=d.definition_card_ids[index],
                     parent=browser
                 )
