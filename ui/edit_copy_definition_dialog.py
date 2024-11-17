@@ -401,6 +401,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "definition_name": self.definition_name.text(),
                 "copy_into_note_type": self.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": self.decks_limit_multibox.currentText(),
+                "field_to_variable_defs": [],
                 "field_to_field_defs": self.within_note_editor_tab.get_field_to_field_editor().get_field_to_field_defs(),
                 "copy_on_sync": self.copy_on_sync_checkbox.isChecked(),
                 "copy_on_add": self.copy_on_add_checkbox.isChecked(),
