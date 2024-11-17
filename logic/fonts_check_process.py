@@ -6,6 +6,8 @@ from typing import Callable, Optional
 # noinspection PyUnresolvedReferences
 from aqt import mw
 
+from .FatalProcessError import FatalProcessError
+
 
 def fonts_check_process(
         text: str,
@@ -28,6 +30,8 @@ def fonts_check_process(
      :param file_cache: A dictionary to cache the open JSON file contents, to avoid opening the file multiple times
 
      :return A string that can be parsed as an array of strings, e.g. '["font1", "font2", ...]'
+
+     :raises FatalProcessError: If the file is not found, empty, or has invalid JSON content
     """
 
     if not show_error_message:
@@ -54,14 +58,12 @@ def fonts_check_process(
 
         fonts_dict_file_full = media_path / fonts_dict_file
         if not fonts_dict_file_full.is_file():
-            show_error_message(f"Error in fonts_check_process: File '{fonts_dict_file_full}' does not exist")
-            return ""
+            raise FatalProcessError(f"File '{fonts_dict_file_full}' does not exist")
 
         with open(fonts_dict_file_full, "r", encoding='utf-8') as f:
             file_content = f.read().strip()
             if not file_content:
-                show_error_message(f"Error in fonts_check_process: File '{fonts_dict_file_full}' is empty")
-                return ""
+                raise FatalProcessError(f"File '{fonts_dict_file_full}' is empty")
 
             try:
                 fonts_dict = json.loads(file_content)
@@ -69,9 +71,7 @@ def fonts_check_process(
                 if file_cache is not None:
                     file_cache[fonts_dict_file] = fonts_dict
             except json.JSONDecodeError as e:
-                show_error_message(
-                    f"Error in fonts_check_process: Invalid JSON content, check what your file contains: '{fonts_dict_file_full}' - {e}")
-                return ""
+                raise FatalProcessError(f"Error parsing JSON in file '{fonts_dict_file_full}': {e}")
 
     if text is None or text == "":
         show_error_message("Text was empty")
@@ -90,7 +90,7 @@ def fonts_check_process(
             all_chars_excluded_by_regex = False
 
         char_fonts = fonts_dict.get(char, None)
-        if char_fonts:
+        if char_fonts is not None:
             some_chars_found = True
             encountered_fonts.update(char_fonts)
             # loop through encountered_fonts and set all char_fonts that are in it to True in valid_fonts, else False
@@ -126,7 +126,10 @@ def fonts_check_process(
         return ""
 
     if len(valid_fonts) == 0:
-        show_error_message(f"{text} - Some characters had valid fonts but no fonts were valid for every character")
+        if (len(text)) == 1:
+            show_error_message(f"{text} - No fonts were valid for this character")
+        else:
+            show_error_message(f"{text} - Some characters had valid fonts but no fonts were valid for every character")
         return ""
 
     return f'["{join_str.join(valid_fonts)}"]'

@@ -12,6 +12,7 @@ from aqt.operations import CollectionOp
 from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiApplication
 from aqt.utils import tooltip
 
+from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
 from .interpolate_fields import interpolate_from_text
 from .kana_highlight_process import kana_highlight_process
@@ -82,7 +83,7 @@ def copy_fields(
     def on_done(copy_results):
         mw.progress.finish()
         tooltip(f"{copy_results.result_text} in {time.time() - start_time:.2f} seconds", parent=parent, period=5000)
-        if not is_sync:
+        if not is_sync and debug_text != "":
             # For finding sentences to debug
             ScrollMessageBox.information(parent, "Debug results", debug_text)
 
@@ -129,7 +130,7 @@ def copy_fields_in_background(
 
     undo_text = f"Copy fields ({definition_name})"
     if card_ids:
-        undo_text += f" for selected {len(card_ids)} cards"
+        undo_text += f" for {len(card_ids)} cards"
 
     undo_entry = mw.col.add_custom_undo_entry(undo_text)
 
@@ -140,7 +141,7 @@ def copy_fields_in_background(
 
     mw.taskman.run_on_main(
         lambda: mw.progress.start(
-            label="Copying into fields", max=0, immediate=False
+            label=f"Copying fields ({definition_name})", max=0, immediate=False
         )
     )
 
@@ -333,39 +334,45 @@ def copy_for_single_note(
         # Step 2.2: If we have further processing steps, run them
         if process_chain is not None:
             for process in process_chain:
-                if process["name"] == KANA_HIGHLIGHT_PROCESS:
-                    result_val = kana_highlight_process(
-                        text=result_val,
-                        onyomi_field=process.get("onyomi_field", None),
-                        kunyomi_field=process.get("kunyomi_field", None),
-                        kanji_field=process.get("kanji_field", None),
-                        note=note,
-                        show_error_message=show_error_message,
-                    )
-                    show_error_message(result_val)
-                if process["name"] == REGEX_PROCESS:
-                    result_val = regex_process(
-                        text=result_val,
-                        regex=process.get("regex", None),
-                        replacement=process.get("replacement", None),
-                        flags=process.get("flags", None),
-                        show_error_message=show_error_message,
-                    )
-                if process["name"] == FONTS_CHECK_PROCESS:
-                    result_val = fonts_check_process(
-                        text=result_val,
-                        fonts_dict_file=process.get("fonts_dict_file", None),
-                        limit_to_fonts=process.get("limit_to_fonts", None),
-                        character_limit_regex=process.get("character_limit_regex", None),
-                        show_error_message=show_error_message,
-                        file_cache=file_cache,
-                    )
-                if process["name"] == KANJIUM_TO_JAVDEJONG_PROCESS:
-                    result_val = kanjium_to_javdejong_process(
-                        text=result_val,
-                        delimiter=process.get("delimiter", None),
-                        show_error_message=show_error_message,
-                    )
+                try:
+                    if process["name"] == KANA_HIGHLIGHT_PROCESS:
+                        result_val = kana_highlight_process(
+                            text=result_val,
+                            onyomi_field=process.get("onyomi_field", None),
+                            kunyomi_field=process.get("kunyomi_field", None),
+                            kanji_field=process.get("kanji_field", None),
+                            note=note,
+                            show_error_message=show_error_message,
+                        )
+                        show_error_message(result_val)
+                    if process["name"] == REGEX_PROCESS:
+                        result_val = regex_process(
+                            text=result_val,
+                            regex=process.get("regex", None),
+                            replacement=process.get("replacement", None),
+                            flags=process.get("flags", None),
+                            show_error_message=show_error_message,
+                        )
+                    if process["name"] == FONTS_CHECK_PROCESS:
+                        result_val = fonts_check_process(
+                            text=result_val,
+                            fonts_dict_file=process.get("fonts_dict_file", None),
+                            limit_to_fonts=process.get("limit_to_fonts", None),
+                            character_limit_regex=process.get("character_limit_regex", None),
+                            show_error_message=show_error_message,
+                            file_cache=file_cache,
+                        )
+                    if process["name"] == KANJIUM_TO_JAVDEJONG_PROCESS:
+                        result_val = kanjium_to_javdejong_process(
+                            text=result_val,
+                            delimiter=process.get("delimiter", None),
+                            show_error_message=show_error_message,
+                        )
+                except FatalProcessError as e:
+                    # If some process fails in a way that will always fail, we stop the whole operation
+                    # so the user can fix the issue without needing to wait for all the other notes to be copied
+                    show_error_message(f"Error in {process['name']} process: {e}")
+                    return False
 
         # Step 2.3: Set the value into the target note's field
         try:
