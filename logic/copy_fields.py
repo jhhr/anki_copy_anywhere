@@ -357,7 +357,6 @@ def copy_for_single_note(
                             note=note,
                             show_error_message=show_error_message,
                         )
-                        show_error_message(result_val)
                     if process["name"] == REGEX_PROCESS:
                         result_val = regex_process(
                             text=result_val,
