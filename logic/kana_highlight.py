@@ -321,7 +321,7 @@ def kana_highlight(
         if kanji_count is None or kanji_pos is None:
             show_error_message(
                 "Error in kana_highlight[]: process_readings() called with no kanji_count or kanji_pos specified")
-            return furigana
+            return [False, True] if return_on_or_kun_match_only else furigana
 
         # No onyomi or kunyomi reading matched the furigana
         # Assuming the word is a jukujigun, we'll highlight part of the furigana matching the kanji position
@@ -351,7 +351,7 @@ def kana_highlight(
                 new_furigana += "</b>"
             cur_mora_index = cur_mora_range_max
 
-        return new_furigana
+        return [False, True] if return_on_or_kun_match_only else new_furigana
 
     # Regex sub replacer function.
     def furigana_replacer(match):
@@ -364,7 +364,7 @@ def kana_highlight(
             # to a sound tag?) so we'll just leave it out anyway
             return furigana
         if word in (kanji_to_highlight, f"{kanji_to_highlight}々"):
-            [onyomi_match, kunyomi_match] = process_readings(
+            [onyomi_match, _] = process_readings(
                 furigana,
                 kanji_count=1,
                 kanji_pos=0,
