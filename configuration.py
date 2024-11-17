@@ -34,14 +34,30 @@ class RegexProcess(TypedDict):
     flags: Optional[str]
 
 
-FONTS_CHECK_PROCESS = "Fonts check"
+def get_regex_process_label(regex_process):
+    regex = regex_process['regex']
+    if len(regex) > 40:
+        regex = regex[:20] + "..."
+    return f"{REGEX_PROCESS}: <code>{regex}</code>"
 
+
+FONTS_CHECK_PROCESS = "Fonts check"
 
 class FontsCheckProcess(TypedDict):
     name: str
     fonts_dict_file: str
     limit_to_fonts: Optional[str]
     character_limit_regex: Optional[str]
+
+
+def get_fonts_check_process_label(fonts_check_process):
+    fonts_limit = fonts_check_process.get('limit_to_fonts', None)
+    if fonts_limit:
+        fonts_limit = f", (limit {len(fonts_limit)} fonts)"
+    else:
+        fonts_limit = ""
+    return f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
+
 
 KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
 class KanaHighlightProcess(TypedDict):

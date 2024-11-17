@@ -35,7 +35,9 @@ from ..configuration import (
     CopyFieldToField,
     KanaHighlightProcess,
     RegexProcess,
+    get_regex_process_label,
     FontsCheckProcess,
+    get_fonts_check_process_label,
     KanjiumToJavdejongProcess,
     ALL_PROCESS_NAMES,
     NEW_PROCESS_DEFAULTS,
@@ -61,6 +63,9 @@ class ClickableLabel(QLabel):
     def mousePressEvent(self, event):
         # Show tooltip near the label when clicked
         QToolTip.showText(self.mapToGlobal(QPoint(0, self.height())), self.tooltip_text)
+
+    def setLabelText(self, text):
+        self.setText(text)
 
 
 class KanjiumToJavdejongProcessDialog(QDialog):
@@ -116,6 +121,7 @@ def validate_regex(dialog):
         dialog.regex_error_display.setText(f"Error: {e}")
         return False
     return True
+
 
 class RegexProcessDialog(QDialog):
     def __init__(self, parent, process: RegexProcess):
@@ -399,7 +405,7 @@ class EditExtraProcessingWidget(QWidget):
         return self.process_chain
 
     def add_process_row(self, index, process):
-        process_dialog, process_name = self.get_process_dialog_and_name(process)
+        process_dialog, get_process_name = self.get_process_dialog_and_name(process)
 
         if process_dialog is None:
             return
@@ -412,7 +418,7 @@ class EditExtraProcessingWidget(QWidget):
         hbox = QHBoxLayout()
         self.middle_grid.addLayout(hbox, index, 1)
 
-        process_label = ClickableLabel(process_name, process_dialog.description, self)
+        process_label = ClickableLabel(get_process_name(process), process_dialog.description, self)
         hbox.addStretch(1)
         hbox.addWidget(process_label)
 
@@ -421,6 +427,7 @@ class EditExtraProcessingWidget(QWidget):
                 for i, cur_process in enumerate(self.process_chain):
                     if cur_process == process:
                         self.process_chain[i] = process_dialog.process
+                        process_label.setLabelText(get_process_name(process_dialog.process))
                 self.update_process_chain()
                 return 0
             return -1
@@ -466,12 +473,12 @@ class EditExtraProcessingWidget(QWidget):
                 self,
                 process,
                 note_type
-            ), KANA_HIGHLIGHT_PROCESS
+            ), get_fonts_check_process_label
         if process_name == REGEX_PROCESS:
-            return RegexProcessDialog(self, process), REGEX_PROCESS
+            return RegexProcessDialog(self, process), get_regex_process_label
         if process_name == FONTS_CHECK_PROCESS:
-            return FontsCheckProcess(self, process), FONTS_CHECK_PROCESS
+            return FontsCheckProcess(self, process), lambda: FONTS_CHECK_PROCESS
         if process_name == KANJIUM_TO_JAVDEJONG_PROCESS:
-            return KanjiumToJavdejongProcessDialog(self, process), KANJIUM_TO_JAVDEJONG_PROCESS
+            return KanjiumToJavdejongProcessDialog(self, process), lambda: KANJIUM_TO_JAVDEJONG_PROCESS
 
         return None, ""
