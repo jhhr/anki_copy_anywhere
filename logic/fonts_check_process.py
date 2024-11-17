@@ -38,8 +38,9 @@ def fonts_check_process(
         show_error_message("Error in fonts_check_process: Missing 'fonts_dict_file'")
         return ""
 
-    if character_limit_regex is not None:
-        character_limit_regex = re.compile(character_limit_regex)
+    char_regex = None
+    if character_limit_regex is not None and character_limit_regex != "":
+        char_regex = re.compile(character_limit_regex)
 
     # try to get the fonts_dict from the cache
     if file_cache is not None:
@@ -82,15 +83,15 @@ def fonts_check_process(
     all_chars_excluded_by_regex = None
 
     for char in text:
-        if character_limit_regex is not None:
-            if not character_limit_regex.fullmatch(char):
+        if char_regex is not None:
+            if not char_regex.fullmatch(char):
                 all_chars_excluded_by_regex = True
                 continue
             all_chars_excluded_by_regex = False
 
-        if char in fonts_dict:
+        char_fonts = fonts_dict.get(char, None)
+        if char_fonts:
             some_chars_found = True
-            char_fonts = fonts_dict[char]
             encountered_fonts.update(char_fonts)
             # loop through encountered_fonts and set all char_fonts that are in it to True in valid_fonts, else False
             for font in encountered_fonts:
