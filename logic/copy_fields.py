@@ -9,7 +9,7 @@ from anki.notes import Note
 from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
-from aqt.qt import QWidget, QVBoxLayout, QLabel, QScrollArea, QMessageBox, QGuiApplication
+from aqt.qt import QWidget, QDialog, QVBoxLayout, QLabel, QScrollArea, QGuiApplication
 from aqt.utils import tooltip
 
 from .FatalProcessError import FatalProcessError
@@ -35,24 +35,35 @@ from ..utils import (
 SEARCH_FIELD_VALUE_PLACEHOLDER = "$SEARCH_FIELD_VALUE$"
 
 
-# Since printing into console on Windows breaks the characters to be unreadable,
-# I'll use a GUI element to show debug messages
-class ScrollMessageBox(QMessageBox):
-    def __init__(self, l, *args, **kwargs):
-        QMessageBox.__init__(self, *args, **kwargs)
+class ScrollMessageBox(QDialog):
+    """
+    A simple class to show a scrollable message box to display debug messages
+
+    :param message_list: A list of messages to display
+    :param title: The title of the message box
+    :param parent: The parent widget
+    """
+
+    def __init__(self, message_list, title, parent=None, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.setWindowTitle(title)
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         self.content = QWidget()
         scroll.setWidget(self.content)
         lay = QVBoxLayout(self.content)
-        for item in l:
-            lay.addWidget(QLabel(item, self))
-        self.layout().addWidget(scroll, 0, 0, 1, self.layout().columnCount())
-        # Get the screen size
+        for item in message_list:
+            label = QLabel(item, self)
+            label.setWordWrap(True)
+            lay.addWidget(label)
+        self.layout = QVBoxLayout(self)
+        self.layout.addWidget(scroll)
+        self.setModal(False)
+        # resize horizontally to a percentage of screen width or sizeHint, whichever is larger
+        # but allow vertical resizing to follow sizeHint
         screen = QGuiApplication.primaryScreen().availableGeometry()
-
-        # Set the initial size to a percentage of the screen size
-        self.resize(screen.width() * 0.6, screen.height() * 0.95)
+        self.resize(max(self.sizeHint().height(), int(screen.width() * 0.35)), self.sizeHint().height())
+        self.show()
 
 
 def get_ord_from_model(model, fld_name):
@@ -73,19 +84,21 @@ def copy_fields(
         is_sync: bool = False,
 ):
     start_time = time.time()
-    debug_text = ""
+    debug_texts = []
 
     def show_error_message(message: str):
-        nonlocal debug_text
-        debug_text += f"<br/>{message}"
+        nonlocal debug_texts
+        debug_texts.append(message)
         print(message)
 
     def on_done(copy_results):
         mw.progress.finish()
         tooltip(f"{copy_results.result_text} in {time.time() - start_time:.2f} seconds", parent=parent, period=5000)
-        if not is_sync and debug_text != "":
-            # For finding sentences to debug
-            ScrollMessageBox.information(parent, "Debug results", debug_text)
+        if not is_sync and len(debug_texts) > 0:
+            ScrollMessageBox(
+                debug_texts,
+                title=f'{copy_definition["definition_name"]} Debug Messages',
+                parent=parent)
 
     return (
         CollectionOp(
@@ -204,7 +217,7 @@ def copy_fields_in_background(
 
     mw.taskman.run_on_main(
         lambda: mw.progress.update(
-            label=f"{card_cnt}/{total_cards_count} cards' fetches cached",
+            label=f"<strong>{definition_name}</strong><br/>{card_cnt}/{total_cards_count} notes copied into",
             value=card_cnt,
             max=total_cards_count,
         )
@@ -236,7 +249,7 @@ def copy_fields_in_background(
         if card_cnt % 10 == 0:
             mw.taskman.run_on_main(
                 lambda: mw.progress.update(
-                    label=f"{card_cnt}/{total_cards_count} notes copied into",
+                    label=f"<strong>{definition_name}</strong><br/>{card_cnt}/{total_cards_count} notes copied into",
                     value=card_cnt,
                     max=total_cards_count,
                 )
@@ -475,7 +488,6 @@ def get_notes_to_copy_from(
         show_error_message(
             f"Error in copy fields: Did not find any cards with copy_from_cards_query='{interpolated_cards_query}'")
         return []
-
 
     # select a card or cards based on the select_card_by value
     selected_notes = []
