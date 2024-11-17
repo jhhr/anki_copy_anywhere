@@ -100,8 +100,8 @@ def fonts_check_process(
                 else:
                     valid_fonts.discard(font)
 
-        if limit_to_fonts is not None:
-            valid_fonts = valid_fonts.intersection(limit_to_fonts)
+    if limit_to_fonts is not None:
+        valid_fonts = valid_fonts.intersection(limit_to_fonts)
 
     join_str = "\", \""
 
