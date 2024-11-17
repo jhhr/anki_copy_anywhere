@@ -130,7 +130,7 @@ class PickCopyDefinitionDialog(QDialog):
 
         def remove_row_ui():
             self.checkboxes.remove(checkbox)
-            self.definition_card_ids.pop(index)
+            self.definition_card_ids.pop(0)
             for widget in [checkbox, edit_button, duplicate_button, remove_button]:
                 widget.deleteLater()
                 self.middle_grid.removeWidget(widget)
@@ -138,6 +138,9 @@ class PickCopyDefinitionDialog(QDialog):
         self.remove_row_funcs.append(remove_row_ui)
 
         def remove_row():
+            # When removing a definition, we in fact remake the whole grid
+            # Thus we remove all definition's UI, remove the one definition
+            # and then add the remaining definitions back
             for func in self.remove_row_funcs:
                 func()
             self.remove_row_funcs = []
