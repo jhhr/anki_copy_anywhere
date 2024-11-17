@@ -187,12 +187,391 @@ WHOLE = "whole"
 Edge: str = Union[LEFT, RIGHT, MIDDLE, WHOLE]
 
 
-class KanjiData(TypedDict):
+class WordData(TypedDict):
     """
-    TypedDict for the kanji data in
+    TypedDict for data about a single word that was matched in the text for the kanji_to_highlight
     """
-    pos: int
-    count: int
+    kanji_pos: int  # position of the kanji_to_highlight in the word
+    kanji_count: int  # number of kanji in the word
+    word: str  # the word itself
+    furigana: str  # the furigana for the word
+    edge: Edge  # Where in the word the kanji_to_highlight is at
+
+
+class HighlightArgs(TypedDict):
+    """
+    TypedDict for the base arguments passed to kana_highlight as these get passed around a lot
+    """
+    text: str
+    onyomi: str
+    kunyomi: str
+    kanji_to_highlight: str
+
+
+def process_readings(
+        highlight_args: HighlightArgs,
+        word_data: WordData,
+        return_on_or_kun_match_only: bool = False,
+        show_error_message: Callable = print
+):
+    """
+    Function that processes furigana by checking all possible onyomi and kunyomi readings on it
+    Either returns the furigana as-is when there is no match or modifies the furigana by
+    adding <b> tags around the part that matches the reading
+
+    :param highlight_args: dict, the base arguments passed to kana_highlight
+    :param word_data: dict, all the data about the word that was matched
+    :param return_on_or_kun_match_only: bool, return [True, False] if an onyomi match is found
+        and [False, True] if a kunyomi match is found
+    :param show_error_message: Callable, function to call when an error message is needed
+    :return: string, the modified furigana
+        or [True, False] / [False, True] if return_on_or_kun_match_only
+    """
+    target_furigana_section = get_target_furigana_section(
+        word_data.get("furigana"),
+        word_data.get("edge"),
+        show_error_message
+    )
+    if target_furigana_section is None:
+        return highlight_args.get("text")
+
+    onyomi_match = check_onyomi_readings(
+        highlight_args.get("onyomi"),
+        word_data.get("furigana"),
+        target_furigana_section,
+        word_data.get("edge"),
+        return_on_or_kun_match_only
+    )
+    if onyomi_match:
+        return onyomi_match
+
+    kunyomi_match = check_kunyomi_readings(
+        highlight_args.get("kunyomi"),
+        word_data.get("furigana"),
+        target_furigana_section,
+        word_data.get("edge"),
+        return_on_or_kun_match_only
+    )
+    if kunyomi_match:
+        return kunyomi_match
+
+    kanji_count = word_data.get("kanji_count")
+    kanji_pos = word_data.get("kanji_pos")
+
+    if kanji_count is None or kanji_pos is None:
+        show_error_message(
+            "Error in kana_highlight[]: process_readings() called with no kanji_count or kanji_pos specified")
+        return [False, True] if return_on_or_kun_match_only else word_data.get("furigana")
+
+    return handle_jukujigun_case(word_data, return_on_or_kun_match_only)
+
+
+def get_target_furigana_section(
+        furigana: str,
+        edge: Edge,
+        show_error_message: Callable
+):
+    """
+    Function that returns the part of the furigana that should be matched against the onyomi or kunyomi
+    :param furigana: string, the furigana to process
+    :param edge: string, [left, right, middle, whole], the part of the furigana to match
+        against the onyomi or kunyomi
+    :param show_error_message: Callable, function to call when an error message is needed
+    :return: string, the part of the furigana that should be matched against the onyomi or kunyomi
+    """
+    if edge == WHOLE:
+        # Highlight the whole furigana
+        return furigana
+    if edge == LEFT:
+        # Leave out the last character of the furigana
+        return furigana[:-1]
+    if edge == RIGHT:
+        # Leave out the first character of the furigana
+        return furigana[1:]
+    if edge == MIDDLE:
+        # Leave out both the first and last characters of the furigana
+        return furigana[1:-1]
+    show_error_message(
+        "Error in kana_highlight[]: process_readings() called with no edge specified")
+    return None
+
+
+def check_onyomi_readings(
+        onyomi: str,
+        furigana: str,
+        target_furigana_section: str,
+        edge: Edge,
+        return_on_or_kun_match_only: bool
+):
+    """
+    Function that checks the onyomi readings against the target furigana section
+    
+    :param onyomi: string, the onyomi readings for the kanji
+    :param furigana: string, the furigana to process
+    :param target_furigana_section: string, the part of the furigana that should be matched against the onyomi
+    The following passed to replace_onyomi_match
+    :param edge: string, [left, right, middle, whole], the part of the furigana to match
+    :param return_on_or_kun_match_only: bool
+
+    :return: string, the modified furigana
+      or [True, False] when return_on_or_kun_match_only
+    """
+    onyomi_readings = onyomi.split("、")
+    # order readings by length so that we try to match the longest reading first
+    onyomi_readings.sort(key=len, reverse=True)
+
+    for onyomi_reading in onyomi_readings:
+        # remove text in () in the reading
+        onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
+        # Convert the onyomi to hiragana since the furigana is in hiragana
+        onyomi_reading = to_hiragana(onyomi_reading)
+        if onyomi_reading in target_furigana_section:
+            print(f"\nonyomi_reading: {onyomi_reading}")
+            return replace_onyomi_match(furigana, onyomi_reading, edge,
+                                        return_on_or_kun_match_only)
+        # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
+        # This only applies to the first kana in the reading and if the reading isn't a single kana
+        if len(onyomi_reading) != 1 and onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
+            for onyomi_kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
+                converted_kunyomi = onyomi_reading.replace(onyomi_reading[0], onyomi_kana, 1)
+                if converted_kunyomi in target_furigana_section:
+                    print(f"\nconverted_onyomi: {converted_kunyomi}")
+                    return replace_onyomi_match(furigana, converted_kunyomi, edge,
+                                                return_on_or_kun_match_only)
+        # Then also check for small tsu conversion of some consonants
+        # this only happens in the last kana of the reading
+        for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
+            if onyomi_reading[-1] == tsu_kana:
+                converted_kunyomi = onyomi_reading[:-1] + "っ"
+                if converted_kunyomi in target_furigana_section:
+                    print(f"\nconverted_onyomi: {converted_kunyomi}")
+                    return replace_onyomi_match(furigana, converted_kunyomi, edge,
+                                                return_on_or_kun_match_only)
+    return None
+
+
+def replace_onyomi_match(
+        furigana: str,
+        onyomi_that_matched: str,
+        edge: Edge,
+        return_on_or_kun_match_only: bool
+):
+    """
+    Function that replaces the furigana with the onyomi reading that matched
+    :param furigana: string, the furigana to process
+    :param onyomi_that_matched: string, the onyomi reading that matched
+    :param edge: string, [left, right, middle, whole], the part of the furigana to match
+    :param return_on_or_kun_match_only: bool, return [True, False] if an onyomi match is found
+
+    :return: string, the modified furigana
+      or [True, False] when return_on_or_kun_match_only
+    """
+    if return_on_or_kun_match_only:
+        return [True, False]
+
+    if edge == RIGHT:
+        reg = re_match_from_right(onyomi_that_matched)
+    elif edge == LEFT:
+        reg = re_match_from_left(onyomi_that_matched)
+    else:
+        reg = re_match_from_middle(onyomi_that_matched)
+    return re.sub(reg, onyomi_replacer, furigana)
+
+
+def check_kunyomi_readings(
+        kunyomi: str,
+        furigana: str,
+        target_furigana_section: str,
+        edge: Edge,
+        return_on_or_kun_match_only: bool
+):
+    """
+    Function that checks the kunyomi readings against the target furigana section
+
+    :param kunyomi: string, the kunyomi readings for the kanji
+    :param furigana: string, the furigana to process
+    :param target_furigana_section: string, the part of the furigana that should be matched against the kunyomi
+    The following passed to replace_kunyomi_match
+    :param edge: string, [left, right, middle, whole], the part of the furigana to match
+        against the onyomi or kunyomi
+    :param return_on_or_kun_match_only: bool
+
+    :return: string, the modified furigana
+      or [False, True] when return_on_or_kun_match_only
+    """
+    for kunyomi_reading in kunyomi.split("、"):
+        # Remove the okurigana in the reading which are split by a dot
+        kunyomi_stem = re.sub(r"\..+", "", kunyomi_reading).strip()
+        # For kunyomi we just check for a match with the stem
+        if kunyomi_stem in target_furigana_section:
+            print(f"\nkunyomi_stem: {kunyomi_stem}")
+            return replace_kunyomi_match(furigana, kunyomi_stem, edge, return_on_or_kun_match_only)
+        # Also check for changed kana
+        if kunyomi_stem[0] in HIRAGANA_CONVERSION_DICT:
+            for kunyomi_kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
+                converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kunyomi_kana, 1)
+                if converted_kunyomi in target_furigana_section:
+                    print(f"\nconverted_kunyomi: {converted_kunyomi}")
+                    return replace_kunyomi_match(furigana, converted_kunyomi, edge,
+                                                 return_on_or_kun_match_only)
+
+        # Then also check for small tsu conversion of some consonants
+        # this only happens in the last kana of the reading
+        for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
+            if kunyomi_stem[-1] == tsu_kana:
+                converted_kunyomi = kunyomi_stem[:-1] + "っ"
+                if converted_kunyomi in target_furigana_section:
+                    print(f"\nconverted_kunyomi: {converted_kunyomi}")
+                    return replace_kunyomi_match(furigana, converted_kunyomi, edge,
+                                                 return_on_or_kun_match_only)
+    return None
+
+
+def replace_kunyomi_match(
+        furigana: str,
+        kunyomi_that_matched: str,
+        edge: Edge,
+        return_on_or_kun_match_only: bool
+):
+    """
+    Function that replaces the furigana with the kunyomi reading that matched
+    :param furigana: string, the furigana to process
+    :param kunyomi_that_matched: string, the kunyomi reading that matched
+    :param edge: string, [left, right, middle, whole], the part of the furigana to match
+    :param return_on_or_kun_match_only: bool, return [False, True] if a kunyomi match is found
+    :return: string, the modified furigana
+        or [False, True] when return_on_or_kun_match_only
+    """
+    if return_on_or_kun_match_only:
+        return [False, True]
+
+    if edge == RIGHT:
+        reg = re_match_from_right(kunyomi_that_matched)
+    elif edge == LEFT:
+        reg = re_match_from_left(kunyomi_that_matched)
+    else:
+        reg = re_match_from_middle(kunyomi_that_matched)
+    return re.sub(reg, kunyomi_replacer, furigana)
+
+
+def handle_jukujigun_case(
+        word_data: WordData,
+        return_on_or_kun_match_only: bool
+):
+    """
+    Function that handles the case of a jukujigun/ateji word where the furigana
+    doesn't match the onyomi or kunyomi. Highlights the part of the furigana matching
+    the kanji position
+    :param word_data: dict, all the data about the word that was matched
+    :param return_on_or_kun_match_only: bool, return [False, True] if a kunyomi match is found
+    :return: string, the modified furigana
+        or [False, True] when return_on_or_kun_match_only
+    """
+    kanji_count = word_data.get("kanji_count")
+    kanji_pos = word_data.get("kanji_pos")
+    furigana = word_data.get("furigana")
+
+    # First split the word into mora
+    mora_list = ALL_MORA_REC.findall(furigana)
+    # Divide the mora by the number of kanji in the word
+    mora_count = len(mora_list)
+    mora_per_kanji = mora_count // kanji_count
+    # Split the remainder evenly among the kanji, by adding one mora to each kanji until the remainder is 0
+    remainder = mora_count % kanji_count
+    new_furigana = ""
+    cur_mora_index = 0
+    for kanji_index in range(kanji_count):
+        cur_mora_range_max = cur_mora_index + mora_per_kanji
+        if remainder > 0:
+            cur_mora_range_max += 1
+            remainder -= 1
+        if kanji_index == kanji_pos:
+            new_furigana += "<b>"
+        elif kanji_index == kanji_pos + 1:
+            new_furigana += "</b>"
+
+        for mora_index in range(cur_mora_index, cur_mora_range_max):
+            new_furigana += mora_list[mora_index]
+
+        if kanji_index == kanji_pos and kanji_index == kanji_count - 1:
+            new_furigana += "</b>"
+        cur_mora_index = cur_mora_range_max
+
+    return [False, True] if return_on_or_kun_match_only else new_furigana
+
+
+def handle_whole_kanji_case(highlight_args, word: str, furigana: str, show_error_message: Callable):
+    """
+    The case when the whole word contains the kanji to highlight.
+    So, either it's a single kanji word or the kanji is repeated.
+
+    :param highlight_args: dict, the base arguments passed to kana_highlight
+    :param word: string, the word
+    :param furigana: string, the whole furigana for the word
+    :param show_error_message: Callable, function to call when an error message is needed
+
+    :return: string, the modified furigana entirely highlighted, additionally
+        in katakana for onyomi
+    """
+    [onyomi_match, _] = process_readings(
+        highlight_args,
+        {"kanji_pos": 0, "kanji_count": 1, "furigana": furigana, "edge": WHOLE, "word": word},
+        return_on_or_kun_match_only=True,
+        show_error_message=show_error_message
+    )
+    if onyomi_match:
+        # For onyomi matches the furigana should be in katakana
+        return f"<b>{to_katakana(furigana)}</b>"
+    # For kunyomi matches keep in hiragana
+    return f"<b>{furigana}</b>"
+
+
+def handle_partial_kanji_case(
+        highlight_args: HighlightArgs,
+        word: str,
+        furigana: str,
+        show_error_message: Callable
+):
+    """
+    The case when the word contains other kanji in addition to the kanji to highlight.
+    Could be 2 or more kanji in the word.
+
+    :param highlight_args: dict, the base arguments passed to kana_highlight
+    :param word: string, the word that was matched for kanji_to_highlight
+    :param furigana: string, the furigana for the word
+    :param show_error_message: Callable, function to call when an error message is needed
+
+    :return: string, the modified furigana with the kanji to highlight highlighted
+    """
+    kanji_to_highlight = highlight_args.get("kanji_to_highlight")
+
+    kanji_pos = word.find(kanji_to_highlight)
+    if kanji_pos == -1:
+        return furigana
+    # Take of note of which side of the word the kanji is found on
+    # 1. left edge, the furigana replacement has to begin on the left edge and can't end on the right edge
+    # 2. right edge, the furigana replacement has to end on the right edge and can't begin on the left edge
+    # 3. both (the word is just the kanji or the kanji is repeated), we can just highlight the whole furigana
+    # 4. or middle, the furigana replacement can't begin on the left or end on the right
+    kanji_in_left_edge = kanji_pos == 0
+    kanji_in_right_edge = kanji_pos == len(word) - 1
+    # We've already ruled out case 3. so, the middle case
+    # is 4. where the kanji is in the middle of the word
+    kanji_in_middle = not kanji_in_left_edge and not kanji_in_right_edge
+
+    word_data = {
+        "kanji_pos": kanji_pos,
+        "kanji_count": len(word),
+        "furigana": furigana,
+        "edge": MIDDLE if kanji_in_middle else (LEFT if kanji_in_left_edge else RIGHT),
+        "word": word,
+    }
+
+    return process_readings(
+        highlight_args,
+        word_data,
+        show_error_message=show_error_message
+    )
 
 
 def kana_highlight(
@@ -200,6 +579,7 @@ def kana_highlight(
         onyomi: str,
         kunyomi: str,
         text: str,
+        show_error_message: Callable = print
 ) -> str:
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
@@ -210,345 +590,18 @@ def kana_highlight(
     :param kunyomi: kunyomi reading of the kanji, separated by commas if there are multiple readings
         okurigana should be separated by a dot
     :param text: The text to process
+    :param show_error_message: Callable, function to call when an error message is needed
     :return: The text cleaned from any previous <b> tags and with the furigana highlighted with <b> tags
         when the furigana corresponds to the kanji_to_highlight
     """
-    debug_text = ""
 
-    def debug_print(text):
-        nonlocal debug_text
-        debug_text += text + "\n"
-        print(text)
+    highlight_args = {
+        "text": text,
+        "onyomi": onyomi,
+        "kunyomi": kunyomi,
+        "kanji_to_highlight": kanji_to_highlight
+    }
 
-    def process_readings(
-            furigana: str,
-            edge: Edge,
-            kanji_data: KanjiData,
-            return_on_or_kun_match_only: bool = False,
-            show_error_message: Callable = print
-    ):
-        """
-        Function that processes furigana by checking all possible onyomi and kunyomi readings on it
-        Either returns the furigana as-is when there is no match or modifies the furigana by
-        adding <b> tags around the part that matches the reading
-
-        :param furigana: string, the furigana to process
-        :param edge: string, [left, right, middle, whole], the part of the furigana to match
-            against the onyomi or kunyomi
-        :param kanji_data: dict, the position and count of the kanji in the word
-        :param return_on_or_kun_match_only: bool, return [True, False] if an onyomi match is found
-            and [False, True] if a kunyomi match is found
-        :param show_error_message: Callable, function to call when an error message is needed
-        :return: string, the modified furigana
-            or [True, False] / [False, True] if return_on_or_kun_match_only
-        """
-        target_furigana_section = get_target_furigana_section(
-            furigana, edge, show_error_message)
-        if target_furigana_section is None:
-            return text
-
-        onyomi_match = check_onyomi_readings(
-            furigana, target_furigana_section, edge, return_on_or_kun_match_only)
-        if onyomi_match:
-            return onyomi_match
-
-        kunyomi_match = check_kunyomi_readings(
-            furigana, target_furigana_section, edge, return_on_or_kun_match_only)
-        if kunyomi_match:
-            return kunyomi_match
-
-        kanji_count = kanji_data.get("count")
-        kanji_pos = kanji_data.get("pos")
-
-        if kanji_count is None or kanji_pos is None:
-            show_error_message(
-                "Error in kana_highlight[]: process_readings() called with no kanji_count or kanji_pos specified")
-            return [False, True] if return_on_or_kun_match_only else furigana
-
-        return handle_jukujigun_case(furigana, kanji_data, return_on_or_kun_match_only)
-
-    def get_target_furigana_section(
-            furigana: str,
-            edge: Edge,
-            show_error_message: Callable
-    ):
-        """
-        Function that returns the part of the furigana that should be matched against the onyomi or kunyomi
-        :param furigana: string, the furigana to process
-        :param edge: string, [left, right, middle, whole], the part of the furigana to match
-            against the onyomi or kunyomi
-        :param show_error_message: Callable, function to call when an error message is needed
-        :return: string, the part of the furigana that should be matched against the onyomi or kunyomi
-        """
-        if edge == WHOLE:
-            # Highlight the whole furigana
-            return furigana
-        if edge == LEFT:
-            # Leave out the last character of the furigana
-            return furigana[:-1]
-        if edge == RIGHT:
-            # Leave out the first character of the furigana
-            return furigana[1:]
-        if edge == MIDDLE:
-            # Leave out both the first and last characters of the furigana
-            return furigana[1:-1]
-        show_error_message(
-            "Error in kana_highlight[]: process_readings() called with no edge specified")
-        return None
-
-    def check_onyomi_readings(
-            furigana: str,
-            target_furigana_section: str,
-            edge: Edge,
-            return_on_or_kun_match_only: bool
-    ):
-        """
-        Function that checks the onyomi readings against the target furigana section
-        :param furigana: string, the furigana to process
-        :param target_furigana_section: string, the part of the furigana that should be matched against the onyomi
-        The following passed to replace_onyomi_match
-        :param edge: string, [left, right, middle, whole], the part of the furigana to match
-        :param return_on_or_kun_match_only: bool
-
-        :return: string, the modified furigana
-          or [True, False] when return_on_or_kun_match_only
-        """
-        onyomi_readings = onyomi.split("、")
-        # order readings by length so that we try to match the longest reading first
-        onyomi_readings.sort(key=len, reverse=True)
-
-        for onyomi_reading in onyomi_readings:
-            # remove text in () in the reading
-            onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
-            # Convert the onyomi to hiragana since the furigana is in hiragana
-            onyomi_reading = to_hiragana(onyomi_reading)
-            if onyomi_reading in target_furigana_section:
-                debug_print(f"\nonyomi_reading: {onyomi_reading}")
-                return replace_onyomi_match(furigana, onyomi_reading, edge,
-                                            return_on_or_kun_match_only)
-            # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
-            # This only applies to the first kana in the reading and if the reading isn't a single kana
-            if len(onyomi_reading) != 1 and onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
-                for onyomi_kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
-                    converted_kunyomi = onyomi_reading.replace(onyomi_reading[0], onyomi_kana, 1)
-                    if converted_kunyomi in target_furigana_section:
-                        debug_print(f"\nconverted_onyomi: {converted_kunyomi}")
-                        return replace_onyomi_match(furigana, converted_kunyomi, edge,
-                                                    return_on_or_kun_match_only)
-            # Then also check for small tsu conversion of some consonants
-            # this only happens in the last kana of the reading
-            for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
-                if onyomi_reading[-1] == tsu_kana:
-                    converted_kunyomi = onyomi_reading[:-1] + "っ"
-                    if converted_kunyomi in target_furigana_section:
-                        debug_print(f"\nconverted_onyomi: {converted_kunyomi}")
-                        return replace_onyomi_match(furigana, converted_kunyomi, edge,
-                                                    return_on_or_kun_match_only)
-        return None
-
-    def replace_onyomi_match(
-            furigana: str,
-            onyomi_that_matched: str,
-            edge: Edge,
-            return_on_or_kun_match_only: bool
-    ):
-        """
-        Function that replaces the furigana with the onyomi reading that matched
-        :param furigana: string, the furigana to process
-        :param onyomi_that_matched: string, the onyomi reading that matched
-        :param edge: string, [left, right, middle, whole], the part of the furigana to match
-        :param return_on_or_kun_match_only: bool, return [True, False] if an onyomi match is found
-
-        :return: string, the modified furigana
-          or [True, False] when return_on_or_kun_match_only
-        """
-        if return_on_or_kun_match_only:
-            return [True, False]
-
-        if edge == RIGHT:
-            reg = re_match_from_right(onyomi_that_matched)
-        elif edge == LEFT:
-            reg = re_match_from_left(onyomi_that_matched)
-        else:
-            reg = re_match_from_middle(onyomi_that_matched)
-        return re.sub(reg, onyomi_replacer, furigana)
-
-    def check_kunyomi_readings(
-            furigana: str,
-            target_furigana_section: str,
-            edge: Edge,
-            return_on_or_kun_match_only: bool
-    ):
-        """
-        Function that checks the kunyomi readings against the target furigana section
-        :param furigana: string, the furigana to process
-        :param target_furigana_section: string, the part of the furigana that should be matched against the kunyomi
-        The following passed to replace_kunyomi_match
-        :param edge: string, [left, right, middle, whole], the part of the furigana to match
-            against the onyomi or kunyomi
-        :param return_on_or_kun_match_only: bool
-
-        :return: string, the modified furigana
-          or [False, True] when return_on_or_kun_match_only
-        """
-        for kunyomi_reading in kunyomi.split("、"):
-            # Remove the okurigana in the reading which are split by a dot
-            kunyomi_stem = re.sub(r"\..+", "", kunyomi_reading).strip()
-            # For kunyomi we just check for a match with the stem
-            if kunyomi_stem in target_furigana_section:
-                debug_print(f"\nkunyomi_stem: {kunyomi_stem}")
-                return replace_kunyomi_match(furigana, kunyomi_stem, edge, return_on_or_kun_match_only)
-            # Also check for changed kana
-            if kunyomi_stem[0] in HIRAGANA_CONVERSION_DICT:
-                for kunyomi_kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
-                    converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kunyomi_kana, 1)
-                    if converted_kunyomi in target_furigana_section:
-                        debug_print(f"\nconverted_kunyomi: {converted_kunyomi}")
-                        return replace_kunyomi_match(furigana, converted_kunyomi, edge,
-                                                     return_on_or_kun_match_only)
-
-            # Then also check for small tsu conversion of some consonants
-            # this only happens in the last kana of the reading
-            for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
-                if kunyomi_stem[-1] == tsu_kana:
-                    converted_kunyomi = kunyomi_stem[:-1] + "っ"
-                    if converted_kunyomi in target_furigana_section:
-                        debug_print(f"\nconverted_kunyomi: {converted_kunyomi}")
-                        return replace_kunyomi_match(furigana, converted_kunyomi, edge,
-                                                     return_on_or_kun_match_only)
-        return None
-
-    def replace_kunyomi_match(
-            furigana: str,
-            kunyomi_that_matched: str,
-            edge: Edge,
-            return_on_or_kun_match_only: bool
-    ):
-        """
-        Function that replaces the furigana with the kunyomi reading that matched
-        :param furigana: string, the furigana to process
-        :param kunyomi_that_matched: string, the kunyomi reading that matched
-        :param edge: string, [left, right, middle, whole], the part of the furigana to match
-        :param return_on_or_kun_match_only: bool, return [False, True] if a kunyomi match is found
-        :return: string, the modified furigana
-            or [False, True] when return_on_or_kun_match_only
-        """
-        if return_on_or_kun_match_only:
-            return [False, True]
-
-        if edge == RIGHT:
-            reg = re_match_from_right(kunyomi_that_matched)
-        elif edge == LEFT:
-            reg = re_match_from_left(kunyomi_that_matched)
-        else:
-            reg = re_match_from_middle(kunyomi_that_matched)
-        return re.sub(reg, kunyomi_replacer, furigana)
-
-    def handle_jukujigun_case(
-            furigana: str,
-            kanji_data: KanjiData,
-            return_on_or_kun_match_only: bool
-    ):
-        """
-        Function that handles the case of a jukujigun/ateji word where the furigana
-        doesn't match the onyomi or kunyomi. Highlights the part of the furigana matching
-        the kanji position
-        :param furigana: string, the furigana to process
-        :param kanji_data: dict, the position and count of the kanji in the word
-        :param return_on_or_kun_match_only: bool, return [False, True] if a kunyomi match is found
-        :return: string, the modified furigana
-            or [False, True] when return_on_or_kun_match_only
-        """
-        kanji_count = kanji_data.get("count")
-        kanji_pos = kanji_data.get("pos")
-
-        # First split the word into mora
-        mora_list = ALL_MORA_REC.findall(furigana)
-        # Divide the mora by the number of kanji in the word
-        mora_count = len(mora_list)
-        mora_per_kanji = mora_count // kanji_count
-        # Split the remainder evenly among the kanji, by adding one mora to each kanji until the remainder is 0
-        remainder = mora_count % kanji_count
-        new_furigana = ""
-        cur_mora_index = 0
-        for kanji_index in range(kanji_count):
-            cur_mora_range_max = cur_mora_index + mora_per_kanji
-            if remainder > 0:
-                cur_mora_range_max += 1
-                remainder -= 1
-            if kanji_index == kanji_pos:
-                new_furigana += "<b>"
-            elif kanji_index == kanji_pos + 1:
-                new_furigana += "</b>"
-
-            for mora_index in range(cur_mora_index, cur_mora_range_max):
-                new_furigana += mora_list[mora_index]
-
-            if kanji_index == kanji_pos and kanji_index == kanji_count - 1:
-                new_furigana += "</b>"
-            cur_mora_index = cur_mora_range_max
-
-        return [False, True] if return_on_or_kun_match_only else new_furigana
-
-    def handle_whole_kanji_case(furigana: str):
-        """
-        The case when the whole word contains the kanji to highlight.
-        So, either it's a single kanji word or the kanji is repeated.
-        :param furigana: string, the whole furigana for the word
-        :return: string, the modified furigana entirely highlighted, additionally
-            in katakana for onyomi
-        """
-        [onyomi_match, _] = process_readings(
-            furigana,
-            kanji_data={"pos": 0, "count": 1},
-            edge=WHOLE,
-            return_on_or_kun_match_only=True
-        )
-        if onyomi_match:
-            # For onyomi matches the furigana should be in katakana
-            return f"<b>{to_katakana(furigana)}</b>"
-        # For kunyomi matches keep in hiragana
-        return f"<b>{furigana}</b>"
-
-    def handle_partial_kanji_case(word: str, furigana: str):
-        """
-        The case when the word contains other kanji in addition to the kanji to highlight.
-        Could be 2 or more kanji in the word.
-        :param word: string, the word
-        :param furigana: string, the whole furigana for the word
-        :return: string, the modified furigana with the kanji to highlight highlighted
-        """
-        kanji_pos = word.find(kanji_to_highlight)
-        if kanji_pos == -1:
-            return furigana
-        # Take of note of which side of the word the kanji is found on
-        # 1. left edge, the furigana replacement has to begin on the left edge and can't end on the right edge
-        # 2. right edge, the furigana replacement has to end on the right edge and can't begin on the left edge
-        # 3. both (the word is just the kanji or the kanji is repeated), we can just highlight the whole furigana
-        # 4. or middle, the furigana replacement can't begin on the left or end on the right
-        kanji_in_left_edge = kanji_pos == 0
-        kanji_in_right_edge = kanji_pos == len(word) - 1
-        # We've already ruled out case 3. so, the middle case
-        # is 4. where the kanji is in the middle of the word
-        kanji_in_middle = not kanji_in_left_edge and not kanji_in_right_edge
-
-        kanji_count = len(word)
-
-        kanji_data = {
-            "pos": kanji_pos,
-            "count": kanji_count
-        }
-
-        if kanji_in_left_edge:
-            return process_readings(furigana, LEFT, kanji_data)
-        if kanji_in_right_edge:
-            return process_readings(furigana, RIGHT, kanji_data)
-        if kanji_in_middle:
-            return process_readings(furigana, MIDDLE, kanji_data)
-        # Sanity check, return something, we should never get here
-        return furigana
-
-    # Regex sub replacer function.
     def furigana_replacer(match: re.Match):
         """
         Replacer function for KANJI_AND_FURIGANA_REC. This function is called for every match
@@ -566,9 +619,9 @@ def kana_highlight(
             return furigana
 
         if word in (kanji_to_highlight, f"{kanji_to_highlight}々"):
-            return handle_whole_kanji_case(furigana)
+            return handle_whole_kanji_case(highlight_args, word, furigana, show_error_message)
 
-        return handle_partial_kanji_case(word, furigana)
+        return handle_partial_kanji_case(highlight_args, word, furigana, show_error_message)
 
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)

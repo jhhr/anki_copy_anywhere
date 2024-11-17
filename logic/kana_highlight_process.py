@@ -53,4 +53,4 @@ def kana_highlight_process(
             f"Error in kana_highlight: note doesn't contain fields: Kanji ({kanji_to_highlight}), Onyomi ({onyomi}), Kunyomi ({kunyomi})")
         return kana_filter(text)
 
-    return kana_highlight(kanji_to_highlight, onyomi, kunyomi, text)
+    return kana_highlight(kanji_to_highlight, onyomi, kunyomi, text, show_error_message)
