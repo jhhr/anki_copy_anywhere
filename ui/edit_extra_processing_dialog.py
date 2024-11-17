@@ -354,6 +354,7 @@ class EditExtraProcessingWidget(QWidget):
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
         self.process_dialogs = []
+        self.remove_row_funcs = []
         try:
             self.process_chain = field_to_field_def["process_chain"]
         except KeyError:
@@ -401,6 +402,9 @@ class EditExtraProcessingWidget(QWidget):
         self.field_to_field_def["process_chain"] = self.process_chain
         self.init_options_to_process_combobox()
 
+        for index, process in enumerate(self.process_chain):
+            self.add_process_row(index, process)
+
     def get_process_chain(self):
         return self.process_chain
 
@@ -427,7 +431,10 @@ class EditExtraProcessingWidget(QWidget):
                 for i, cur_process in enumerate(self.process_chain):
                     if cur_process == process:
                         self.process_chain[i] = process_dialog.process
-                        process_label.setLabelText(get_process_name(process_dialog.process))
+                # Remake the whole grid
+                for func in self.remove_row_funcs:
+                    func()
+                self.remove_row_funcs = []
                 self.update_process_chain()
                 return 0
             return -1
@@ -440,10 +447,18 @@ class EditExtraProcessingWidget(QWidget):
         # Remove
         remove_button = QPushButton("Delete")
 
-        def remove_row():
+        def remove_row_ui():
             for widget in [process_label, edit_button, remove_button]:
                 widget.deleteLater()
                 self.middle_grid.removeWidget(widget)
+
+        self.remove_row_funcs.append(remove_row_ui)
+
+        def remove_row():
+            # Remake the whole grid
+            for func in self.remove_row_funcs:
+                func()
+            self.remove_row_funcs = []
             self.remove_process(process, process_dialog)
 
         remove_button.clicked.connect(remove_row)
