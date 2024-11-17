@@ -3,7 +3,7 @@ import math
 import random
 import time
 from operator import itemgetter
-from typing import Callable
+from typing import Callable, Union
 
 from anki.notes import Note
 from anki.utils import ids2str
@@ -20,12 +20,17 @@ from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
 from ..configuration import (
     CopyDefinition,
+    CopyFieldToVariable,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
     KANA_HIGHLIGHT_PROCESS,
     REGEX_PROCESS,
     FONTS_CHECK_PROCESS,
     KANJIUM_TO_JAVDEJONG_PROCESS,
+    KanjiumToJavdejongProcess,
+    RegexProcess,
+    FontsCheckProcess,
+    KanaHighlightProcess
 )
 from ..utils import (
     write_custom_data,
@@ -267,6 +272,68 @@ def copy_fields_in_background(
     return results
 
 
+def apply_process_chain(
+        process_chain: list[Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]],
+        text: str,
+        note: Note,
+        show_error_message: Callable[[str], None] = None,
+        file_cache: dict = None,
+) -> Union[str, None]:
+    """
+    Apply a list of processes to a text
+    :param process_chain: The list of processes to apply
+    :param text: The text to apply the processes to
+    :param note: The note to use for the processes
+    :param show_error_message: A function to show error messages
+    :param file_cache: A dictionary to cache opened files' content
+    :return: The text after the processes have been applied or None if there was an error
+    """
+    if not show_error_message:
+        def show_error_message(message: str):
+            print(message)
+
+    for process in process_chain:
+        try:
+            if process["name"] == KANA_HIGHLIGHT_PROCESS:
+                text = kana_highlight_process(
+                    text=text,
+                    onyomi_field=process.get("onyomi_field", None),
+                    kunyomi_field=process.get("kunyomi_field", None),
+                    kanji_field=process.get("kanji_field", None),
+                    note=note,
+                    show_error_message=show_error_message,
+                )
+            if process["name"] == REGEX_PROCESS:
+                text = regex_process(
+                    text=text,
+                    regex=process.get("regex", None),
+                    replacement=process.get("replacement", None),
+                    flags=process.get("flags", None),
+                    show_error_message=show_error_message,
+                )
+            if process["name"] == FONTS_CHECK_PROCESS:
+                text = fonts_check_process(
+                    text=text,
+                    fonts_dict_file=process.get("fonts_dict_file", None),
+                    limit_to_fonts=process.get("limit_to_fonts", None),
+                    character_limit_regex=process.get("character_limit_regex", None),
+                    show_error_message=show_error_message,
+                    file_cache=file_cache,
+                )
+            if process["name"] == KANJIUM_TO_JAVDEJONG_PROCESS:
+                text = kanjium_to_javdejong_process(
+                    text=text,
+                    delimiter=process.get("delimiter", None),
+                    show_error_message=show_error_message,
+                )
+        except FatalProcessError as e:
+            # If some process fails in a way that will always fail, we stop the whole operation
+            # so the user can fix the issue without needing to wait for all the other notes to be copied
+            show_error_message(f"Error in {process['name']} process: {e}")
+            return None
+    return text
+
+
 def copy_for_single_note(
         copy_definition: CopyDefinition,
         note: Note,
@@ -289,6 +356,7 @@ def copy_for_single_note(
 
     (
         field_to_field_defs,
+        field_to_variable_defs,
         only_copy_into_decks,
         copy_from_cards_query,
         select_card_by,
@@ -297,6 +365,7 @@ def copy_for_single_note(
         copy_mode,
     ) = itemgetter(
         "field_to_field_defs",
+        "field_to_variable_defs",
         "only_copy_into_decks",
         "copy_from_cards_query",
         "select_card_by",
@@ -306,6 +375,16 @@ def copy_for_single_note(
     )(copy_definition)
 
     extra_state = {}
+
+    # Step 0: Get variable values for the note
+    variable_values_dict = None
+    if field_to_variable_defs is not None:
+        variable_values_dict = get_variable_values_for_note(
+            field_to_variable_defs=field_to_variable_defs,
+            note=note,
+            show_error_message=show_error_message,
+            file_cache=file_cache,
+        )
 
     # Step 1: get notes to copy from for this card
     notes_to_copy_from = []
@@ -321,6 +400,7 @@ def copy_for_single_note(
             select_card_by=select_card_by,
             select_card_count=select_card_count,
             show_error_message=show_error_message,
+            variable_values_dict=variable_values_dict,
         )
     else:
         show_error_message("Error in copy fields: missing copy mode value")
@@ -346,45 +426,15 @@ def copy_for_single_note(
         )
         # Step 2.2: If we have further processing steps, run them
         if process_chain is not None:
-            for process in process_chain:
-                try:
-                    if process["name"] == KANA_HIGHLIGHT_PROCESS:
-                        result_val = kana_highlight_process(
-                            text=result_val,
-                            onyomi_field=process.get("onyomi_field", None),
-                            kunyomi_field=process.get("kunyomi_field", None),
-                            kanji_field=process.get("kanji_field", None),
-                            note=note,
-                            show_error_message=show_error_message,
-                        )
-                    if process["name"] == REGEX_PROCESS:
-                        result_val = regex_process(
-                            text=result_val,
-                            regex=process.get("regex", None),
-                            replacement=process.get("replacement", None),
-                            flags=process.get("flags", None),
-                            show_error_message=show_error_message,
-                        )
-                    if process["name"] == FONTS_CHECK_PROCESS:
-                        result_val = fonts_check_process(
-                            text=result_val,
-                            fonts_dict_file=process.get("fonts_dict_file", None),
-                            limit_to_fonts=process.get("limit_to_fonts", None),
-                            character_limit_regex=process.get("character_limit_regex", None),
-                            show_error_message=show_error_message,
-                            file_cache=file_cache,
-                        )
-                    if process["name"] == KANJIUM_TO_JAVDEJONG_PROCESS:
-                        result_val = kanjium_to_javdejong_process(
-                            text=result_val,
-                            delimiter=process.get("delimiter", None),
-                            show_error_message=show_error_message,
-                        )
-                except FatalProcessError as e:
-                    # If some process fails in a way that will always fail, we stop the whole operation
-                    # so the user can fix the issue without needing to wait for all the other notes to be copied
-                    show_error_message(f"Error in {process['name']} process: {e}")
-                    return False
+            result_val = apply_process_chain(
+                process_chain=process_chain,
+                text=result_val,
+                note=note,
+                show_error_message=show_error_message,
+                file_cache=file_cache,
+            )
+            if result_val is None:
+                return False
 
         # Step 2.3: Set the value into the target note's field
         try:
@@ -400,12 +450,63 @@ def copy_for_single_note(
     return True
 
 
+def get_variable_values_for_note(
+        field_to_variable_defs: list[CopyFieldToVariable],
+        note: Note,
+        file_cache: dict = None,
+        show_error_message: Callable[[str], None] = None,
+) -> Union[dict, None]:
+    """
+    Get the values for the variables from the note
+    :param field_to_variable_defs: The definitions of the variables to get
+    :param note: The note to get the values from
+    :param file_cache: A dictionary to cache opened files' content for process chains
+    :param show_error_message: A function to show error messages
+    :return: A dictionary of the values for the variables or None if there was an error
+    """
+    if not show_error_message:
+        def show_error_message(message: str):
+            print(message)
+
+    variable_values_dict = {}
+    for field_to_variable_def in field_to_variable_defs:
+        copy_into_variable = field_to_variable_def["copy_into_variable"]
+        copy_from_text = field_to_variable_def["copy_from_text"]
+        process_chain = field_to_variable_def.get("process_chain", None)
+
+        # Step 1: Interpolate the text with values from the note
+        interpolated_value, invalid_fields = interpolate_from_text(
+            copy_from_text,
+            note=note,
+        )
+        if len(invalid_fields) > 0:
+            show_error_message(
+                f"Error getting variable values: Invalid fields in copy_from_text: {', '.join(invalid_fields)}")
+
+        # Step 2: If we have further processing steps, run them
+        if process_chain is not None:
+            interpolated_value = apply_process_chain(
+                process_chain=process_chain,
+                text=interpolated_value,
+                note=note,
+                show_error_message=show_error_message,
+                file_cache=file_cache,
+            )
+            if interpolated_value is None:
+                return None
+
+        variable_values_dict[copy_into_variable] = interpolated_value
+
+    return variable_values_dict
+
+
 def get_notes_to_copy_from(
         copy_from_cards_query: str,
         copy_into_note: Note,
         select_card_by: str,
         deck_id,
         extra_state: dict,
+        variable_values_dict: dict = None,
         only_copy_into_decks: str = None,
         select_card_count: str = '1',
         show_error_message: Callable[[str], None] = None,
@@ -419,6 +520,7 @@ def get_notes_to_copy_from(
             the query
     :param deck_id: The current deck id, used to filter the cards to copy from
     :param extra_state: A dictionary to store cached values to re-use in subsequent calls of this function
+    :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param only_copy_into_decks: A comma separated whitelist of deck names. Limits the cards to copy from
             to only those in the decks in the whitelist
     :param select_card_count: How many cards to select from the query. Default is 1
@@ -470,6 +572,7 @@ def get_notes_to_copy_from(
     interpolated_cards_query, invalid_fields = interpolate_from_text(
         copy_from_cards_query,
         note=copy_into_note,
+        variable_values_dict=variable_values_dict,
     )
     cards_query_id = base64.b64encode(f"cards{interpolated_cards_query}".encode()).decode()
     try:
@@ -534,6 +637,7 @@ def get_field_values_from_notes(
         copy_from_text: str,
         notes: list[Note],
         current_target_value: str = "",
+        variable_values_dict: dict = None,
         select_card_separator: str = ', ',
         show_error_message: Callable[[str], None] = None,
 ) -> str:
@@ -543,6 +647,8 @@ def get_field_values_from_notes(
             text and field names and special values enclosed in double curly braces that need to be
             replaced with the actual values from the notes.
     :param notes: The selected notes to get the value from
+    :param current_target_value: The current value of the target field in the note
+    :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
             if there is only one note
     :param show_error_message: A function to show error messages, used for storing all messages until the
@@ -568,7 +674,8 @@ def get_field_values_from_notes(
         interpolated_value, invalid_fields = interpolate_from_text(
             copy_from_text,
             note,
-            current_target_value
+            current_field_value=current_target_value,
+            variable_values_dict=variable_values_dict,
         )
         if len(invalid_fields) > 0:
             show_error_message(

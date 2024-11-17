@@ -24,7 +24,8 @@ from aqt.qt import (
 # noinspection PyUnresolvedReferences
 from aqt.utils import showInfo
 
-from .copy_field_to_field_editor import CopyFieldToFieldEditor
+from .copy_field_to_field_editor import CopyFieldToFieldEditor, get_variable_names_from_copy_definition
+from .field_to_variable_editor import CopyFieldToVariableEditor
 from .interpolated_text_edit import InterpolatedTextEditLayout
 from .scrollable_dialog import ScrollableQDialog
 from ..configuration import (
@@ -33,6 +34,7 @@ from ..configuration import (
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
 )
+from ..logic.interpolate_fields import VARIABLES_KEY
 
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
@@ -48,6 +50,7 @@ else:
     QSizePolicyFixed = QSizePolicy.Fixed
     QSizePolicyPreferred = QSizePolicy.Preferred
     QAlignTop = Qt.AlignTop
+
 
 
 def set_size_policy_for_all_widgets(layout, h_policy, v_policy):
@@ -71,6 +74,15 @@ class FieldToFieldEditorVBox(QVBoxLayout):
         set_size_policy_for_all_widgets(self, QSizePolicyPreferred, QSizePolicyFixed)
 
 
+class FieldsToVariableEditorVBox(QVBoxLayout):
+    def __init__(self, parent, copy_definition):
+        super().__init__(parent)
+        self.addWidget(QLabel("Fields to copy into variables"))
+        self.field_to_variable_editor = CopyFieldToVariableEditor(parent, copy_definition)
+        self.addWidget(self.field_to_variable_editor)
+        set_size_policy_for_all_widgets(self, QSizePolicyPreferred, QSizePolicyFixed)
+
+
 class AcrossNotesCopyEditor(QWidget):
     def __init__(self, parent, copy_definition):
         super().__init__(parent)
@@ -79,6 +91,10 @@ class AcrossNotesCopyEditor(QWidget):
         self.main_layout = QVBoxLayout()
         self.main_layout.setAlignment(QAlignTop)
         self.setLayout(self.main_layout)
+
+        self.variables_vbox = FieldsToVariableEditorVBox(self, copy_definition)
+        self.main_layout.addLayout(self.variables_vbox)
+
         self.form = QFormLayout()
         self.main_layout.addLayout(self.form)
 
@@ -137,13 +153,19 @@ Get specific cards types with a specific interval
         self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model["name"])
 
         new_options_dict = {
-            model["name"]: [field for field in mw.col.models.field_names(model)]
+            model["name"]: mw.col.models.field_names(model)
         }
+        variable_names = get_variable_names_from_copy_definition(self.copy_definition)
+        if len(variable_names) > 0:
+            new_options_dict[VARIABLES_KEY] = variable_names
         self.card_query_text_layout.update_options(new_options_dict)
         self.card_query_text_layout.validate_text()
 
     def get_field_to_field_editor(self):
         return self.fields_vbox.field_to_field_editor
+
+    def get_field_to_variable_editor(self):
+        return self.variables_vbox.field_to_variable_editor
 
 
 class WithinNoteCopyEditor(QWidget):
@@ -364,6 +386,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_into_note_type": self.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": self.decks_limit_multibox.currentText(),
                 "field_to_field_defs": self.across_notes_editor_tab.get_field_to_field_editor().get_field_to_field_defs(),
+                "field_to_variable_defs": self.across_notes_editor_tab.get_field_to_variable_editor().get_field_to_variable_defs(),
                 "copy_from_cards_query": self.across_notes_editor_tab.card_query_text_layout.get_text(),
                 "select_card_by": self.across_notes_editor_tab.card_select_cbox.currentText(),
                 "select_card_count": self.across_notes_editor_tab.card_select_count.text(),

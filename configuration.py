@@ -42,7 +42,6 @@ def get_regex_process_label(regex_process):
 
 
 FONTS_CHECK_PROCESS = "Fonts check"
-
 class FontsCheckProcess(TypedDict):
     name: str
     fonts_dict_file: str
@@ -67,11 +66,14 @@ class KanaHighlightProcess(TypedDict):
     kanji_field: str
 
 
-ALL_PROCESS_NAMES = [
+ALL_FIELD_TO_FIELD_PROCESS_NAMES = [
     KANJIUM_TO_JAVDEJONG_PROCESS,
     REGEX_PROCESS,
     FONTS_CHECK_PROCESS,
     KANA_HIGHLIGHT_PROCESS,
+]
+ALL_FIELD_TO_VARIABLE_PROCESS_NAMES = [
+    REGEX_PROCESS,
 ]
 
 NEW_PROCESS_DEFAULTS = {
@@ -107,7 +109,13 @@ class CopyFieldToField(TypedDict):
     copy_into_note_field: str
     copy_from_text: str
     copy_if_empty: bool
-    process_chain: list
+    process_chain: list[Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]]
+
+
+class CopyFieldToVariable(TypedDict):
+    copy_into_variable: str
+    copy_from_text: str
+    process_chain: list[Union[RegexProcess]]
 
 
 COPY_MODE_WITHIN_NOTE = "Within note"
@@ -120,6 +128,7 @@ class CopyDefinition(TypedDict):
     copy_mode: str
     copy_into_note_type: str
     field_to_field_defs: list[CopyFieldToField]
+    field_to_variable_defs: list[CopyFieldToVariable]
     only_copy_into_decks: str
     copy_from_cards_query: Optional[str]
     select_card_by: Optional[str]

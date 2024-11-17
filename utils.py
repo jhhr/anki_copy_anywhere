@@ -90,4 +90,6 @@ def filter_init(filter_prefix, valid_args, filter_str, context):
 
 def to_lowercase_dict(d: Dict[str, Any]) -> Dict[str, Any]:
     """Converts a dictionary to lowercase keys"""
+    if d is None:
+        return {}
     return {k.lower(): v for k, v in d.items()}

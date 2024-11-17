@@ -11,6 +11,7 @@ FROM_TEXT_FIELD_REGEX = re.compile(r"{{(.+?)}}")
 # General special fields value
 SPECIAL_FIELDS_KEY = "__Special fields"
 NOTE_ID_FIELD = "__Note ID"
+VARIABLES_KEY = "__Variables"
 
 # Special fields that can be used in the "Define what to copy from" PasteableTextEdit
 # Prefix them with __ to avoid conflicts with actual note field names
@@ -22,6 +23,12 @@ SOURCE_SPECIAL_FIELDS_DICT = {
         DESTINATION_FIELD_VALUE,
     ]
 }
+VARIABLE_SPECIAL_FIELDS_DICT = {
+    SPECIAL_FIELDS_KEY: [
+        NOTE_ID_FIELD,
+    ]
+}
+
 
 
 def get_special_field_value_for_note(note: Note, field_name: str) -> Union[str, None]:
@@ -33,11 +40,21 @@ def get_special_field_value_for_note(note: Note, field_name: str) -> Union[str, 
     return None
 
 
-def interpolate_from_text(text: str, note: Note, current_field_value: str = None) -> Tuple[
+def interpolate_from_text(
+        text: str,
+        note: Note,
+        current_field_value: str = None,
+        variable_values_dict: dict = None
+) -> Tuple[
     Union[str, None], List[str]]:
     """
     Interpolates a text that uses curly brace syntax.
     Also returns a list of all invalid fields in the text for debugging.
+
+    :param text: The text to interpolate
+    :param note: The note to get the values from
+    :param current_field_value: The value of the field that is being copied into
+    :param variable_values_dict: A dictionary of custom variables to use in the interpolation
     """
     # Bunch of extra logic to make this whole process case.insensitive
 
@@ -46,6 +63,7 @@ def interpolate_from_text(text: str, note: Note, current_field_value: str = None
 
     # field.lower() -> value map
     all_note_fields = to_lowercase_dict(note)
+    variable_fields = to_lowercase_dict(variable_values_dict)
 
     # Lowercase the characters inside {{}} in the from_text
     text = FROM_TEXT_FIELD_REGEX.sub(lambda x: "{{" + x.group(1).lower() + "}}", text)
@@ -57,6 +75,8 @@ def interpolate_from_text(text: str, note: Note, current_field_value: str = None
         value = all_note_fields.get(field_lower, None)
         if not value:
             value = get_special_field_value_for_note(note, field_lower)
+        if not value:
+            value = variable_fields.get(field_lower, None)
         if (not value
                 and current_field_value is not None
                 and field_lower == DESTINATION_FIELD_VALUE.lower()):

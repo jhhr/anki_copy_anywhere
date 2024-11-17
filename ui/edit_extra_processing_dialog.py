@@ -1,5 +1,6 @@
 import re
 from contextlib import suppress
+from typing import Union
 
 # noinspection PyUnresolvedReferences
 from aqt import mw
@@ -25,6 +26,7 @@ from aqt.qt import (
 from aqt.utils import tooltip
 
 from .list_input import ListInputWidget
+from ..configuration import CopyDefinition
 
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
@@ -33,13 +35,13 @@ else:
 
 from ..configuration import (
     CopyFieldToField,
+    CopyFieldToVariable,
     KanaHighlightProcess,
     RegexProcess,
     get_regex_process_label,
     FontsCheckProcess,
     get_fonts_check_process_label,
     KanjiumToJavdejongProcess,
-    ALL_PROCESS_NAMES,
     NEW_PROCESS_DEFAULTS,
     KANJIUM_TO_JAVDEJONG_PROCESS,
     REGEX_PROCESS,
@@ -347,16 +349,23 @@ class KanaHighlightProcessDialog(QDialog):
 
 
 class EditExtraProcessingWidget(QWidget):
-    def __init__(self, parent, copy_definition, field_to_field_def: CopyFieldToField):
+    def __init__(
+            self,
+            parent,
+            copy_definition: CopyDefinition,
+            field_to_x_def: Union[CopyFieldToField, CopyFieldToVariable],
+            allowed_process_names: list[str],
+    ):
         super().__init__(parent)
-        self.field_to_field_def = field_to_field_def
+        self.field_to_x_def = field_to_x_def
+        self.allowed_process_names = allowed_process_names
         self.copy_definition = copy_definition
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
         self.process_dialogs = []
         self.remove_row_funcs = []
         try:
-            self.process_chain = field_to_field_def["process_chain"]
+            self.process_chain = field_to_x_def["process_chain"]
         except KeyError:
             self.process_chain = []
 
@@ -388,8 +397,9 @@ class EditExtraProcessingWidget(QWidget):
         self.add_process_chain_button.clear()
         self.add_process_chain_button.addItem("-")
         # Add options not currently active to the combobox
-        for process in ALL_PROCESS_NAMES:
-            if process not in currently_active_processes or process in MULTIPLE_ALLOWED_PROCESS_NAMES:
+        for process in self.allowed_process_names:
+            if (process not in currently_active_processes
+                    or process in MULTIPLE_ALLOWED_PROCESS_NAMES):
                 self.add_process_chain_button.addItem(process)
 
     def remove_process(self, process, process_dialog):
@@ -399,7 +409,7 @@ class EditExtraProcessingWidget(QWidget):
         self.update_process_chain()
 
     def update_process_chain(self, ):
-        self.field_to_field_def["process_chain"] = self.process_chain
+        self.field_to_x_def["process_chain"] = self.process_chain
         self.init_options_to_process_combobox()
 
         for index, process in enumerate(self.process_chain):
