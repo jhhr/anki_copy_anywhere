@@ -58,7 +58,7 @@ else:
 
 class ClickableLabel(QLabel):
     def __init__(self, text, tooltip_text, parent=None):
-        super().__init__(text, parent)
+        super().__init__(f'{text} (?)', parent)
         self.tooltip_text = tooltip_text
         self.setFont(QFont('SansSerif', 10))
 
@@ -67,7 +67,7 @@ class ClickableLabel(QLabel):
         QToolTip.showText(self.mapToGlobal(QPoint(0, self.height())), self.tooltip_text)
 
     def setLabelText(self, text):
-        self.setText(text)
+        self.setText(f'{text} (?)')
 
 
 class KanjiumToJavdejongProcessDialog(QDialog):
@@ -125,6 +125,14 @@ def validate_regex(dialog):
     return True
 
 
+REGEX_FLAGS_DESCRIPTION = """
+ASCII - A: Make \\w, \\W, \\b, \\B, \\d, \\D, \\s and \\S match only ASCII characters.<br/>
+IGNORECASE - I: Perform case-insensitive matching.<br/>
+VERBOSE - X: Write regex on multiple lines with whitespace and comments.<br/>
+MULTILINE - M: Make ^ and $ match the start/end of each line.<br/>
+DOTALL - S: Make . match any character, including newlines. Use to match across multiple lines.<br/>
+"""
+
 class RegexProcessDialog(QDialog):
     def __init__(self, parent, process: RegexProcess):
         super().__init__(parent)
@@ -159,7 +167,8 @@ class RegexProcessDialog(QDialog):
             "MULTILINE",
             "DOTALL",
         ])
-        self.form.addRow("Flags", self.flags_field)
+        regex_label = ClickableLabel("Flags", REGEX_FLAGS_DESCRIPTION, self)
+        self.form.addRow(regex_label, self.flags_field)
 
         with suppress(KeyError): self.regex_field.setText(self.process["regex"])
         with suppress(KeyError): self.replacement_field.setText(self.process["replacement"])
