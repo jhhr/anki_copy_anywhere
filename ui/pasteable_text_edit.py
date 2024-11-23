@@ -9,6 +9,8 @@ from aqt.qt import (
     QAction,
 )
 
+from .auto_resizing_text_edit import AutoResizingTextEdit
+
 
 class GroupedQMenu(QMenu):
     def __init__(self, title="", parent=None):
@@ -38,7 +40,7 @@ class GroupedQMenu(QMenu):
         super().showEvent(event)
 
 
-class PasteableTextEdit(QTextEdit):
+class PasteableTextEdit(AutoResizingTextEdit):
     """
     Custom QTextEdit that allows for pasting predefined text options
     selected from a right-click context menu.

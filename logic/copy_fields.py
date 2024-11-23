@@ -9,6 +9,7 @@ from anki.notes import Note
 from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
+# noinspection PyUnresolvedReferences
 from aqt.qt import QWidget, QDialog, QVBoxLayout, QLabel, QScrollArea, QGuiApplication
 from aqt.utils import tooltip
 
@@ -36,8 +37,6 @@ from ..utils import (
     write_custom_data,
     CacheResults
 )
-
-SEARCH_FIELD_VALUE_PLACEHOLDER = "$SEARCH_FIELD_VALUE$"
 
 
 class ScrollMessageBox(QDialog):

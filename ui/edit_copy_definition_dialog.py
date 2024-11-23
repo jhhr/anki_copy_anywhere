@@ -38,6 +38,7 @@ from ..configuration import (
 from ..logic.interpolate_fields import (
     VARIABLES_KEY,
     BASE_NOTE_MENU_DICT,
+    intr_format,
 )
 
 if qtmajor > 5:
@@ -105,17 +106,13 @@ class AcrossNotesCopyEditor(QWidget):
             label="Search query to get source cards",
             # No special fields for search, just the destination note fields will be used
             options_dict={},
-            description="""<ul>
+            description=f"""<ul>
             <li>Use the same query syntax as in the card browser</li> 
-            <li>Reference the destination notes' fields with {{Field Name}}.</li>
-            <li>Right-click to select a {{Field name}} to paste</li>
+            <li>Reference the destination notes' fields with {intr_format('Field Name')}.</li>
+            <li>Right-click to select a {intr_format('Field Name')} or special values to paste</li>
             </ul>""",
             height=100,
-            placeholder_text="""Examples:
-Get non-suspended cards from a specific whose field contains a value
-\"deck:My deck\" someField:*{{Field in destination note}}* -is:suspended
-Get specific cards types with a specific interval
-"card:My card 1" prop:ivl<5""",
+            placeholder_text=f'\"deck:My deck\" "A Different Field:*{intr_format("Field_Name")}*" -is:suspended',
         )
 
         self.form.addRow(self.card_query_text_layout)
