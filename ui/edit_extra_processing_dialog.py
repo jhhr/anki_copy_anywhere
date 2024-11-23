@@ -507,12 +507,12 @@ class EditExtraProcessingWidget(QWidget):
                 self,
                 process,
                 note_type
-            ), get_fonts_check_process_label
+            ), lambda _: KANA_HIGHLIGHT_PROCESS
         if process_name == REGEX_PROCESS:
             return RegexProcessDialog(self, process), get_regex_process_label
         if process_name == FONTS_CHECK_PROCESS:
-            return FontsCheckProcess(self, process), lambda: FONTS_CHECK_PROCESS
+            return FontsCheckProcess(self, process), get_fonts_check_process_label
         if process_name == KANJIUM_TO_JAVDEJONG_PROCESS:
-            return KanjiumToJavdejongProcessDialog(self, process), lambda: KANJIUM_TO_JAVDEJONG_PROCESS
+            return KanjiumToJavdejongProcessDialog(self, process), lambda _: KANJIUM_TO_JAVDEJONG_PROCESS
 
         return None, ""

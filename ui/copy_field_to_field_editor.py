@@ -28,24 +28,38 @@ else:
 from ..configuration import (
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
-    ALL_FIELD_TO_FIELD_PROCESS_NAMES
+    ALL_FIELD_TO_FIELD_PROCESS_NAMES,
+    CopyDefinition,
 )
+
+from .add_model_options_to_dict import add_model_options_to_dict
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
 from .interpolated_text_edit import InterpolatedTextEditLayout
 from ..logic.interpolate_fields import (
-    SOURCE_SPECIAL_FIELDS_DICT,
-    DESTINATION_FIELD_VALUE,
+    BASE_NOTE_MENU_DICT,
+    DESTINATION_PREFIX,
     VARIABLES_KEY,
+    DESTINATION_NOTE_MENU_DICT,
+    NOTE_ID,
+    CARD_IVL,
+    CARD_TYPE,
+    intr_format,
 )
 
 
-def get_variable_names_from_copy_definition(copy_definition):
-    variables = []
+def get_variable_names_from_copy_definition(copy_definition: CopyDefinition) -> dict:
+    variable_menu_dict = {}
     for variable_def in copy_definition.get("field_to_variable_defs", []):
         variable_name = variable_def["copy_into_variable"]
         if variable_name is not None:
-            variables.append(variable_name)
-    return variables
+            variable_menu_dict[variable_name] = intr_format(variable_name)
+    return variable_menu_dict
+
+
+def get_new_base_dict(copy_mode):
+    if copy_mode == COPY_MODE_WITHIN_NOTE:
+        return DESTINATION_NOTE_MENU_DICT.copy()
+    return DESTINATION_NOTE_MENU_DICT | BASE_NOTE_MENU_DICT
 
 
 class CopyFieldToFieldEditor(QWidget):
@@ -60,9 +74,9 @@ class CopyFieldToFieldEditor(QWidget):
         self.field_to_field_defs = copy_definition.get("field_to_field_defs", [])
         self.copy_definition = copy_definition
         self.copy_mode = copy_mode
-        self.selected_copy_into_model_name = copy_definition.get("copy_into_note_type")
+        self.selected_copy_into_model = mw.col.models.by_name(copy_definition.get("copy_into_note_type"))
 
-        self.copy_from_menu_options_dict = SOURCE_SPECIAL_FIELDS_DICT.copy()
+        self.copy_from_menu_options_dict = get_new_base_dict(copy_mode)
         self.update_copy_from_options_dict()
 
         self.copy_definition = copy_definition
@@ -124,16 +138,17 @@ class CopyFieldToFieldEditor(QWidget):
         with suppress(KeyError):
             field_target_cbox.setCurrentText(copy_field_to_field_definition["copy_into_note_field"])
 
+        across = self.copy_mode == COPY_MODE_ACROSS_NOTES
         # Copy from field
         copy_from_text_layout = InterpolatedTextEditLayout(
             label="Source fields' content that will replace the field",
-            options_dict=SOURCE_SPECIAL_FIELDS_DICT,
+            options_dict=get_new_base_dict(self.copy_mode),
             description=f"""<ul>
-        <li>Reference the source notes' fields with {{{{Field Name}}}}.</li>
-        <li>The destination field's content is in {{{{{DESTINATION_FIELD_VALUE}}}}}.</li>
-        {"<li>Referencing the destination field by name will use the value from the source notes!</li>" if self.copy_mode == COPY_MODE_ACROSS_NOTES else ""}
-        <li>Right-click to select a {{{{Field name}}}} to paste</li>
-        <li>There are additional special values you can use, such as the note ID</li>
+        <li>Reference any {'source' if across else ""} notes field with {intr_format('Field Name')}.</li>
+        {f'''<li>Reference any destination note fields with {intr_format(f'{DESTINATION_PREFIX}Field Name')}, including the current target</li>
+        <li>Referencing the destination field by name will use the value from the source notes!</li>''' if across else ""}
+        <li>Right-click to select a {intr_format('Field Name')} to paste</li>
+        <li>There are many other data values you can use, such as the {intr_format(NOTE_ID)}, {intr_format(CARD_IVL)}, {intr_format(CARD_TYPE)} etc.</li>
         </ul>"""
         )
         copy_field_inputs_dict["copy_from_text"] = copy_from_text_layout
@@ -208,20 +223,18 @@ class CopyFieldToFieldEditor(QWidget):
             field_to_field_defs.append(copy_field_definition)
         return field_to_field_defs
 
-    def set_selected_copy_into_model(self, model_name):
-        self.selected_copy_into_model_name = model_name
+    def set_selected_copy_into_model(self, model):
+        self.selected_copy_into_model = model
+        self.update_copy_from_options_dict()
         for copy_field_inputs in self.copy_field_inputs:
             self.update_field_target_options(copy_field_inputs["copy_into_note_field"])
-            if self.copy_mode == COPY_MODE_WITHIN_NOTE:
-                self.update_copy_from_options_dict()
-                copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
+            copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
 
     def update_field_target_options(self, field_target_cbox):
         """
         Updates the options in the "Note field to copy into" dropdown box.
         """
-        model = mw.col.models.by_name(self.selected_copy_into_model_name)
-        if model is None:
+        if not self.selected_copy_into_model:
             return
 
         previous_text = field_target_cbox.currentText()
@@ -229,7 +242,7 @@ class CopyFieldToFieldEditor(QWidget):
         # Clear will unset the current selected text
         field_target_cbox.clear()
         field_target_cbox.addItem("-")
-        for field_name in mw.col.models.field_names(model):
+        for field_name in mw.col.models.field_names(self.selected_copy_into_model):
             if field_name == previous_text:
                 previous_text_in_new_options = True
             field_target_cbox.addItem(field_name)
@@ -243,30 +256,34 @@ class CopyFieldToFieldEditor(QWidget):
         Updates the raw options dict used for the "Define what to copy from" TextEdit right-click menu.
         The raw dict is used for validating the text in the TextEdit.
         """
-        field_names_by_model_dict = SOURCE_SPECIAL_FIELDS_DICT.copy()
+        options_dict = get_new_base_dict(self.copy_mode)
 
-        def add_model_field_names(model_name, model_id):
-            nonlocal field_names_by_model_dict
-            field_names_by_model_dict[model_name] = []
-            for field_name in mw.col.models.field_names(mw.col.models.get(model_id)):
-                field_names_by_model_dict[model_name].append(field_name)
+        variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
+        if variables_dict:
+            options_dict[VARIABLES_KEY] = variables_dict
 
         if self.copy_mode == COPY_MODE_WITHIN_NOTE:
-            if not self.selected_copy_into_model_name:
+            if not self.selected_copy_into_model:
                 return
             # If we're in within note copy mode, only add the single model as the target
-            model = mw.col.models.by_name(self.selected_copy_into_model_name)
-            if model is None:
-                return
-            add_model_field_names(model["name"], model["id"])
+            model = self.selected_copy_into_model
+            add_model_options_to_dict(model["name"], model["id"], options_dict)
         else:
-            # Otherwise, add fields from all models
+            # In ACROSS_NOTES modes, add fields from all models
             models = mw.col.models.all_names_and_ids()
             for model in models:
-                add_model_field_names(model.name, model.id)
+                # The destination note type will be a special case that goes 1 level deeper
+                # Essentially including this means you can do within-note copying too,
+                # though the idea is to be mixing any source and any destination fields into
+                # a single destination field
+                if model.name == self.selected_copy_into_model:
+                    add_model_options_to_dict(
+                        f'(Destination) {model.name}',
+                        model.id,
+                        options_dict,
+                        DESTINATION_PREFIX
+                    )
+                # Remember that the source note fields should also be added for the same note type!
+                add_model_options_to_dict(model.name, model.id, options_dict)
 
-        variable_names = get_variable_names_from_copy_definition(self.copy_definition)
-        if variable_names:
-            field_names_by_model_dict[VARIABLES_KEY] = variable_names
-
-        self.copy_from_menu_options_dict = field_names_by_model_dict
+        self.copy_from_menu_options_dict = options_dict

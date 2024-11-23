@@ -1,4 +1,5 @@
 from functools import partial
+from typing import Union
 
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
@@ -66,21 +67,57 @@ class PasteableTextEdit(QTextEdit):
 
         context_menu = QMenu(parent=self)
 
-        options_list = self.options_dict.items()
-
-        def add_option_to_menu(menu, option, text):
-            # Create a partial function to pass the text to
-            callback = partial(self.insert_text_at_cursor, text)
-            action = QAction(option, self)
+        def add_option_to_menu(menu: QMenu, option_name: str, option_text: str):
+            """
+            Add the final option to the context menu that will perform the
+            text insertion when clicked.
+            :param menu: Menu or submenu to add the option to
+            :param option_name: Text to display in the menu
+            :param option_text: Text to insert into the QTextEdit
+            :return:
+            """
+            callback = partial(self.insert_text_at_cursor, option_text)
+            action = QAction(option_name, self)
             action.triggered.connect(callback)
             menu.addAction(action)
 
-        # Make a two level menu with the first level being the group name
-        for group_name, options in options_list:
-            group_menu = QMenu(group_name, parent=self)
-            context_menu.addMenu(group_menu)
-            for option, text in options.items():
-                add_option_to_menu(group_menu, option, text)
+        def add_list_to_menu(menu: QMenu, option_list: list[str]):
+            """
+            Add a list of options to the context menu.
+            Lists are assumed to contain only strings, not further dicts.
+            :param menu: Menu or submenu to add the options to
+            :param option_list: List of options to add
+            :return:
+            """
+            for option in option_list:
+                add_option_to_menu(menu, option, option)
+
+        def populate_menu(menu: QMenu, options: Union[list, dict, str], ):
+            """
+            Recursively add options to the context menu to
+            allow arbitrary nesting of options and submenus.
+            :param menu: QMenu to add options to
+            :param options: dict of options to add, possibly containing sub-dicts
+            :return: None
+            """
+            if isinstance(options, dict):
+                for key, value in options.items():
+                    if isinstance(value, dict):
+                        sub_menu = QMenu(key, parent=self)
+                        menu.addMenu(sub_menu)
+                        # If value is a dict, will recursively add sub-menu
+                        # Else, option(s) will be added to the sub-menu
+                        populate_menu(sub_menu, value)
+                    elif isinstance(value, list):
+                        add_list_to_menu(menu, value)
+                    else:
+                        add_option_to_menu(menu, key, value)
+            elif isinstance(options, list):
+                add_list_to_menu(menu, options)
+            else:
+                add_option_to_menu(menu, options, options)
+
+        populate_menu(context_menu, self.options_dict)
 
         # Show the context menu at the event position
         context_menu.exec(event.globalPos())
@@ -103,8 +140,10 @@ class PasteableTextEdit(QTextEdit):
         if self.options_dict is None:
             self.options_dict = {}
         self.options_dict[group_name] = {}
+        return self.options_dict[group_name]
 
-    def add_option_to_group(self, group_name, option_name, option_text):
-        if group_name not in self.options_dict:
-            self.add_option_group(group_name)
-        self.options_dict[group_name][option_name] = option_text
+    def add_option_to_group(self, group_name: str, option_name: str, option_text: str, target_level: dict = None):
+        current_level = (self.options_dict if target_level is None else target_level)
+        if group_name not in current_level:
+            current_level[group_name] = {}
+        current_level[group_name][option_name] = option_text

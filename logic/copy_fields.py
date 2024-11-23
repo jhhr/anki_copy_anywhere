@@ -3,7 +3,7 @@ import math
 import random
 import time
 from operator import itemgetter
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 from anki.notes import Note
 from anki.utils import ids2str
@@ -420,7 +420,7 @@ def copy_for_single_note(
         result_val = get_field_values_from_notes(
             copy_from_text=copy_from_text,
             notes=notes_to_copy_from,
-            current_target_value=note[copy_into_note_field],
+            dest_note=note,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
         )
@@ -477,7 +477,7 @@ def get_variable_values_for_note(
         # Step 1: Interpolate the text with values from the note
         interpolated_value, invalid_fields = interpolate_from_text(
             copy_from_text,
-            note=note,
+            source_note=note,
         )
         if len(invalid_fields) > 0:
             show_error_message(
@@ -571,7 +571,7 @@ def get_notes_to_copy_from(
 
     interpolated_cards_query, invalid_fields = interpolate_from_text(
         copy_from_cards_query,
-        note=copy_into_note,
+        source_note=copy_into_note,
         variable_values_dict=variable_values_dict,
     )
     cards_query_id = base64.b64encode(f"cards{interpolated_cards_query}".encode()).decode()
@@ -636,7 +636,7 @@ def get_notes_to_copy_from(
 def get_field_values_from_notes(
         copy_from_text: str,
         notes: list[Note],
-        current_target_value: str = "",
+        dest_note: Optional[Note],
         variable_values_dict: dict = None,
         select_card_separator: str = ', ',
         show_error_message: Callable[[str], None] = None,
@@ -646,8 +646,9 @@ def get_field_values_from_notes(
     :param copy_from_text: Text defining the content to copy into the note's target field. Contains
             text and field names and special values enclosed in double curly braces that need to be
             replaced with the actual values from the notes.
-    :param notes: The selected notes to get the value from
-    :param current_target_value: The current value of the target field in the note
+    :param notes: The selected notes to get the value from. In the case of COPY_MODE_WITHIN_NOTE,
+            this will be a list with only one note
+    :param dest_note: The note to copy into, omitted in COPY_MODE_WITHIN_NOTE
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
             if there is only one note
@@ -669,14 +670,20 @@ def get_field_values_from_notes(
         select_card_separator = ", "
 
     result_val = ""
+
     for i, note in enumerate(notes):
-        # Return the interpolated value using the note
-        interpolated_value, invalid_fields = interpolate_from_text(
-            copy_from_text,
-            note,
-            current_field_value=current_target_value,
-            variable_values_dict=variable_values_dict,
-        )
+        try:
+            # Return the interpolated value using the note
+            interpolated_value, invalid_fields = interpolate_from_text(
+                copy_from_text,
+                source_note=note,
+                dest_note=dest_note,
+                variable_values_dict=variable_values_dict,
+            )
+        except ValueError as e:
+            show_error_message(f"Error in text interpolation: {e}")
+            break
+
         if len(invalid_fields) > 0:
             show_error_message(
                 f"Error in copy fields: Invalid fields in copy_from_text: {', '.join(invalid_fields)}")

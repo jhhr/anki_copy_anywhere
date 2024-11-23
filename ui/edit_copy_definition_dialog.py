@@ -24,6 +24,7 @@ from aqt.qt import (
 # noinspection PyUnresolvedReferences
 from aqt.utils import showInfo
 
+from .add_model_options_to_dict import add_model_options_to_dict
 from .copy_field_to_field_editor import CopyFieldToFieldEditor, get_variable_names_from_copy_definition
 from .field_to_variable_editor import CopyFieldToVariableEditor
 from .interpolated_text_edit import InterpolatedTextEditLayout
@@ -34,7 +35,10 @@ from ..configuration import (
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
 )
-from ..logic.interpolate_fields import VARIABLES_KEY
+from ..logic.interpolate_fields import (
+    VARIABLES_KEY,
+    BASE_NOTE_MENU_DICT,
+)
 
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
@@ -50,7 +54,6 @@ else:
     QSizePolicyFixed = QSizePolicy.Fixed
     QSizePolicyPreferred = QSizePolicy.Preferred
     QAlignTop = Qt.AlignTop
-
 
 
 def set_size_policy_for_all_widgets(layout, h_policy, v_policy):
@@ -150,14 +153,16 @@ Get specific cards types with a specific interval
                 self.card_select_separator.setText(copy_definition["select_card_separator"])
 
     def update_fields_by_target_note_type(self, model):
-        self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model["name"])
+        self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model)
+        self.variables_vbox.field_to_variable_editor.set_selected_copy_into_model(model)
 
-        new_options_dict = {
-            model["name"]: mw.col.models.field_names(model)
-        }
-        variable_names = get_variable_names_from_copy_definition(self.copy_definition)
-        if len(variable_names) > 0:
-            new_options_dict[VARIABLES_KEY] = variable_names
+        new_options_dict = BASE_NOTE_MENU_DICT.copy()
+        variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
+        if variables_dict:
+            new_options_dict[VARIABLES_KEY] = variables_dict
+
+        add_model_options_to_dict(model["name"], model["id"], new_options_dict)
+
         self.card_query_text_layout.update_options(new_options_dict)
         self.card_query_text_layout.validate_text()
 
@@ -185,7 +190,7 @@ class WithinNoteCopyEditor(QWidget):
         return self.fields_vbox.field_to_field_editor
 
     def update_fields_by_target_note_type(self, model):
-        self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model["name"])
+        self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model)
 
 
 class EditCopyDefinitionDialog(ScrollableQDialog):

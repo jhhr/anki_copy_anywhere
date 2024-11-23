@@ -1,7 +1,9 @@
 import json
 from typing import Dict, Any
 
+# noinspection PyUnresolvedReferences
 from anki.cards import Card
+# noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
 

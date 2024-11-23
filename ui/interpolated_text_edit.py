@@ -1,3 +1,5 @@
+from typing import Union
+
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
     QWidget,
@@ -21,6 +23,12 @@ from aqt.qt import (
 from .pasteable_text_edit import PasteableTextEdit
 from ..logic.interpolate_fields import (
     get_fields_from_text,
+    intr_format,
+    ARG_SEPARATOR,
+    basic_arg_validator,
+    ARG_VALIDATORS,
+    CARD_VALUE_RE,
+    NOTE_VALUE_RE,
 )
 
 
@@ -53,8 +61,6 @@ class InterpolatedTextEditLayout(QVBoxLayout):
             placeholder_text=placeholder_text,
         )
         self.error_label = QLabel()
-        # Use red color for error label
-        self.error_label.setStyleSheet("color: red;")
         # Connect text changed to validation
         self.text_edit.textChanged.connect(self.validate_text)
         main_label = QLabel(label)
@@ -88,28 +94,65 @@ class InterpolatedTextEditLayout(QVBoxLayout):
         self.options_dict = new_options_dict
         self.validate_dict = {}
 
-        for group_name, field_names in new_options_dict.items():
-            for field in field_names:
-                self.text_edit.add_option_to_group(group_name, field, f"{{{{{field}}}}}")
-                self.validate_dict[field.lower()] = True
+        # Recursively add options to the context menu to
+        # allow arbitrary nesting of options and submenus
+        def add_options_to_validate_dict(option: Union[list, dict, str]):
+            if isinstance(option, dict):
+                for field, value in option.items():
+                    # new_dict_level = self.text_edit.add_option_group(menu_key)
+                    add_options_to_validate_dict(value)
+            elif isinstance(option, list):
+                for field in option:
+                    self.validate_dict[field.lower()] = True
+            else:
+                self.validate_dict[option.lower()] = True
+
+        add_options_to_validate_dict(new_options_dict)
+        self.text_edit.set_options_dict(new_options_dict)
 
     def validate_text(self):
         """
-         Validates text that's using {{}} syntax for note fields.
+         Validates text that's using interpolation syntax for note fields.
          Returns none if a source field is empty.
         """
-        # Regex to pull out any words enclosed in double curly braces
         fields = get_fields_from_text(self.text_edit.toPlainText())
 
         invalid_fields = []
         # Validate that all fields are present in the dict
         for field in fields:
+            arg = None
+            card_type_name = None
+            if ARG_SEPARATOR in field and '__' in field:
+                match = NOTE_VALUE_RE.match(field)
+                if match:
+                    field, arg = match.group(1, 2)
+                else:
+                    match = CARD_VALUE_RE.match(field)
+                    if match:
+                        card_type_name, field, arg = match.group(1, 2, 3)
+                        field = card_type_name + field
+
             try:
-                self.validate_dict[field.lower()]
+                self.validate_dict[intr_format(field.lower())]
             except KeyError:
-                invalid_fields.append(field)
+                invalid_fields.append(f'<b style="color:red">{field}</b>: Not a valid field')
+                continue
+
+            if arg is not None:
+                validator = None
+                if card_type_name is not None:
+                    # ARG_VALIDATORS is a dict with the card value key only, no card type name
+                    validator = ARG_VALIDATORS.get(field[len(card_type_name):], None)
+                else:
+                    validator = ARG_VALIDATORS.get(field, None)
+
+                if validator is not None:
+                    error_msg = basic_arg_validator(arg) or validator(arg)
+                    if error_msg:
+                        invalid_fields.append(
+                            f'{field}<span style="color: orange;"><b style="color:red">{arg or "[blank]"}</b>: {error_msg}</span>')
 
         if len(invalid_fields) > 0:
-            self.error_label.setText(f"Invalid fields: {', '.join(invalid_fields)}")
+            self.error_label.setText("<br/>".join(invalid_fields))
         else:
             self.error_label.setText("")
