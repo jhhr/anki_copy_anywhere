@@ -64,23 +64,34 @@ class CopyFieldToVariableEditor(QWidget):
         self.middle_grid = QGridLayout()
         self.middle_grid.setColumnMinimumWidth(0, 400)
         self.middle_grid.setColumnMinimumWidth(1, 50)
-        self.vbox.addLayout(self.middle_grid)
 
         self.bottom_form = QFormLayout()
-        self.vbox.addLayout(self.bottom_form)
 
-        self.add_new_button = QPushButton("Add another fields-to-variable definition")
-        self.bottom_form.addRow("", self.add_new_button)
-        self.add_new_button.clicked.connect(self.add_new_definition)
+        self.add_new_button = QPushButton("Use variables")
+        self.add_new_button.clicked.connect(self.show_editor)
 
         self.copy_field_inputs = []
 
         # There has to be at least one definition so initialize with one
         if len(self.fields_to_variable_defs) == 0:
-            self.add_new_definition()
+            self.vbox.addWidget(self.add_new_button)
         else:
-            for index, copy_field_to_field_definition in enumerate(self.fields_to_variable_defs):
-                self.add_copy_field_row(index, copy_field_to_field_definition)
+            self.add_editor_layouts()
+            for index, copy_field_to_variable_definition in enumerate(self.fields_to_variable_defs):
+                self.add_copy_field_row(index, copy_field_to_variable_definition)
+
+    def add_editor_layouts(self):
+        self.vbox.addLayout(self.middle_grid)
+        self.vbox.addLayout(self.bottom_form)
+        self.add_new_button = QPushButton("Add another fields-to-variable definition")
+        self.bottom_form.addRow("", self.add_new_button)
+        self.add_new_button.clicked.connect(self.add_new_definition)
+
+    def show_editor(self):
+        self.vbox.removeWidget(self.add_new_button)
+        self.add_new_button.deleteLater()
+        self.add_editor_layouts()
+        self.add_new_definition()
 
     def add_new_definition(self):
         new_definition = {
