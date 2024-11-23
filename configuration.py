@@ -1,3 +1,4 @@
+import html
 from typing import TypedDict, Optional, Union
 
 # noinspection PyUnresolvedReferences
@@ -38,7 +39,7 @@ def get_regex_process_label(regex_process):
     regex = regex_process['regex']
     if len(regex) > 40:
         regex = regex[:20] + "..."
-    return f"{REGEX_PROCESS}: <code>{regex}</code>"
+    return f"{REGEX_PROCESS}: <code>{html.escape(regex)}</code>"
 
 
 FONTS_CHECK_PROCESS = "Fonts check"
