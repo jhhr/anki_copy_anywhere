@@ -220,7 +220,7 @@ def get_card_values_dict_for_note(
             return "" if return_str else None
         if rep_count < 1:
             return "" if return_str else None
-        reps = mw.col.db.scalar(
+        reps = mw.col.db.list(
             f"SELECT ease FROM revlog WHERE cid = {card_id} ORDER BY id DESC LIMIT {rep_count}"
         )
         return str(reps) if return_str else reps
