@@ -372,7 +372,7 @@ def interpolate_from_text(
                 field, source_note, all_note_fields, card_values_dict
             )
         field_lower = field.lower()
-        if not value:
+        if value is None:
             value = variable_fields.get(field_lower, None)
         # value being "" is ok, but None is not
         if value is None:
