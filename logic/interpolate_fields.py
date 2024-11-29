@@ -6,6 +6,13 @@ from typing import Tuple, Union, List, Optional, Callable
 # noinspection PyUnresolvedReferences
 from anki.cards import Card
 # noinspection PyUnresolvedReferences
+from anki.consts import (
+    CARD_TYPE_NEW,
+    CARD_TYPE_LRN,
+    CARD_TYPE_REV,
+    CARD_TYPE_RELEARNING,
+)
+# noinspection PyUnresolvedReferences
 from anki.notes import Note
 # noinspection PyUnresolvedReferences
 from aqt import mw
@@ -44,8 +51,8 @@ CARD_NID = "__Card_NID"
 CARD_CREATED = "__Card_Created"
 CARD_FIRST_REVIEW = "__Card_First_Review"
 CARD_LATEST_REVIEW = "__Card_Latest_Review"
-CARD_DUE = "__Card_Dues"
-CARD_IVL = "__Card_Intervals"
+CARD_DUE = "__Card_Due"
+CARD_IVL = "__Card_Interval"
 CARD_EASE = "__Card_Ease"
 CARD_REP_COUNT = "__Card_Rep_Count"
 CARD_LAPSE_COUNT = "__Card_Lapse_Count"
@@ -235,14 +242,15 @@ def get_card_values_dict_for_note(
             CARD_EASE: card.factor / 10,
             CARD_REP_COUNT: card.reps,
             CARD_LAPSE_COUNT: card.lapses,
-            CARD_FIRST_REVIEW: format_timestamp(first / 1000),
-            CARD_LATEST_REVIEW: format_timestamp(last / 1000),
-            CARD_AVERAGE_TIME: timespan(total / float(cnt)),
+            CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "",
+            CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "",
+            CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "",
             CARD_TOTAL_TIME: timespan(total),
-            CARD_TYPE: "Review" if card.type == Card.TYPE_REV else \
-                "New" if card.type == Card.TYPE_NEW else \
-                    "Learning" if card.type == Card.TYPE_LRN else \
-                        "Relearning",
+            CARD_TYPE: "Review" if card.type == CARD_TYPE_REV \
+                else "New" if card.type == CARD_TYPE_NEW \
+                else "Learning" if card.type == CARD_TYPE_LRN \
+                else "Relearning" if card.type == CARD_TYPE_RELEARNING \
+                else "",
             CARD_CREATED: format_timestamp(card.nid / 1000),
             CARD_CUSTOM_DATA: card.custom_data,
             CARD_LAST_REPS: partial(get_card_last_reps, card.id),
