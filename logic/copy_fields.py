@@ -247,7 +247,7 @@ def copy_fields_in_background(
         mw.col.update_note(copy_into_note)
 
         # Set cache time into card.custom_data
-        write_custom_data(card, "fc", math.floor(time.time()))
+        write_custom_data(card, key="fc", value="1")
         mw.col.update_card(card)
 
         if card_cnt % 10 == 0:

@@ -11,7 +11,7 @@ from aqt.qt import QAction, qconnect, QMenu
 
 from ..configuration import Config
 from ..logic.copy_fields import copy_fields
-from ..reset_custom_data import reset_custom_data
+from ..replace_custom_field_values import replace_custom_field_values
 from ..ui.pick_copy_definition_dialog import show_copy_dialog
 
 config = Config()
@@ -65,12 +65,19 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
     reset_fc_action = QAction("Reset 'fc'", browser)
     qconnect(
         reset_fc_action.triggered,
-        lambda: reset_custom_data(card_ids=browser.selectedNotesAsCards(), parent=browser, reset_field='fc'),
+        lambda: replace_custom_field_values(
+            card_ids=browser.selectedNotesAsCards(),
+            parent=browser,
+            reset_field_key_values=[('fc', None, None, None)]
+            )
     )
     reset_all_action = QAction("Reset all fields", browser)
     qconnect(
         reset_all_action.triggered,
-        lambda: reset_custom_data(card_ids=browser.selectedNotesAsCards(), parent=browser),
+        lambda: replace_custom_field_values(
+            card_ids=browser.selectedNotesAsCards(),
+            parent=browser
+            ),
     )
     custom_data_menu = menu.addMenu("CustomData")
     # Add the actions to the browser's card context menu
