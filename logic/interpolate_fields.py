@@ -62,7 +62,9 @@ CARD_CUSTOM_DATA = "__Card_Custom_Data"
 CARD_TYPE = "__Card_Type"
 
 # A special value that takes an argument for how many reps to retrieve
-CARD_LAST_REPS = f"__Card_Last_Reps{ARG_SEPARATOR}"
+CARD_LAST_EASES = f"__Card_Last_Reps{ARG_SEPARATOR}"
+CARD_LAST_FACTORS = f"__Card_Last_Factors{ARG_SEPARATOR}"
+CARD_LAST_IVLS = f"__Card_Last_Intervals{ARG_SEPARATOR}"
 
 # Card values are all predetermined stuff
 # So this is all the keys the card data menus will have
@@ -82,7 +84,9 @@ CARD_VALUES = [
     CARD_TOTAL_TIME,
     CARD_CUSTOM_DATA,
     CARD_TYPE,
-    CARD_LAST_REPS,
+    CARD_LAST_EASES,
+    CARD_LAST_FACTORS,
+    CARD_LAST_IVLS,
 ]
 # Dict for quick matching between interpolated fields and special values
 CARD_VALUES_DICT = {key: None for key in CARD_VALUES}
@@ -123,12 +127,17 @@ def basic_arg_validator(arg: str) -> str:
     return ""
 
 
+# Basic query for how many to get should either "all"
+# #or parseable as an integer and > 0
+BASE_NUM_ARG_VALIDATOR = lambda arg: "" if ((arg.isdigit() and int(arg) > 0) \
+        or arg == "all") else "should be a positive integer"
+
 ARG_VALIDATORS: dict[str, Callable[[str], str]] = {
     # A tag could be any string, so everything is valid
-    NOTE_HAS_TAG: lambda arg: "",
-    # Reps should be parseable as an integer and > 0
-    CARD_LAST_REPS: lambda arg: "" if arg.isdigit() and int(arg) > 0 \
-        else "should be a positive integer",
+    NOTE_HAS_TAG: BASE_NUM_ARG_VALIDATOR,
+    CARD_LAST_EASES: BASE_NUM_ARG_VALIDATOR,
+    CARD_LAST_FACTORS: BASE_NUM_ARG_VALIDATOR,
+    CARD_LAST_IVLS: BASE_NUM_ARG_VALIDATOR,
 }
 
 # For both copy modes
@@ -213,16 +222,37 @@ def get_card_values_dict_for_note(
     """
     card_values = {}
 
-    def get_card_last_reps(card_id: str, rep_count: str):
-        try:
-            rep_count = int(rep_count)
-        except ValueError:
+    def get_card_last_reps(
+            card_id: str,
+            rep_count: str,
+            get_ease: bool = False,
+            get_ivl: bool = False,
+            get_fct: bool = False,
+        ):
+        if not get_ease and not get_ivl and not get_fct:
             return "" if return_str else None
-        if rep_count < 1:
-            return "" if return_str else None
+        all = rep_count == "all"
+        if not all:
+            try:
+                rep_count = int(rep_count)
+            except ValueError:
+                return "" if return_str else None
+            if rep_count < 1:
+                return "" if return_str else None
         # Get rep eases, excluding manual schedules, identified by ease = 0
         reps = mw.col.db.list(
-            f"SELECT ease FROM revlog WHERE cid = {card_id} AND ease != 0 ORDER BY id DESC LIMIT {rep_count}"
+            f"""SELECT 
+                {",".join(filter(None,[
+                "ease" if get_ease else "",
+                "ivl" if get_ivl else "",
+                "factor" if get_fct else ""
+                ]))}
+                FROM revlog
+                WHERE cid = {card_id}
+                AND ease != 0
+                ORDER BY id
+                {f"DESC LIMIT {rep_count}" if not all else ""}
+            """
         )
         return str(reps) if return_str else reps
 
@@ -254,7 +284,9 @@ def get_card_values_dict_for_note(
                 else "",
             CARD_CREATED: format_timestamp(card.nid / 1000),
             CARD_CUSTOM_DATA: card.custom_data,
-            CARD_LAST_REPS: partial(get_card_last_reps, card.id),
+            CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),
+            CARD_LAST_FACTORS: partial(get_card_last_reps, card.id, get_fct=True),
+            CARD_LAST_IVLS: partial(get_card_last_reps, card.id, get_ivl=True),
         }
     return card_values
 
