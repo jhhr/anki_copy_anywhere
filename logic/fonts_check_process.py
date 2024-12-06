@@ -78,7 +78,7 @@ def fonts_check_process(
         return ""
 
     encountered_fonts = set()
-    valid_fonts = set()
+    valid_fonts = None
     some_chars_found = False
     all_chars_excluded_by_regex = None
 
@@ -93,14 +93,12 @@ def fonts_check_process(
         if char_fonts is not None:
             some_chars_found = True
             encountered_fonts.update(char_fonts)
-            # loop through encountered_fonts and set all char_fonts that are in it to True in valid_fonts, else False
-            for font in encountered_fonts:
-                if font in char_fonts:
-                    valid_fonts.add(font)
-                else:
-                    valid_fonts.discard(font)
+            if valid_fonts is None:
+                valid_fonts = set(char_fonts)
+            else:
+                valid_fonts.intersection_update(char_fonts)
 
-    if limit_to_fonts is not None:
+    if limit_to_fonts is not None and valid_fonts is not None:
         valid_fonts = valid_fonts.intersection(limit_to_fonts)
 
     join_str = "\", \""
@@ -124,6 +122,9 @@ def fonts_check_process(
 
         show_error_message(f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key")
         return ""
+    
+    if valid_fonts is None:
+        valid_fonts = []
 
     if len(valid_fonts) == 0:
         if (len(text)) == 1:
