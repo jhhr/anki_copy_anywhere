@@ -33,6 +33,8 @@ from ..configuration import (
 )
 
 from .add_model_options_to_dict import add_model_options_to_dict
+from .add_intersecting_model_field_options_to_dict import add_intersecting_model_field_options_to_dict, \
+    get_intersecting_model_fields
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
 from .interpolated_text_edit import InterpolatedTextEditLayout
 from ..logic.interpolate_fields import (
@@ -74,9 +76,13 @@ class CopyFieldToFieldEditor(QWidget):
         self.field_to_field_defs = copy_definition.get("field_to_field_defs", [])
         self.copy_definition = copy_definition
         self.copy_mode = copy_mode
-        self.selected_copy_into_model = mw.col.models.by_name(copy_definition.get("copy_into_note_type"))
+        clean_model_names = copy_definition.get("copy_into_note_types", "").strip('""').split('", "')
+        self.selected_copy_into_models = list(
+            filter(None, [mw.col.models.by_name(model_name) for model_name in clean_model_names]))
+        self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
 
         self.copy_from_menu_options_dict = get_new_base_dict(copy_mode)
+        self.intersecting_fields = []
         self.update_copy_from_options_dict()
 
         self.copy_definition = copy_definition
@@ -223,8 +229,8 @@ class CopyFieldToFieldEditor(QWidget):
             field_to_field_defs.append(copy_field_definition)
         return field_to_field_defs
 
-    def set_selected_copy_into_model(self, model):
-        self.selected_copy_into_model = model
+    def set_selected_copy_into_models(self, models):
+        self.selected_copy_into_models = models
         self.update_copy_from_options_dict()
         for copy_field_inputs in self.copy_field_inputs:
             self.update_field_target_options(copy_field_inputs["copy_into_note_field"])
@@ -234,7 +240,7 @@ class CopyFieldToFieldEditor(QWidget):
         """
         Updates the options in the "Note field to copy into" dropdown box.
         """
-        if not self.selected_copy_into_model:
+        if not self.selected_copy_into_models:
             return
 
         previous_text = field_target_cbox.currentText()
@@ -242,10 +248,18 @@ class CopyFieldToFieldEditor(QWidget):
         # Clear will unset the current selected text
         field_target_cbox.clear()
         field_target_cbox.addItem("-")
-        for field_name in mw.col.models.field_names(self.selected_copy_into_model):
-            if field_name == previous_text:
-                previous_text_in_new_options = True
-            field_target_cbox.addItem(field_name)
+        if len(self.selected_copy_into_models) > 1:
+            # intersecting fields should be set
+            if not self.intersecting_fields:
+                self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
+            for field_name in self.intersecting_fields:
+                field_target_cbox.addItem(field_name)
+        else:
+            model = self.selected_copy_into_models[0]
+            for field_name in mw.col.models.field_names(model):
+                if field_name == previous_text:
+                    previous_text_in_new_options = True
+                field_target_cbox.addItem(field_name)
 
         # Reset the selected text, if the new options still include it
         if previous_text_in_new_options:
@@ -257,17 +271,25 @@ class CopyFieldToFieldEditor(QWidget):
         The raw dict is used for validating the text in the TextEdit.
         """
         options_dict = get_new_base_dict(self.copy_mode)
-
         variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
         if variables_dict:
             options_dict[VARIABLES_KEY] = variables_dict
 
+        cur_model_names = [model["name"] for model in self.selected_copy_into_models]
+
         if self.copy_mode == COPY_MODE_WITHIN_NOTE:
-            if not self.selected_copy_into_model:
-                return
-            # If we're in within note copy mode, only add the single model as the target
-            model = self.selected_copy_into_model
-            add_model_options_to_dict(model["name"], model["id"], options_dict)
+            # If there are multiple models, add the intersecting fields only
+            if len(self.selected_copy_into_models) > 1:
+                self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
+                add_intersecting_model_field_options_to_dict(
+                    models=self.selected_copy_into_models,
+                    target_dict=options_dict,
+                    intersecting_fields=self.intersecting_fields
+                )
+            elif len(self.selected_copy_into_models) == 1:
+                # Otherwise only add the single model as the target
+                model = self.selected_copy_into_models[0]
+                add_model_options_to_dict(model["name"], model["id"], options_dict)
         else:
             # In ACROSS_NOTES modes, add fields from all models
             models = mw.col.models.all_names_and_ids()
@@ -276,7 +298,7 @@ class CopyFieldToFieldEditor(QWidget):
                 # Essentially including this means you can do within-note copying too,
                 # though the idea is to be mixing any source and any destination fields into
                 # a single destination field
-                if model.name == self.selected_copy_into_model:
+                if model.name in cur_model_names:
                     add_model_options_to_dict(
                         f'(Destination) {model.name}',
                         model.id,

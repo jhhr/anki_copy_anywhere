@@ -10,17 +10,20 @@ def run_copy_fields_on_add(note, deck_id):
 
     for copy_definition in config.copy_definitions:
         copy_on_add = copy_definition.get("copy_on_add", False)
-        copy_into_note_type = copy_definition.get("copy_into_note_type", None)
-
+        copy_into_note_types = copy_definition.get("copy_into_note_types", None)
+        # Split note_types by comma
+        copy_into_note_types = copy_into_note_types.strip('""').split('", "') if copy_into_note_types else []
+        multiple_note_types = len(copy_into_note_types) > 1
         if not copy_on_add:
             continue
-        if not copy_into_note_type == note.note_type()["name"]:
+        if note.note_type()["name"] not in copy_into_note_types:
             continue
 
         copy_for_single_note(
             copy_definition=copy_definition,
             note=note,
             deck_id=deck_id,
+            multiple_note_types=multiple_note_types,
         )
 
 

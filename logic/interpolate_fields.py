@@ -130,7 +130,7 @@ def basic_arg_validator(arg: str) -> str:
 # Basic query for how many to get should either "all"
 # #or parseable as an integer and > 0
 BASE_NUM_ARG_VALIDATOR = lambda arg: "" if ((arg.isdigit() and int(arg) > 0) \
-        or arg == "all") else "should be a positive integer"
+                                            or arg == "all") else "should be a positive integer"
 
 ARG_VALIDATORS: dict[str, Callable[[str], str]] = {
     # A tag could be any string, so everything is valid
@@ -228,7 +228,7 @@ def get_card_values_dict_for_note(
             get_ease: bool = False,
             get_ivl: bool = False,
             get_fct: bool = False,
-        ):
+    ):
         if not get_ease and not get_ivl and not get_fct:
             return "" if return_str else None
         all = rep_count == "all"
@@ -242,11 +242,11 @@ def get_card_values_dict_for_note(
         # Get rep eases, excluding manual schedules, identified by ease = 0
         reps = mw.col.db.list(
             f"""SELECT 
-                {",".join(filter(None,[
+                {",".join(filter(None, [
                 "ease" if get_ease else "",
                 "ivl" if get_ivl else "",
                 "factor" if get_fct else ""
-                ]))}
+            ]))}
                 FROM revlog
                 WHERE cid = {card_id}
                 AND ease != 0
@@ -300,6 +300,7 @@ NOTE_VALUE_RE = re.compile(rf"""
 $
 """, re.VERBOSE)
 
+# Normal card values have to specify the card type name
 CARD_VALUE_RE = re.compile(rf"""
 ^
 (.+) # match group 1, the card type name
@@ -310,12 +311,24 @@ CARD_VALUE_RE = re.compile(rf"""
 $
 """, re.VERBOSE)
 
+# In multi note type definitions, the card type name is omitted, as we just assume there is only one
+# Same as above but actually simpler as the card type is omitted
+MULTI_CARD_VALUE_RE = re.compile(rf"""
+^
+(__\w+ # match group 1, the card value key
+  (?:{ARG_SEPARATOR})? # the arg separator, optional
+) 
+(.*)? # match group 2, the card value arg, only present when the arg separator is present
+$
+""", re.VERBOSE)
+
 
 def get_from_note_fields(
         field: str,
         note: Note,
         note_fields: dict,
-        card_values_dict: dict = None
+        card_values_dict: dict = None,
+        multiple_note_types: bool = False,
 ) -> Tuple[Union[str, None], Union[dict, None]]:
     """
     Get a value from a note, source or destination. The note's fields or its cards' fields.
@@ -324,6 +337,7 @@ def get_from_note_fields(
     :param note_fields: pre-made dict of note fields
     :param card_values_dict: not pre-made dict of card values, it will be made once needed
            and not, if not needed. The same dict will be passed around to avoid re-making it.
+    :param multiple_note_types: Whether the copy is into multiple note types
     :return: value, card_values_dict
     """
     if not note:
@@ -347,14 +361,27 @@ def get_from_note_fields(
                 return value(maybe_note_value_arg), card_values_dict
             return value, card_values_dict
     # And last, cards are harder since they need to specify the card type name too
-    card_match = CARD_VALUE_RE.match(field)
+    card_match = CARD_VALUE_RE.match(field) if not multiple_note_types else MULTI_CARD_VALUE_RE.match(field)
     if card_match:
-        maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2, 3)
+        if multiple_note_types:
+            maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2)
+            maybe_card_type_name = None
+        else:
+            maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2, 3)
         # Check if the card type name is valid
         if maybe_card_value_key in CARD_VALUES_DICT:
             # If we haven't made the card values dict yet, do it now
             if card_values_dict is None:
                 card_values_dict = get_card_values_dict_for_note(note)
+
+            if multiple_note_types:
+                # If there are multiple note types, we just assume there is only one card type
+                dict_keys = list(card_values_dict.keys())
+                if len(dict_keys) == 1:
+                    maybe_card_type_name = dict_keys[0]
+                elif len(dict_keys) > 1:
+                    raise ValueError("ERROR: Multiple target note types should each only have a single card type")
+                # If there somehow are zero card types, we of course can't get a value
 
             value_dict = card_values_dict.get(maybe_card_type_name)
             if value_dict and maybe_card_value_key in value_dict:
@@ -371,7 +398,8 @@ def interpolate_from_text(
         text: str,
         source_note: Note,
         dest_note: Optional[Note] = None,
-        variable_values_dict: dict = None
+        variable_values_dict: dict = None,
+        multiple_note_types: bool = False,
 ) -> Tuple[
     Union[str, None], List[str]]:
     """
@@ -382,6 +410,7 @@ def interpolate_from_text(
     :param source_note: The note to get the values from for non-prefixed note fields
     :param dest_note: The note to get the values from for DESTINATION_PREFIX-ed note fields
     :param variable_values_dict: A dictionary of custom variables to use in the interpolation
+    :param multiple_note_types: Whether the copy is into multiple note types
     """
     # Bunch of extra logic to make this whole process case-insensitive
 
@@ -406,11 +435,11 @@ def interpolate_from_text(
         if field.startswith(DESTINATION_PREFIX) and dest_note:
             field = field[len(DESTINATION_PREFIX):]
             value, dest_card_values_dict = get_from_note_fields(
-                field, dest_note, all_dest_note_fields, dest_card_values_dict
+                field, dest_note, all_dest_note_fields, dest_card_values_dict, multiple_note_types
             )
         else:
             value, card_values_dict = get_from_note_fields(
-                field, source_note, all_note_fields, card_values_dict
+                field, source_note, all_note_fields, card_values_dict, multiple_note_types
             )
         field_lower = field.lower()
         if value is None:

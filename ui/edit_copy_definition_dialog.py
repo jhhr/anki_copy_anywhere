@@ -1,6 +1,8 @@
 from contextlib import suppress
 
 # noinspection PyUnresolvedReferences
+from anki.utils import ids2str
+# noinspection PyUnresolvedReferences
 from aqt import mw
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
@@ -24,6 +26,7 @@ from aqt.qt import (
 # noinspection PyUnresolvedReferences
 from aqt.utils import showInfo
 
+from .add_intersecting_model_field_options_to_dict import add_intersecting_model_field_options_to_dict
 from .add_model_options_to_dict import add_model_options_to_dict
 from .copy_field_to_field_editor import CopyFieldToFieldEditor, get_variable_names_from_copy_definition
 from .field_to_variable_editor import CopyFieldToVariableEditor
@@ -149,16 +152,28 @@ class AcrossNotesCopyEditor(QWidget):
             with suppress(KeyError):
                 self.card_select_separator.setText(copy_definition["select_card_separator"])
 
-    def update_fields_by_target_note_type(self, model):
-        self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model)
-        self.variables_vbox.field_to_variable_editor.set_selected_copy_into_model(model)
+    def update_fields_by_target_note_type(self, models):
+        self.fields_vbox.field_to_field_editor.set_selected_copy_into_models(models)
+        self.variables_vbox.field_to_variable_editor.set_selected_copy_into_models(models)
+
+        print("models", len(models))
 
         new_options_dict = BASE_NOTE_MENU_DICT.copy()
         variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
         if variables_dict:
             new_options_dict[VARIABLES_KEY] = variables_dict
 
-        add_model_options_to_dict(model["name"], model["id"], new_options_dict)
+        # If there are multiple models, add the intersecting fields only
+        if len(models) > 1:
+            print("intersecting")
+            add_intersecting_model_field_options_to_dict(
+                models,
+                new_options_dict,
+            )
+        elif len(models) == 1:
+            print("single model")
+            model = models[0]
+            add_model_options_to_dict(model["name"], model["id"], new_options_dict)
 
         self.card_query_text_layout.update_options(new_options_dict)
         self.card_query_text_layout.validate_text()
@@ -186,8 +201,8 @@ class WithinNoteCopyEditor(QWidget):
     def get_field_to_field_editor(self):
         return self.fields_vbox.field_to_field_editor
 
-    def update_fields_by_target_note_type(self, model):
-        self.fields_vbox.field_to_field_editor.set_selected_copy_into_model(model)
+    def update_fields_by_target_note_type(self, models):
+        self.fields_vbox.field_to_field_editor.set_selected_copy_into_models(models)
 
 
 class EditCopyDefinitionDialog(ScrollableQDialog):
@@ -238,10 +253,14 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.middle_form = QFormLayout()
         self.main_layout.addLayout(self.middle_form)
 
-        self.note_type_target_cbox = QComboBox()
+        self.note_type_target_cbox = MultiComboBox()
         self.note_type_target_cbox.addItem("-")
-        self.note_type_target_cbox.addItems(model_names_list)
+        # Wrap name in "" to avoid issues with commas in the name
+        self.note_type_target_cbox.addItems([f'"{model_name}"' for model_name in model_names_list])
         self.middle_form.addRow("Destination note type", self.note_type_target_cbox)
+        # Set up a label for showing a warning, if selecting multiple models
+        self.note_type_target_warning = QLabel("")
+        self.middle_form.addRow("", self.note_type_target_warning)
 
         self.decks_limit_multibox = MultiComboBox()
         self.middle_form.addRow("Destination deck limit (optional)", self.decks_limit_multibox)
@@ -279,7 +298,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
 
         if copy_definition:
             with suppress(KeyError):
-                self.note_type_target_cbox.setCurrentText(copy_definition["copy_into_note_type"])
+                self.note_type_target_cbox.setCurrentText(copy_definition["copy_into_note_types"])
             self.update_fields_by_target_note_type()
             with suppress(KeyError):
                 self.definition_name.setText(copy_definition["definition_name"])
@@ -358,20 +377,37 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         Updates the "Note field to copy into" and whatever fields in the editor widgets that depend
         on the note type chosen in the "Note type to copy into" dropdown box.
         """
-        model = mw.col.models.by_name(self.note_type_target_cbox.currentText())
-        if model is None:
+        models = list(filter(None, [mw.col.models.by_name(name.strip('""')) for name in
+                                    self.note_type_target_cbox.currentData()]))
+        if not models:
             return
 
-        # Update fields in editor tabs
-        self.across_notes_editor_tab.update_fields_by_target_note_type(model)
-        self.within_note_editor_tab.update_fields_by_target_note_type(model)
+        if len(models) > 1:
+            text = "When selecting multiple note types, only the fields that are common to all note types will be available as destinations."
+            # Check that each model has a single card template only
+            models_first_templates = []
+            for model in models:
+                if len(model["tmpls"]) > 1:
+                    models_first_templates.append((model["name"], model["tmpls"][0]["name"]))
+            if models_first_templates:
+                text += f"<br><span style='color: orange'>WARNING:</span> The following note types have multiple card types. Only the first one will be used when applying special card values:<ul>"
+                for model_name, template_name in models_first_templates:
+                    text += f"<li>{model_name}: {template_name}</li>"
+                text += "</ul>"
+            self.note_type_target_warning.setText(text)
+        else:
+            self.note_type_target_warning.setText("")
 
-        mid = model["id"]
+        # Update fields in editor tabs
+        self.across_notes_editor_tab.update_fields_by_target_note_type(models)
+        self.within_note_editor_tab.update_fields_by_target_note_type(models)
+
+        mids = [model["id"] for model in models]
 
         dids = mw.col.db.list(f"""
                 SELECT DISTINCT CASE WHEN odid==0 THEN did ELSE odid END
                 FROM cards c, notes n
-                WHERE n.mid = {mid}
+                WHERE n.mid IN {ids2str(mids)}
                 AND c.nid = n.id
             """)
 
@@ -385,7 +421,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
             copy_definition: CopyDefinition = {
                 "definition_name": self.definition_name.text(),
-                "copy_into_note_type": self.note_type_target_cbox.currentText(),
+                "copy_into_note_types": self.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": self.decks_limit_multibox.currentText(),
                 "field_to_field_defs": self.across_notes_editor_tab.get_field_to_field_editor().get_field_to_field_defs(),
                 "field_to_variable_defs": self.across_notes_editor_tab.get_field_to_variable_editor().get_field_to_variable_defs(),
@@ -401,7 +437,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
             copy_definition: CopyDefinition = {
                 "definition_name": self.definition_name.text(),
-                "copy_into_note_type": self.note_type_target_cbox.currentText(),
+                "copy_into_note_types": self.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": self.decks_limit_multibox.currentText(),
                 "field_to_variable_defs": [],
                 "field_to_field_defs": self.within_note_editor_tab.get_field_to_field_editor().get_field_to_field_defs(),

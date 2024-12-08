@@ -19,6 +19,8 @@ from aqt.qt import (
     qtmajor,
 )
 
+from .add_intersecting_model_field_options_to_dict import get_intersecting_model_fields, \
+    add_intersecting_model_field_options_to_dict
 from ..configuration import ALL_FIELD_TO_VARIABLE_PROCESS_NAMES
 
 if qtmajor > 5:
@@ -51,7 +53,10 @@ class CopyFieldToVariableEditor(QWidget):
     def __init__(self, parent, copy_definition):
         super().__init__(parent)
         self.fields_to_variable_defs = copy_definition.get("field_to_variable_defs", [])
-        self.selected_copy_from_model = mw.col.models.by_name(copy_definition.get("copy_into_note_type"))
+        clean_model_names = copy_definition.get("copy_into_note_types", "").strip('""').split('", "')
+        self.selected_copy_into_models = list(
+            filter(None, [mw.col.models.by_name(model_name) for model_name in clean_model_names]))
+        self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
 
         self.copy_from_menu_options_dict = BASE_NOTE_MENU_DICT.copy()
         self.update_copy_from_options_dict()
@@ -199,32 +204,11 @@ class CopyFieldToVariableEditor(QWidget):
             field_to_field_defs.append(copy_variable_definition)
         return field_to_field_defs
 
-    def set_selected_copy_into_model(self, model):
-        self.selected_copy_from_model = model
+    def set_selected_copy_into_models(self, models):
+        self.selected_copy_into_models = models
         self.update_copy_from_options_dict()
         for copy_field_inputs in self.copy_field_inputs:
             copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
-
-    def update_field_target_options(self, field_target_cbox):
-        """
-        Updates the options in the "Note field to copy into" dropdown box.
-        """
-        if self.selected_copy_from_model is None:
-            return
-
-        previous_text = field_target_cbox.currentText()
-        previous_text_in_new_options = False
-        # Clear will unset the current selected text
-        field_target_cbox.clear()
-        field_target_cbox.addItem("-")
-        for field_name in mw.col.models.field_names(self.selected_copy_from_model["name"]):
-            if field_name == previous_text:
-                previous_text_in_new_options = True
-            field_target_cbox.addItem(field_name)
-
-        # Reset the selected text, if the new options still include it
-        if previous_text_in_new_options:
-            field_target_cbox.setCurrentText(previous_text)
 
     def update_copy_from_options_dict(self):
         """
@@ -233,10 +217,19 @@ class CopyFieldToVariableEditor(QWidget):
         """
         field_names_by_model_dict = BASE_NOTE_MENU_DICT.copy()
 
-        if self.selected_copy_from_model is not None:
+        if len(self.selected_copy_into_models) > 1:
+            # If there are multiple models, add the intersecting fields only
+            self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
+            add_intersecting_model_field_options_to_dict(
+                models=self.selected_copy_into_models,
+                target_dict=field_names_by_model_dict,
+                intersecting_fields=self.intersecting_fields,
+            )
+        elif len(self.selected_copy_into_models) == 1:
+            model = self.selected_copy_into_models[0]
             add_model_options_to_dict(
-                model_name=self.selected_copy_from_model["name"],
-                model_id=self.selected_copy_from_model["id"],
+                model_name=model["name"],
+                model_id=model["id"],
                 target_dict=field_names_by_model_dict,
             )
 

@@ -30,6 +30,7 @@ else:
 
 DEFAULT_CARDS_SELECTED_LABEL = "Select some copy definitions to show what cards would apply."
 
+
 class PickCopyDefinitionDialog(QDialog):
     """
     Class for the dialog box to choose which copy definition to apply now, edit or remove.
@@ -262,16 +263,21 @@ class PickCopyDefinitionDialog(QDialog):
                     did_query = "(" + " OR ".join([f"did:{did}" for did in limited_dids]) + ")"
                 else:
                     did_query = ""
-                # Gotta wrap note in quotes, so it works with names containing spaces
+                # Split by comma and remove the first wrapping " but keeping the last one
+                note_type_names = checked_definition["copy_into_note_types"].strip('""').split('", "')
+                # Note: adding "" between each so that we get "note:Some note type" OR "note:Some other note type"
+                note_type_query = '" OR "note:'.join(note_type_names)
+                # Final "" added here!
+                note_type_query = f'"note:{note_type_query}"'
                 def_card_ids = mw.col.find_cards(
-                    f'"note:{checked_definition["copy_into_note_type"]}" {did_query} {browser_query}')
+                    f'{note_type_query} {did_query} {browser_query}')
 
                 self.selected_definitions_applicable_cards.update(def_card_ids)
                 self.definition_card_ids[index] = def_card_ids
                 total_applicable_cards.extend(def_card_ids)
                 checkbox.setText(f"{checked_definition['definition_name']} ({len(def_card_ids)})")
-                if checked_definition["copy_into_note_type"] not in self.models:
-                    self.models.append(checked_definition["copy_into_note_type"])
+                if checked_definition["copy_into_note_types"] not in self.models:
+                    self.models.append(checked_definition["copy_into_note_types"])
             else:
                 self.definition_card_ids[index] = []
         if nothing_checked:

@@ -127,7 +127,7 @@ class CopyDefinition(TypedDict):
     copy_on_sync: bool
     copy_on_add: bool
     copy_mode: str
-    copy_into_note_type: str
+    copy_into_note_types: str
     field_to_field_defs: list[CopyFieldToField]
     field_to_variable_defs: list[CopyFieldToVariable]
     only_copy_into_decks: str

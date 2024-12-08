@@ -1,5 +1,4 @@
 import base64
-import math
 import random
 import time
 from operator import itemgetter
@@ -138,10 +137,10 @@ def copy_fields_in_background(
     :return: CacheResults object
     """
     (
-        copy_into_note_type,
+        copy_into_note_types,
         definition_name
     ) = itemgetter(
-        "copy_into_note_type",
+        "copy_into_note_types",
         "definition_name"
     )(copy_definition)
 
@@ -173,26 +172,35 @@ def copy_fields_in_background(
         def show_error_message(message: str):
             show_message(f"\n{card_cnt}--{message}")
 
-    # Get from_note_type_id either directly or through copy_into_note_type
-    if copy_into_note_type is None:
+    # Get from_note_type_id either directly or through copy_into_note_types
+    if copy_into_note_types is None:
         show_error_message(
-            f"Error in copy fields: Note type for copy_into_note_type '{copy_into_note_type}' not found, check your spelling",
+            f"Error in copy fields: Note type for copy_into_note_types '{copy_into_note_types}' not found, check your spelling",
         )
         return results
     elif card_ids is None:
         show_error_message(
-            "Error in copy fields: Both 'card_ids' and 'copy_into_note_type' were missing. Either one is required")
+            "Error in copy fields: Both 'card_ids' and 'copy_into_note_types' were missing. Either one is required")
         return results
+
+    # Split by comma and remove the first wrapping " but keeping the last one
+    note_type_names = copy_into_note_types.strip('""').split('", "')
+    # Note: adding "" between each so that we get "note:Some note type" OR "note:Some other note type"
+    note_type_query = '" OR "note:'.join(note_type_names)
+    # Final "" added here!
+    note_type_query = f'"note:{note_type_query}"'
+
+    multiple_note_types = len(note_type_names) > 1
 
     # Get cards of the target note type
     if card_ids is not None:
         # If we received a list of ids, we need to filter them by the note type
         # as this could include cards of different note types
         # We'll need to all note_ids as mid is not available in the card object, only in the note
-        note_ids = mw.col.find_notes(f'"note:{copy_into_note_type}"')
+        note_ids = mw.col.find_notes(note_type_query)
         if len(note_ids) == 0:
             show_error_message(
-                f"Error in copy fields: Did not find any notes of note type '{copy_into_note_type}'")
+                f"Error in copy fields: Did not find any notes of note type(s) '{copy_into_note_types}'")
             return results
 
         note_ids_str = ids2str(note_ids)
@@ -203,16 +211,16 @@ def copy_fields_in_background(
             FROM cards
             WHERE nid IN {note_ids_str}
             {f"AND id IN {card_ids_str}" if len(card_ids) > 0 else ""}
-            {"AND json_extract(json_extract(data, '$.cd'), '$.fc') == 0" if is_sync else ""}
+            {"AND json_extract(json_extract(data, '$.cd'), '$.fc') = 0" if is_sync else ""}
         """)
 
         cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
     else:
         # Otherwise, get all cards of the note type
-        card_ids = mw.col.find_cards(f'"note:{copy_into_note_type}" {"prop:cdn:fc=0" if is_sync else ""}')
+        card_ids = mw.col.find_cards(f'{note_type_query} {"prop:cdn:fc=0" if is_sync else ""}')
         if not is_sync and len(card_ids) == 0:
             show_error_message(
-                f"Error in copy fields: Did not find any cards of note type '{copy_into_note_type}'")
+                f"Error in copy fields: Did not find any cards of note type(s) {copy_into_note_types}")
             return results
 
         cards = [mw.col.get_card(card_id) for card_id in card_ids]
@@ -240,9 +248,12 @@ def copy_fields_in_background(
             copy_definition=copy_definition,
             note=copy_into_note,
             deck_id=card.odid or card.did,
+            multiple_note_types=multiple_note_types,
             show_error_message=show_error_message,
             file_cache=file_cache,
         )
+
+        print("success", success)
 
         mw.col.update_note(copy_into_note)
 
@@ -337,6 +348,7 @@ def copy_for_single_note(
         copy_definition: CopyDefinition,
         note: Note,
         deck_id: int,
+        multiple_note_types: bool = False,
         show_error_message: Callable[[str], None] = None,
         file_cache: dict = None,
 ):
@@ -345,6 +357,7 @@ def copy_for_single_note(
     :param copy_definition: The definition of what to copy, includes process chains
     :param note: Note to copy into
     :param deck_id: Deck ID where the cards are going into
+    :param multiple_note_types: Whether the copy is into multiple note types
     :param show_error_message: Optional function to show error messages
     :param file_cache: A dictionary to cache opened files' content
     :return:
@@ -420,6 +433,7 @@ def copy_for_single_note(
             copy_from_text=copy_from_text,
             notes=notes_to_copy_from,
             dest_note=note,
+            multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
         )
@@ -558,10 +572,10 @@ def get_notes_to_copy_from(
         # Check if the current deck is in the white list, otherwise we don't copy into this note
         # whitelist deck is a list of deck or sub deck names
         # parent names can't be included since adding :: would break the filter text
-        target_deck_names = only_copy_into_decks.split(", ")
+        target_deck_names = only_copy_into_decks.strip('""').split('", "')
 
         whitelist_dids = [
-            mw.col.decks.id_for_name(target_deck_name.strip('""')) for
+            mw.col.decks.id_for_name(target_deck_name) for
             target_deck_name in target_deck_names
         ]
         whitelist_dids = set(whitelist_dids)
@@ -636,6 +650,7 @@ def get_field_values_from_notes(
         copy_from_text: str,
         notes: list[Note],
         dest_note: Optional[Note],
+        multiple_note_types: bool = False,
         variable_values_dict: dict = None,
         select_card_separator: str = ', ',
         show_error_message: Callable[[str], None] = None,
@@ -648,6 +663,7 @@ def get_field_values_from_notes(
     :param notes: The selected notes to get the value from. In the case of COPY_MODE_WITHIN_NOTE,
             this will be a list with only one note
     :param dest_note: The note to copy into, omitted in COPY_MODE_WITHIN_NOTE
+    :param multiple_note_types: Whether the copy is into multiple note types
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
             if there is only one note
@@ -678,6 +694,7 @@ def get_field_values_from_notes(
                 source_note=note,
                 dest_note=dest_note,
                 variable_values_dict=variable_values_dict,
+                multiple_note_types=multiple_note_types,
             )
         except ValueError as e:
             show_error_message(f"Error in text interpolation: {e}")

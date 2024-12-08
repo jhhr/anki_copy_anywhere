@@ -294,10 +294,10 @@ The kanji, onyomi and kunyomi fields are gotten from the destination note type.
 
 
 class KanaHighlightProcessDialog(QDialog):
-    def __init__(self, parent, process: KanaHighlightProcess, copy_into_note_type):
+    def __init__(self, parent, process: KanaHighlightProcess, copy_into_note_types):
         super().__init__(parent)
         self.process = process
-        self.copy_into_note_type = copy_into_note_type
+        self.copy_into_note_types = copy_into_note_types
 
         self.description = KANA_HIGHLIGHT_DESCRIPTION
         self.form = QFormLayout()
@@ -351,7 +351,7 @@ class KanaHighlightProcessDialog(QDialog):
         self.accept()
 
     def update_combobox_options(self):
-        for field_name in mw.col.models.field_names(mw.col.models.by_name(self.copy_into_note_type)):
+        for field_name in mw.col.models.field_names(mw.col.models.by_name(self.copy_into_note_types)):
             self.onyomi_field_cbox.addItem(field_name)
             self.kunyomi_field_cbox.addItem(field_name)
             self.kanji_field_cbox.addItem(field_name)
@@ -502,7 +502,7 @@ class EditExtraProcessingWidget(QWidget):
             return None, ""
         if process_name == KANA_HIGHLIGHT_PROCESS:
             with suppress(KeyError):
-                note_type = self.copy_definition["copy_into_note_type"]
+                note_type = self.copy_definition["copy_into_note_types"]
             return KanaHighlightProcessDialog(
                 self,
                 process,
