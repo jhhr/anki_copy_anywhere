@@ -239,7 +239,7 @@ class PickCopyDefinitionDialog(QDialog):
         browser_query = ""
         if self.use_selected_cards and self.browser_card_ids is not None and len(self.browser_card_ids):
             card_ids = self.browser_card_ids
-            browser_query = "(" + " OR ".join([f"cid:{cid}" for cid in card_ids]) + ")"
+            browser_query = f"cid:{','.join(map(str, card_ids))}"
         elif self.browser_search:
             browser_query = self.browser_search
 
@@ -254,13 +254,13 @@ class PickCopyDefinitionDialog(QDialog):
                 limited_dids = []
                 if checked_definition["only_copy_into_decks"]:
                     # Remove the quotes and split the string into a list of deck names
-                    deck_names = checked_definition["only_copy_into_decks"].strip("\"\"''").split('", "')
+                    deck_names = checked_definition["only_copy_into_decks"].strip('""').split('", "')
                     for deck_name in deck_names:
                         did = mw.col.decks.id_for_name(deck_name)
                         if did is not None:
                             limited_dids.append(did)
                 if len(limited_dids) > 0:
-                    did_query = "(" + " OR ".join([f"did:{did}" for did in limited_dids]) + ")"
+                    did_query = f'did:{",".join(map(str, limited_dids))}'
                 else:
                     did_query = ""
                 # Split by comma and remove the first wrapping " but keeping the last one
@@ -268,7 +268,7 @@ class PickCopyDefinitionDialog(QDialog):
                 # Note: adding "" between each so that we get "note:Some note type" OR "note:Some other note type"
                 note_type_query = '" OR "note:'.join(note_type_names)
                 # Final "" added here!
-                note_type_query = f'"note:{note_type_query}"'
+                note_type_query = f'("note:{note_type_query}")'
                 def_card_ids = mw.col.find_cards(
                     f'{note_type_query} {did_query} {browser_query}')
 
@@ -329,7 +329,10 @@ def show_copy_dialog(browser):
         checked_copy_definitions = []
         checked_copy_definition_card_ids = []
         for index, checkbox in enumerate(d.checkboxes):
-            if checkbox.isChecked():
+            # The UI indicates that there are zero cards to copy, so we skip
+            # If we passed that to the copy_fields function, it would actually
+            # perform the copy operation on all cards in the collection as an empty list is falsy
+            if checkbox.isChecked() and len(d.definition_card_ids[index]) > 0:
                 checked_copy_definitions.append(copy_definitions[index])
                 checked_copy_definition_card_ids.append(d.definition_card_ids[index])
 

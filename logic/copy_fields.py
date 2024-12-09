@@ -273,10 +273,9 @@ def copy_fields_in_background(
     :param results: The results object to update with the final result text
     :param card_ids: The card ids to copy into. this would replace the copy_into_field from
        the copy_definition
-    :param result_text: Text to be appended to and shown in the final result tooltip
     :param show_message: Function to show error messages
     :param is_sync: Whether this is a sync operation or not
-    :return: CacheResults object
+    :return: the CacheResults object passed as results
     """
     (
         copy_into_note_types,
@@ -305,10 +304,6 @@ def copy_fields_in_background(
             f"Error in copy fields: Note type for copy_into_note_types '{copy_into_note_types}' not found, check your spelling",
         )
         return results
-    elif card_ids is None:
-        show_error_message(
-            "Error in copy fields: Both 'card_ids' and 'copy_into_note_types' were missing. Either one is required")
-        return results
 
     # Split by comma and remove the first wrapping " but keeping the last one
     note_type_names = copy_into_note_types.strip('""').split('", "')
@@ -320,7 +315,7 @@ def copy_fields_in_background(
     multiple_note_types = len(note_type_names) > 1
 
     # Get cards of the target note type
-    if card_ids is not None:
+    if card_ids is not None and len(card_ids) > 0:
         # If we received a list of ids, we need to filter them by the note type
         # as this could include cards of different note types
         # We'll need to all note_ids as mid is not available in the card object, only in the note
@@ -337,12 +332,12 @@ def copy_fields_in_background(
             SELECT id
             FROM cards
             WHERE nid IN {note_ids_str}
-            {f"AND id IN {card_ids_str}" if len(card_ids) > 0 else ""}
+            AND id IN {card_ids_str}
             {"AND json_extract(json_extract(data, '$.cd'), '$.fc') = 0" if is_sync else ""}
         """)
 
         cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
-    else:
+    elif card_ids is None:
         # Otherwise, get all cards of the note type
         card_ids = mw.col.find_cards(f'{note_type_query} {"prop:cdn:fc=0" if is_sync else ""}')
         if not is_sync and len(card_ids) == 0:
@@ -351,6 +346,10 @@ def copy_fields_in_background(
             return results
 
         cards = [mw.col.get_card(card_id) for card_id in card_ids]
+    else:
+        # This is an error. If card_ids is an empty list, we won't do anything
+        # To copy into all cards card_ids should explicitly be None
+        return results
 
     total_cards_count = len(cards)
 
