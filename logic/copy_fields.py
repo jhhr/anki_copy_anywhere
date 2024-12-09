@@ -12,7 +12,7 @@ from aqt import mw
 from aqt.operations import CollectionOp
 from aqt.progress import ProgressUpdate
 # noinspection PyUnresolvedReferences
-from aqt.qt import QWidget, QDialog, QVBoxLayout, QLabel, QScrollArea, QGuiApplication
+from aqt.qt import QWidget, QDialog, QVBoxLayout, QLabel, QScrollArea, QGuiApplication, QTextEdit
 from aqt.utils import tooltip
 
 from .FatalProcessError import FatalProcessError
@@ -35,6 +35,7 @@ from ..configuration import (
     FontsCheckProcess,
     KanaHighlightProcess
 )
+from ..ui.auto_resizing_text_edit import AutoResizingTextEdit
 from ..utils import (
     write_custom_data,
 )
@@ -57,10 +58,9 @@ class ScrollMessageBox(QDialog):
         self.content = QWidget()
         scroll.setWidget(self.content)
         lay = QVBoxLayout(self.content)
-        for item in message_list:
-            label = QLabel(item, self)
-            label.setWordWrap(True)
-            lay.addWidget(label)
+        textbox = AutoResizingTextEdit(self, readOnly=True)
+        textbox.setPlainText("\n".join(message_list))
+        lay.addWidget(textbox)
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(scroll)
         self.setModal(False)

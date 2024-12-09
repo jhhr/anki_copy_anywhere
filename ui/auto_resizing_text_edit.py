@@ -12,8 +12,8 @@ else:
 
 
 class AutoResizingTextEdit(QTextEdit):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self, parent=None, **kwargs):
+        super().__init__(parent, **kwargs)
         self.textChanged.connect(self.autoResize)
 
     def autoResize(self):
