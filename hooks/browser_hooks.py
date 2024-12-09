@@ -92,8 +92,8 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
     def make_copy_fields_lambda(copy_def):
         return lambda: copy_fields(
             parent=browser,
-            copy_definition=copy_def,
-            card_ids=browser.selectedNotesAsCards()
+            copy_definitions=[copy_def],
+            card_ids=browser.selectedNotesAsCards(),
         )
 
     for copy_definition in config.copy_definitions:

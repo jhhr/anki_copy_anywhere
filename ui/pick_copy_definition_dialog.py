@@ -326,12 +326,16 @@ def show_copy_dialog(browser):
         # Run all selected copy definitions according to the checkboxes
         config.load()
         copy_definitions = config.copy_definitions
+        checked_copy_definitions = []
+        checked_copy_definition_card_ids = []
         for index, checkbox in enumerate(d.checkboxes):
             if checkbox.isChecked():
-                # Run the copy definition
-                copy_definition = copy_definitions[index]
-                copy_fields(
-                    copy_definition=copy_definition,
-                    card_ids=d.definition_card_ids[index],
-                    parent=browser
-                )
+                checked_copy_definitions.append(copy_definitions[index])
+                checked_copy_definition_card_ids.append(d.definition_card_ids[index])
+
+        # Run the copy definitions
+        copy_fields(
+            copy_definitions=checked_copy_definitions,
+            card_ids_per_definition=checked_copy_definition_card_ids,
+            parent=browser,
+        )

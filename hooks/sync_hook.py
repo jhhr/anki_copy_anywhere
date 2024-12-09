@@ -2,7 +2,7 @@ from typing import List
 
 from anki.utils import ids2str
 from aqt import mw
-from aqt.gui_hooks import sync_will_start, sync_did_finish
+from aqt.gui_hooks import sync_will_start
 
 from ..configuration import Config
 from ..logic.copy_fields import copy_fields
@@ -38,21 +38,25 @@ def auto_copy_definitions(local_rids: List[int], texts: List[str]):
 
     remote_reviewed_cids = review_cid_remote(local_rids)
 
-    for copy_definition in config.copy_definitions:
-        copy_on_sync = copy_definition.get("copy_on_sync", False)
-        if not copy_on_sync:
-            continue
+    if (len(remote_reviewed_cids)) == 0:
+        return
 
-        fut = copy_fields(
-            copy_definition=copy_definition,
-            card_ids=set(remote_reviewed_cids),
-            is_sync=True,
-        )
+    copy_on_sync_definitions = [
+        definition for definition in config.copy_definitions if definition.get("copy_on_sync", False)
+    ]
+    if not copy_on_sync_definitions:
+        return
 
-        if fut:
-            # wait for copy to finish
-            (copy_result_msg, _) = fut.result()
-            texts.append(copy_result_msg)
+    fut = copy_fields(
+        copy_definitions=copy_on_sync_definitions,
+        card_ids=list(set(remote_reviewed_cids)),
+        is_sync=True,
+    )
+
+    if fut:
+        # wait for copy to finish
+        (copy_result_msg, _) = fut.result()
+        texts.append(copy_result_msg)
 
 
 def init_sync_hook():
@@ -60,4 +64,4 @@ def init_sync_hook():
     texts = []
 
     sync_will_start.append(lambda: create_comparelog(local_rids, texts))
-    sync_did_finish.append(lambda: auto_copy_definitions(local_rids, texts))
+    sync_will_start.append(lambda: auto_copy_definitions(local_rids, texts))

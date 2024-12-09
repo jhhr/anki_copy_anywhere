@@ -4,10 +4,13 @@ import time
 from operator import itemgetter
 from typing import Callable, Union, Optional
 
+from anki.cards import Card
+from anki.collection import Progress
 from anki.notes import Note
 from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
+from aqt.progress import ProgressUpdate
 # noinspection PyUnresolvedReferences
 from aqt.qt import QWidget, QDialog, QVBoxLayout, QLabel, QScrollArea, QGuiApplication
 from aqt.utils import tooltip
@@ -34,7 +37,6 @@ from ..configuration import (
 )
 from ..utils import (
     write_custom_data,
-    CacheResults
 )
 
 
@@ -79,10 +81,68 @@ def get_ord_from_model(model, fld_name):
 PICK_CARD_BY_VALID_VALUES = ('Random', 'Random_stable', 'Least_reps')
 
 
+class CacheResults:
+    """
+    Helper class used with CollectionOp, as suggested in qt/aqt/operations/__init__.py:
+        '''
+        `op` should either return OpChanges, or an object with a 'changes'
+        property. The changes will be passed to `operation_did_execute` so that
+        the UI can decide whether it needs to update itself.
+        '''
+    The result of merge_undo_entries(undo_entry) should be entered into the 'changes' property.
+    Any other properties can be used to store additional information.
+    Here, result_text is used to store a text that will be displayed in the UI after
+    an op finishes.
+    """
+
+    def __init__(self, result_text: str, changes):
+        self.result_text = result_text
+        self.changes = changes
+
+    def set_result_text(self, result_text):
+        self.result_text = result_text
+
+    def add_result_text(self, result_text):
+        self.result_text += result_text
+
+    def get_result_text(self):
+        return self.result_text
+
+
+class ProgressUpdateDef():
+    """
+    Helper class used with CollectionOp.with_backend_progress(progress_update) to
+    update the progress bar and its label. In qt/aqt/progress.py the progress-update
+    function is used like this:
+        '''
+        update = ProgressUpdate(user_wants_abort=user_wants_abort)
+        progress = self.mw.backend.latest_progress()
+        progress_update(progress, update)
+        '''
+    The update.label, update.value and update.max are used to update the progress bar.
+    The progress_update function then needs a way to get information from the within the
+    op while it runs. This class is used to store the label, value and max_value in
+    a mutable object that the progress_update function can access.
+    """
+
+    def __init__(self, label: str = None, value: int = None, max_value: int = None):
+        self.label = label
+        self.value = value
+        self.max_value = max_value
+
+    def has_update(self):
+        return self.label is not None or self.value is not None or self.max_value is not None
+
+    def clear(self):
+        self.label = None
+        self.value = None
+        self.max_value = None
+
+
 def copy_fields(
-        copy_definition: CopyDefinition,
+        copy_definitions: list[CopyDefinition],
         card_ids=None,
-        result_text: str = "",
+        card_ids_per_definition: list[list[int]] = None,
         parent=None,
         is_sync: bool = False,
 ):
@@ -96,39 +156,121 @@ def copy_fields(
 
     def on_done(copy_results):
         mw.progress.finish()
-        tooltip(f"{copy_results.result_text} in {time.time() - start_time:.2f} seconds", parent=parent, period=5000)
+        main_time = f"{time.time() - start_time:.2f}s total time<br>" \
+            if len(copy_definitions) > 1 else "Finished in "
+        tooltip(f"{main_time}{copy_results.get_result_text()}",
+                parent=parent,
+                period=5000 + len(copy_definitions) * 1000
+                )
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(
                 debug_texts,
-                title=f'{copy_definition["definition_name"]} Debug Messages',
+                title="Copy fields debug Messages",
                 parent=parent)
+
+    def on_failure(exception):
+        mw.progress.finish()
+        show_error_message(f"Copying failed: {exception}")
+        if not is_sync and len(debug_texts) > 0:
+            ScrollMessageBox(
+                debug_texts,
+                title="Copy Fields debug Messages",
+                parent=parent)
+        # Need to raise the exception to get the traceback to the cause in the console
+        raise exception
+
+    # We'll mutate this object in copy_fields_in_background, so that when
+    # the progress callback is called, it will have the latest values
+    progress_update_def = ProgressUpdateDef()
+
+    def on_progress(_: Progress, update: ProgressUpdate):
+        # progress contains some text that the sync progress bar uses, so it's useless
+        # here as it never changes
+        nonlocal progress_update_def
+        if progress_update_def.has_update():
+            update.label = progress_update_def.label
+            update.value = progress_update_def.value
+            update.max = progress_update_def.max_value
+            progress_update_def.clear()
+
+    def op(_):
+        copied_into_cards = []
+        if len(copy_definitions) == 1:
+            undo_text = f"Copy fields ({copy_definitions[0]['definition_name']})"
+            if card_ids:
+                undo_text += f" for {len(card_ids)} cards"
+        elif len(copy_definitions) > 1:
+            undo_text = f"Copying with {len(copy_definitions)} definitions"
+            total_card_count = None
+            if card_ids:
+                total_card_count = len(card_ids) * len(copy_definitions)
+            elif card_ids_per_definition:
+                total_card_count = sum(len(ids) for ids in card_ids_per_definition)
+            if total_card_count:
+                undo_text += f" for a {total_card_count} cards"
+            else:
+                undo_text += " for all possible target cards"
+        else:
+            show_error_message("Error in copy fields: No definitions given")
+            return
+        undo_entry = mw.col.add_custom_undo_entry(undo_text)
+        results = CacheResults(
+            result_text="",
+            changes=mw.col.merge_undo_entries(undo_entry),
+        )
+
+        for i, copy_definition in enumerate(copy_definitions):
+            if i > 0:
+                results.add_result_text("<br>")
+            results = copy_fields_in_background(
+                copy_definition=copy_definition,
+                card_ids=card_ids_per_definition[i] if card_ids_per_definition is not None else card_ids,
+                show_message=show_error_message,
+                is_sync=is_sync,
+                copied_into_cards=copied_into_cards,
+                undo_entry=undo_entry,
+                results=results,
+                progress_update_def=progress_update_def,
+            )
+            if mw.progress.want_cancel():
+                break
+        for card in copied_into_cards:
+            write_custom_data(card, key="fc", value="1")
+            mw.col.update_card(card)
+            # undo_entry has to be updated after every undoable op or the last_step will
+            # increment causing an "target undo op not found" error!
+            results.changes = mw.col.merge_undo_entries(undo_entry)
+        return results
 
     return (
         CollectionOp(
             parent=parent,
-            op=lambda col: copy_fields_in_background(
-                copy_definition=copy_definition,
-                card_ids=card_ids,
-                result_text=result_text,
-                show_message=show_error_message,
-                is_sync=is_sync,
-            ),
+            op=op,
         )
         .success(on_done)
+        .failure(on_failure)
+        .with_backend_progress(on_progress)
         .run_in_background()
     )
 
 
 def copy_fields_in_background(
         copy_definition: CopyDefinition,
-        card_ids=None,
-        result_text: str = "",
-        show_message: Callable[[str], None] = None,
-        is_sync: bool = False,
+        copied_into_cards: list[Card],
+        undo_entry: int,
+        results: CacheResults,
+        progress_update_def: ProgressUpdateDef,
+        is_sync: Optional[bool] = False,
+        card_ids: Optional[list[int]] = None,
+        show_message: Optional[Callable[[str], None]] = None,
 ):
     """
     Function run to copy stuff into many notes at once.
     :param copy_definition: The definition of what to copy, includes process chains
+    :param copied_into_cards: An initially empty list of cards that will be appended to with the cards
+         that were copied into
+    :param undo_entry: The undo entry to merge the changes into
+    :param results: The results object to update with the final result text
     :param card_ids: The card ids to copy into. this would replace the copy_into_field from
        the copy_definition
     :param result_text: Text to be appended to and shown in the final result tooltip
@@ -144,22 +286,7 @@ def copy_fields_in_background(
         "definition_name"
     )(copy_definition)
 
-    undo_text = f"Copy fields ({definition_name})"
-    if card_ids:
-        undo_text += f" for {len(card_ids)} cards"
-
-    undo_entry = mw.col.add_custom_undo_entry(undo_text)
-
-    results = CacheResults(
-        result_text="",
-        changes=mw.col.merge_undo_entries(undo_entry),
-    )
-
-    mw.taskman.run_on_main(
-        lambda: mw.progress.start(
-            label=f"Copying fields ({definition_name})", max=0, immediate=False
-        )
-    )
+    start_time = time.time()
 
     card_cnt = 0
     debug_text = ""
@@ -227,19 +354,24 @@ def copy_fields_in_background(
 
     total_cards_count = len(cards)
 
-    mw.taskman.run_on_main(
-        lambda: mw.progress.update(
-            label=f"<strong>{definition_name}</strong><br/>{card_cnt}/{total_cards_count} notes copied into",
-            value=card_cnt,
-            max=total_cards_count,
-        )
-    )
-
     # Cache any opened files, so process chains can use them instead of needing to open them again
     # contents will be cached by file name
     file_cache = {}
 
     for card in cards:
+        if card_cnt % 10 == 0:
+            elapsed_s = time.time() - start_time
+            elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
+            progress_update_def.label = f"""<strong>{definition_name}</strong>:
+            <br>Copied {card_cnt}/{total_cards_count} cards
+            <br>Time: {elapsed_time}"""
+            if card_cnt / total_cards_count > 0.10 or elapsed_s > 5:
+                eta_s = (elapsed_s / card_cnt) * (total_cards_count - card_cnt)
+                eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
+                progress_update_def.label += f" - ETA: {eta}"
+            progress_update_def.value = card_cnt
+            progress_update_def.max_value = total_cards_count
+
         card_cnt += 1
 
         copy_into_note = card.note()
@@ -253,32 +385,23 @@ def copy_fields_in_background(
             file_cache=file_cache,
         )
 
-        print("success", success)
-
         mw.col.update_note(copy_into_note)
+        # undo_entry has to be updated after every undoable op or the last_step will
+        # increment causing an "target undo op not found" error!
+        results.changes = mw.col.merge_undo_entries(undo_entry)
 
-        # Set cache time into card.custom_data
-        write_custom_data(card, key="fc", value="1")
-        mw.col.update_card(card)
+        copied_into_cards.append(card)
 
-        if card_cnt % 10 == 0:
-            mw.taskman.run_on_main(
-                lambda: mw.progress.update(
-                    label=f"<strong>{definition_name}</strong><br/>{card_cnt}/{total_cards_count} notes copied into",
-                    value=card_cnt,
-                    max=total_cards_count,
-                )
-            )
         if mw.progress.want_cancel():
             break
-
-        if undo_entry is not None:
-            mw.col.merge_undo_entries(undo_entry)
 
         if not success:
             return results
 
-    results.set_result_text(f"{result_text + '<br>' if result_text != '' else ''}{card_cnt} cards' copied into")
+    print(results.get_result_text())
+    results.add_result_text(
+        f"{time.time() - start_time:.2f}s - <i>{copy_definition['definition_name']}:</i> {card_cnt} cards"
+    )
     return results
 
 

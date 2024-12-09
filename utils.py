@@ -7,15 +7,6 @@ from anki.cards import Card
 from aqt.utils import tooltip
 
 
-class CacheResults:
-    def __init__(self, result_text: str, changes):
-        self.result_text = result_text
-        self.changes = changes
-
-    def set_result_text(self, result_text):
-        self.result_text = result_text
-
-
 def add_dict_key_value(
     dict: dict,
     key: str,
