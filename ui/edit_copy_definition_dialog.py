@@ -156,8 +156,6 @@ class AcrossNotesCopyEditor(QWidget):
         self.fields_vbox.field_to_field_editor.set_selected_copy_into_models(models)
         self.variables_vbox.field_to_variable_editor.set_selected_copy_into_models(models)
 
-        print("models", len(models))
-
         new_options_dict = BASE_NOTE_MENU_DICT.copy()
         variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
         if variables_dict:
@@ -165,13 +163,11 @@ class AcrossNotesCopyEditor(QWidget):
 
         # If there are multiple models, add the intersecting fields only
         if len(models) > 1:
-            print("intersecting")
             add_intersecting_model_field_options_to_dict(
                 models,
                 new_options_dict,
             )
         elif len(models) == 1:
-            print("single model")
             model = models[0]
             add_model_options_to_dict(model["name"], model["id"], new_options_dict)
 

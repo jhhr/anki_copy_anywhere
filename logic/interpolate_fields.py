@@ -54,6 +54,8 @@ CARD_LATEST_REVIEW = "__Card_Latest_Review"
 CARD_DUE = "__Card_Due"
 CARD_IVL = "__Card_Interval"
 CARD_EASE = "__Card_Ease"
+CARD_STABILITY = "__Card_Stability"
+CARD_DIFFICULTY = "__Card_Difficulty"
 CARD_REP_COUNT = "__Card_Rep_Count"
 CARD_LAPSE_COUNT = "__Card_Lapse_Count"
 CARD_AVERAGE_TIME = "__Card_Average_Time"
@@ -78,6 +80,8 @@ CARD_VALUES = [
     CARD_DUE,
     CARD_IVL,
     CARD_EASE,
+    CARD_STABILITY,
+    CARD_DIFFICULTY,
     CARD_REP_COUNT,
     CARD_LAPSE_COUNT,
     CARD_AVERAGE_TIME,
@@ -129,8 +133,12 @@ def basic_arg_validator(arg: str) -> str:
 
 # Basic query for how many to get should either "all"
 # #or parseable as an integer and > 0
-BASE_NUM_ARG_VALIDATOR = lambda arg: "" if ((arg.isdigit() and int(arg) > 0) \
-                                            or arg == "all") else "should be a positive integer"
+def BASE_NUM_ARG_VALIDATOR(arg):
+    if ((arg.isdigit() and int(arg) > 0) or arg == "all"):
+        return ""
+    else:
+        return "should be a positive integer"
+
 
 ARG_VALIDATORS: dict[str, Callable[[str], str]] = {
     # A tag could be any string, so everything is valid
@@ -271,6 +279,9 @@ def get_card_values_dict_for_note(
             CARD_DUE: card.due,
             CARD_IVL: card.ivl,
             CARD_EASE: card.factor / 10,
+            # If FSRS is not enabled, memory_state will be None
+            CARD_STABILITY: round(card.memory_state.stability, 1) if card.memory_state else 0,
+            CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
             CARD_REP_COUNT: card.reps,
             CARD_LAPSE_COUNT: card.lapses,
             CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "",
@@ -361,7 +372,8 @@ def get_from_note_fields(
                 return value(maybe_note_value_arg), card_values_dict
             return value, card_values_dict
     # And last, cards are harder since they need to specify the card type name too
-    card_match = CARD_VALUE_RE.match(field) if not multiple_note_types else MULTI_CARD_VALUE_RE.match(field)
+    card_match = CARD_VALUE_RE.match(field) if not multiple_note_types \
+        else MULTI_CARD_VALUE_RE.match(field)
     if card_match:
         if multiple_note_types:
             maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2)
