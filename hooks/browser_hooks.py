@@ -54,13 +54,6 @@ def add_separator_to_gear():
     deck_browser_will_show_options_menu.append(aux)
 
 
-# add_separator_to_gear()
-# add_action_to_gear(
-#     cache_fetches_menu,
-#     lambda: f"Cache fetch fields for the next {config.days_to_cache_fields_menu} days"
-# )
-
-
 def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
     reset_fc_action = QAction("Reset 'fc'", browser)
     qconnect(

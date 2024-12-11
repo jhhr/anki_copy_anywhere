@@ -150,31 +150,9 @@ class Config:
     def copy_fields_shortcut(self):
         return self.data["copy_fields_shortcut"]
 
-    @property
-    def days_to_cache_fields_menu(self):
-        return self.data["days_to_cache_fields_menu"]
-
-    @days_to_cache_fields_menu.setter
-    def days_to_cache_fields_menu(self, value):
-        self.data["days_to_cache_fields_menu"] = value
-        self.save()
-
-    @property
-    def days_to_cache_fields_auto(self):
-        return self.data["days_to_cache_fields_auto"]
-
-    @days_to_cache_fields_auto.setter
-    def days_to_cache_fields_auto(self, value):
-        self.data["days_to_cache_fields_auto"] = value
-        self.save()
-
-    @property
-    def cache_new_cards_count(self):
-        return self.data["cache_new_cards_count"]
-
-    @cache_new_cards_count.setter
-    def cache_new_cards_count(self, value):
-        self.data["cache_new_cards_count"] = value
+    @copy_fields_shortcut.setter
+    def copy_fields_shortcut(self, value):
+        self.data["copy_fields_shortcut"] = value
         self.save()
 
     @property
