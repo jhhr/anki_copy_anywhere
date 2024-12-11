@@ -469,7 +469,7 @@ def apply_process_chain(
 def copy_for_single_note(
         copy_definition: CopyDefinition,
         note: Note,
-        deck_id: int,
+        deck_id: int = None,
         multiple_note_types: bool = False,
         show_error_message: Callable[[str], None] = None,
         file_cache: dict = None,
@@ -478,7 +478,9 @@ def copy_for_single_note(
     Copy fields into a single note
     :param copy_definition: The definition of what to copy, includes process chains
     :param note: Note to copy into
-    :param deck_id: Deck ID where the cards are going into
+    :param deck_id: Deck ID where the cards are going into, only needed when adding
+      a note since cards don't exist yet. Otherwise, the deck_ids are checked from the cards
+      of the note
     :param multiple_note_types: Whether the copy is into multiple note types
     :param show_error_message: Optional function to show error messages
     :param file_cache: A dictionary to cache opened files' content
@@ -639,8 +641,8 @@ def get_notes_to_copy_from(
         copy_from_cards_query: str,
         copy_into_note: Note,
         select_card_by: str,
-        deck_id,
         extra_state: dict,
+        deck_id: int = None,
         variable_values_dict: dict = None,
         only_copy_into_decks: str = None,
         select_card_count: str = '1',
@@ -653,7 +655,7 @@ def get_notes_to_copy_from(
     :param copy_into_note: The note to copy into, used to interpolate the query
     :param select_card_by: How to select the card to copy from, if we get multiple results using the
             the query
-    :param deck_id: The current deck id, used to filter the cards to copy from
+    :param deck_id: Optional deck id of the note to copy into
     :param extra_state: A dictionary to store cached values to re-use in subsequent calls of this function
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param only_copy_into_decks: A comma separated whitelist of deck names. Limits the cards to copy from
@@ -701,6 +703,12 @@ def get_notes_to_copy_from(
             target_deck_name in target_deck_names
         ]
         whitelist_dids = set(whitelist_dids)
+        deck_ids = []
+        if deck_id is not None:
+            deck_ids.append(deck_id)
+        else:
+            for card in copy_into_note.cards():
+                deck_ids.append(card.odid or card.did)
         if deck_id not in whitelist_dids:
             return []
 

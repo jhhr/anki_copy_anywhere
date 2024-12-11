@@ -260,6 +260,9 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
 
         self.decks_limit_multibox = MultiComboBox()
         self.middle_form.addRow("Destination deck limit (optional)", self.decks_limit_multibox)
+        self.middle_form.addRow("", QLabel("""<small>Cards belong to decks, note notes.<br>
+        If your note type has multiple card types, the whitelisting applies to the note,<rb>
+        if any of its cards belong to a whitelisted deck.</small>"""))
 
         self.copy_on_sync_checkbox = QCheckBox("Run on sync for reviewed cards")
         self.copy_on_sync_checkbox.setChecked(False)
