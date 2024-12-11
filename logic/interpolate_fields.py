@@ -178,16 +178,13 @@ DESTINATION_NOTE_MENU_DICT = {
 def get_note_data_value(
         note: Note,
         field_name: str,
-        return_str: bool = True
     ) -> Union[str, int, None, Callable[[str], Union[str, any]]]:
     """
     Get the value for a single special field.
     """
 
     def has_tag(arg: str):
-        if return_str:
-            return arg if note.has_tag(arg) else ""
-        return note.has_tag(arg)
+        return arg if note.has_tag(arg) else "-"
 
     if field_name == NOTE_TYPE_ID:
         return note.model()["id"]
@@ -198,7 +195,7 @@ def get_note_data_value(
     if field_name == NOTE_HAS_TAG:
         return has_tag
     if field_name == NOTE_CARD_COUNT:
-        return str(len(note.card_ids()))
+        return len(note.card_ids())
     return None
 
 
@@ -214,48 +211,28 @@ def format_timestamp(e, time_format=None):
 def format_timestamp_days(e, time_format=None):
     return time.strftime(time_format or "%Y-%m-%d", time.localtime(e))
 
-
-def get_card_values_dict_for_note(
-        note: Note,
-        return_str: bool = True
-    ) -> dict[
-        str,
-        dict[
-            str,
-            Union[str, Callable[[str], Union[str, any]]]
-        ]
-    ]:
-    """
-    Get a dictionary of special fields that are card-specific.
-    """
-    card_values = {}
-
-    def get_card_last_reps(
-            card_id: str,
-            rep_count: str,
-            get_ease: bool = False,
-            get_ivl: bool = False,
-            get_fct: bool = False,
+def get_card_last_reps(
+        card_id: str,
+        rep_count: str,
+        get_ease: bool = False,
+        get_ivl: bool = False,
+        get_fct: bool = False,
     ) -> Union[
-            Union[
                 # Return  or a flat list of values
                 List[Union[int, float]],
                 # or a list of lists of values when two or more rev_log fields are requested
                 List[List[Union[int, float]]]
-            ],
-            # or a string representation of those lists
-            str,
         ]:
         if not get_ease and not get_ivl and not get_fct:
-            return "[]" if return_str else []
+            return []
         all = rep_count == "all"
         if not all:
             try:
                 rep_count = int(rep_count)
             except ValueError:
-                return "[]" if return_str else []
+                return []
             if rep_count < 1:
-                return "[]" if return_str else []
+                return []
         # Get rep eases, excluding manual schedules, identified by ease = 0
         reps = mw.col.db.list(
             f"""SELECT 
@@ -271,21 +248,19 @@ def get_card_values_dict_for_note(
                 {f"DESC LIMIT {rep_count}" if not all else ""}
             """
         )
-        return str(reps) if return_str else reps
-    
+        return reps
 
-    # Add values as a dict by card_type_name
-    for card in note.cards():
-        card_type_name = card.template()["name"]
-
-        (first, last, cnt, total) = mw.col.db.first(
-            f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card.id}"
-        )
-
-        card_values[card_type_name] = {
-            CARD_ID: card.id,
+def get_value_for_card(
+        card: Card,
+        note: Note,
+    ) -> dict[str, any]:
+    (first, last, cnt, total) = mw.col.db.first(
+        f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card.id}"
+    )
+    return {
+            CARD_ID: card.id or 0,
             OTHER_CARD_IDS: [cid for cid in note.card_ids() if cid != card.id],
-            CARD_NID: card.nid,
+            CARD_NID: card.nid or 0,
             CARD_DUE: card.due or 0,
             CARD_IVL: card.ivl or 0,
             CARD_EASE: card.factor / 10 or 0,
@@ -294,21 +269,47 @@ def get_card_values_dict_for_note(
             CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
             CARD_REP_COUNT: card.reps or 0,
             CARD_LAPSE_COUNT: card.lapses or 0,
-            CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "",
-            CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "",
-            CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "",
+            CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "-",
+            CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "-",
+            CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-",
             CARD_TOTAL_TIME: timespan(total),
             CARD_TYPE: "Review" if card.type == CARD_TYPE_REV \
                 else "New" if card.type == CARD_TYPE_NEW \
                 else "Learning" if card.type == CARD_TYPE_LRN \
                 else "Relearning" if card.type == CARD_TYPE_RELEARNING \
                 else "",
-            CARD_CREATED: format_timestamp(card.nid / 1000),
-            CARD_CUSTOM_DATA: card.custom_data or "{}",
+            CARD_CREATED: format_timestamp(card.nid / 1000) if card.nid else "-",
+            CARD_CUSTOM_DATA: card.custom_data or {},
             CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),
             CARD_LAST_FACTORS: partial(get_card_last_reps, card.id, get_fct=True),
             CARD_LAST_IVLS: partial(get_card_last_reps, card.id, get_ivl=True),
-        }
+    }
+
+def get_card_values_dict_for_note(
+        note: Note,
+    ) -> dict[
+        str,
+        dict[
+            str,
+            Union[str, Callable[[str], Union[str, any]]]
+        ]
+    ]:
+    """
+    Get a dictionary of special fields that are card-specific.
+    """
+    card_values = {}
+
+    # cards will be empty for a new note being added so we can't return anything
+    cards = note.cards()
+    if not cards:
+        for card_template in note.note_type()["tmpls"]:
+            # Make a fake card to get the default values
+            card_values[card_template["name"]] = get_value_for_card(Card(mw.col), note)
+    # Add values as a dict by card_type_name
+    for card in note.cards():
+        card_type_name = card.template()["name"]
+
+        card_values[card_type_name] = get_value_for_card(card, note)
     return card_values
 
 
@@ -395,6 +396,11 @@ def get_from_note_fields(
             # If we haven't made the card values dict yet, do it now
             if card_values_dict is None:
                 card_values_dict = get_card_values_dict_for_note(note)
+                
+            # New notes will have no cards, so we can't get a value
+            # Return "" so we don't flag this as an invalid field
+            if not card_values_dict:
+                return "", card_values_dict
 
             if multiple_note_types:
                 # If there are multiple note types, we just assume there is only one card type
