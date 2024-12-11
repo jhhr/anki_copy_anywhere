@@ -108,7 +108,8 @@ def fonts_check_process(
             show_error_message(f"{text} - All characters excluded by regex")
         else:
             show_error_message(
-                f"{text} - No characters had a match in the fonts dictionary, check that your dictionary has entries for the expected characters")
+                f"{text} - No characters had a match in the fonts dictionary, check that your "
+                +" dictionary has entries for the expected characters")
             return ""
 
         # All characters were excluded by the regex, so we assume they are all ok to be displayed by all the fonts
@@ -122,7 +123,7 @@ def fonts_check_process(
 
         show_error_message(f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key")
         return ""
-    
+
     if valid_fonts is None:
         valid_fonts = []
 

@@ -179,7 +179,7 @@ def get_note_data_value(
         note: Note,
         field_name: str,
         return_str: bool = True
-) -> Union[str, int, None, Callable[[str], Union[str, any]]]:
+    ) -> Union[str, int, None, Callable[[str], Union[str, any]]]:
     """
     Get the value for a single special field.
     """
@@ -218,13 +218,13 @@ def format_timestamp_days(e, time_format=None):
 def get_card_values_dict_for_note(
         note: Note,
         return_str: bool = True
-) -> dict[
+    ) -> dict[
     str,
     dict[
         str,
         Union[str, Callable[[str], Union[str, any]]]
-    ]
-]:
+        ]
+    ]:
     """
     Get a dictionary of special fields that are card-specific.
     """
@@ -317,7 +317,7 @@ CARD_VALUE_RE = re.compile(rf"""
 (.+) # match group 1, the card type name
 (__\w+ # match group 2, the card value key
   (?:{ARG_SEPARATOR})? # the arg separator, optional
-) 
+)
 (.*)? # match group 3, the card value arg, only present when the arg separator is present
 $
 """, re.VERBOSE)
@@ -328,7 +328,7 @@ MULTI_CARD_VALUE_RE = re.compile(rf"""
 ^
 (__\w+ # match group 1, the card value key
   (?:{ARG_SEPARATOR})? # the arg separator, optional
-) 
+)
 (.*)? # match group 2, the card value arg, only present when the arg separator is present
 $
 """, re.VERBOSE)
@@ -340,7 +340,7 @@ def get_from_note_fields(
         note_fields: dict,
         card_values_dict: dict = None,
         multiple_note_types: bool = False,
-) -> Tuple[Union[str, None], Union[dict, None]]:
+    ) -> Tuple[Union[str, None], Union[dict, None]]:
     """
     Get a value from a note, source or destination. The note's fields or its cards' fields.
     :param field: interpolation field key
@@ -412,8 +412,7 @@ def interpolate_from_text(
         dest_note: Optional[Note] = None,
         variable_values_dict: dict = None,
         multiple_note_types: bool = False,
-) -> Tuple[
-    Union[str, None], List[str]]:
+    ) -> Tuple[Union[str, None], List[str]]:
     """
     Interpolates a text that uses curly brace syntax.
     Also returns a list of all invalid fields in the text for debugging.

@@ -126,6 +126,7 @@ class CopyDefinition(TypedDict):
     definition_name: str
     copy_on_sync: bool
     copy_on_add: bool
+    copy_on_review: bool
     copy_mode: str
     copy_into_note_types: str
     field_to_field_defs: list[CopyFieldToField]

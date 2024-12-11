@@ -150,7 +150,10 @@ class InterpolatedTextEditLayout(QVBoxLayout):
                     error_msg = basic_arg_validator(arg) or validator(arg)
                     if error_msg:
                         invalid_fields.append(
-                            f'{field}<span style="color: orange;"><b style="color:red">{arg or "[blank]"}</b>: {error_msg}</span>')
+                            f'''{field}
+                            <span style="color: orange;"><b style="color:red">
+                              {arg or "[blank]"}</b>: {error_msg}
+                            </span>''')
 
         if len(invalid_fields) > 0:
             self.error_label.setText("<br/>".join(invalid_fields))

@@ -268,6 +268,10 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.copy_on_add_checkbox = QCheckBox("Run when adding new note")
         self.copy_on_add_checkbox.setChecked(False)
         self.middle_form.addRow("", self.copy_on_add_checkbox)
+        
+        self.copy_on_review_cehckbox = QCheckBox("Run on review")
+        self.copy_on_review_cehckbox.setChecked(False)
+        self.middle_form.addRow("", self.copy_on_review_cehckbox)
 
         # Both the across and within note editors will share the same field-to-field editor
         # Add tabs using QTabWidget to select between showing AcrossNotesCopyEditor and WithinNoteCopyEditor
@@ -302,6 +306,8 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 self.copy_on_sync_checkbox.setChecked(copy_definition["copy_on_sync"])
             with suppress(KeyError):
                 self.copy_on_add_checkbox.setChecked(copy_definition["copy_on_add"])
+            with suppress(KeyError):
+                self.copy_on_review_cehckbox.setChecked(copy_definition["copy_on_review"])
             with suppress(KeyError):
                 self.decks_limit_multibox.setCurrentText(copy_definition["only_copy_into_decks"])
             with suppress(KeyError):
@@ -427,6 +433,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "select_card_separator": self.across_notes_editor_tab.card_select_separator.text(),
                 "copy_on_sync": self.copy_on_sync_checkbox.isChecked(),
                 "copy_on_add": self.copy_on_add_checkbox.isChecked(),
+                "copy_on_review": self.copy_on_review_cehckbox.isChecked(),
                 "copy_mode": self.selected_editor_type,
             }
             return copy_definition
@@ -439,6 +446,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "field_to_field_defs": self.within_note_editor_tab.get_field_to_field_editor().get_field_to_field_defs(),
                 "copy_on_sync": self.copy_on_sync_checkbox.isChecked(),
                 "copy_on_add": self.copy_on_add_checkbox.isChecked(),
+                "copy_on_review": self.copy_on_review_cehckbox.isChecked(),
                 "copy_mode": self.selected_editor_type,
                 "copy_from_cards_query": None,
                 "select_card_by": None,
