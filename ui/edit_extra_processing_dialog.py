@@ -351,10 +351,12 @@ class KanaHighlightProcessDialog(QDialog):
         self.accept()
 
     def update_combobox_options(self):
-        for field_name in mw.col.models.field_names(mw.col.models.by_name(self.copy_into_note_types)):
-            self.onyomi_field_cbox.addItem(field_name)
-            self.kunyomi_field_cbox.addItem(field_name)
-            self.kanji_field_cbox.addItem(field_name)
+        for note_type_name in self.copy_into_note_types.strip('""').split('", "'):
+            note_type = mw.col.models.by_name(note_type_name)
+            for field_name in mw.col.models.field_names(note_type):
+                self.onyomi_field_cbox.addItem(field_name)
+                self.kunyomi_field_cbox.addItem(field_name)
+                self.kanji_field_cbox.addItem(field_name)
 
 
 class EditExtraProcessingWidget(QWidget):
