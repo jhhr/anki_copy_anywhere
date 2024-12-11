@@ -1,7 +1,7 @@
 from anki import hooks
 from anki.cards import Card
 from anki.notes import Note
-from aqt.gui_hooks import reviewer_did_answer_card
+from aqt.gui_hooks import reviewer_did_answer_card, editor_did_unfocus_field
 from aqt import mw
 
 
@@ -12,6 +12,8 @@ from ..logic.copy_fields import copy_for_single_note
 def run_copy_fields_on_add(note: Note, deck_id: int):
     config = Config()
     config.load()
+    
+    note_type_name = note.note_type()["name"]
 
     for copy_definition in config.copy_definitions:
         copy_on_add = copy_definition.get("copy_on_add", False)
@@ -23,9 +25,11 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
         # Split note_types by comma
         copy_into_note_types = copy_into_note_types.strip('""').split('", "')
         multiple_note_types = len(copy_into_note_types) > 1
-        if note.note_type()["name"] not in copy_into_note_types:
+        if note_type_name not in copy_into_note_types:
             continue
 
+        # No need to merge undo entries for adding a note as undoing the add
+        # will remove the note entirely
         copy_for_single_note(
             copy_definition=copy_definition,
             note=note,
@@ -42,6 +46,9 @@ def run_copy_fields_on_review(card: Card):
     """
     config = Config()
     config.load()
+    
+    note = card.note()
+    note_type_name = note.note_type()["name"]
 
     for copy_definition in config.copy_definitions:
         copy_on_review = copy_definition.get("copy_on_review", False)
@@ -53,8 +60,7 @@ def run_copy_fields_on_review(card: Card):
             continue
         copy_into_note_types = copy_into_note_types.strip('""').split('", "')
         multiple_note_types = len(copy_into_note_types) > 1
-        note = card.note()
-        if card.note().note_type()["name"] not in copy_into_note_types:
+        if note_type_name not in copy_into_note_types:
             continue
 
         # Merge undo entry for the review
@@ -63,12 +69,64 @@ def run_copy_fields_on_review(card: Card):
         copy_for_single_note(
             copy_definition=copy_definition,
             note=note,
-            deck_id=card.did,
             multiple_note_types=multiple_note_types,
         )
         mw.col.update_note(note)
         mw.col.merge_undo_entries(undo_entry)
 
+def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str):
+    config = Config()
+    config.load()
+    note_type_name = note.note_type()["name"]
+    changed = False
+
+    print("run_copy_fields_on_unfocus_field", changed, note, field_name)
+
+    for copy_definition in config.copy_definitions:
+        copy_into_note_types = copy_definition.get("copy_into_note_types", None)
+        if not copy_into_note_types:
+            continue
+        # Split note_types by comma
+        copy_into_note_types = copy_into_note_types.strip('""').split('", "')
+        multiple_note_types = len(copy_into_note_types) > 1
+        print("note_type_name", note_type_name, note_type_name in copy_into_note_types)
+        if note_type_name not in copy_into_note_types:
+            continue
+
+        # Check field-to-field defs for a match on this field
+        field_to_field_defs = copy_definition.get("field_to_field_defs")
+        if not field_to_field_defs:
+            continue
+
+        # get field-to-field matching this field
+        field_to_field_def = None
+        for f in field_to_field_defs:
+            print("f", f.get("copy_into_note_field"), field_name)
+            if f.get("copy_into_note_field") == field_name:
+                field_to_field_def = f
+                break
+        print("field_to_field_def", field_to_field_def is not None)
+        if not field_to_field_def:
+            continue
+
+        print("field_to_field_def unfucs", field_to_field_def.get("copy_on_unfocus"))
+        if not field_to_field_def.get("copy_on_unfocus"):
+            continue
+
+        # Merge to last undo entry
+        # undo_status = mw.col.undo_status()
+        # undo_entry = undo_status.last_step
+        changed = copy_for_single_note(
+            copy_definition=copy_definition,
+            note=note,
+            field_only=field_name,
+            multiple_note_types=multiple_note_types,
+        )
+        print("changed", changed)
+        # mw.col.update_note(note)
+        # mw.col.merge_undo_entries(undo_entry)
+
+    return changed
 
 def init_note_hooks():
     hooks.note_will_be_added.append(
@@ -76,4 +134,7 @@ def init_note_hooks():
     )
     reviewer_did_answer_card.append(
         lambda reviewer, card, ease: run_copy_fields_on_review(card)
+    )
+    editor_did_unfocus_field.append(
+        lambda changed, note, field_idx: run_copy_fields_on_unfocus_field(changed, note, note.keys()[field_idx])
     )

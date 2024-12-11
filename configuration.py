@@ -110,6 +110,7 @@ class CopyFieldToField(TypedDict):
     copy_into_note_field: str
     copy_from_text: str
     copy_if_empty: bool
+    copy_on_unfocus: bool
     process_chain: list[Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]]
 
 

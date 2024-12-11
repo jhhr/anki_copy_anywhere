@@ -469,6 +469,7 @@ def apply_process_chain(
 def copy_for_single_note(
         copy_definition: CopyDefinition,
         note: Note,
+        field_only: str = None,
         deck_id: int = None,
         multiple_note_types: bool = False,
         show_error_message: Callable[[str], None] = None,
@@ -478,6 +479,8 @@ def copy_for_single_note(
     Copy fields into a single note
     :param copy_definition: The definition of what to copy, includes process chains
     :param note: Note to copy into
+    :param field_only: Optional field to limit copying to. Used when copying is applied
+      in the note editor
     :param deck_id: Deck ID where the cards are going into, only needed when adding
       a note since cards don't exist yet. Otherwise, the deck_ids are checked from the cards
       of the note
@@ -547,10 +550,21 @@ def copy_for_single_note(
 
     # Step 2: Get value for each field we are copying into
     for field_to_field_def in field_to_field_defs:
-        copy_from_text = field_to_field_def["copy_from_text"]
         copy_into_note_field = field_to_field_def["copy_into_note_field"]
+        if field_only is not None and copy_into_note_field != field_only:
+            continue
+        copy_from_text = field_to_field_def["copy_from_text"]
         copy_if_empty = field_to_field_def["copy_if_empty"]
         process_chain = field_to_field_def.get("process_chain", None)
+
+        try:
+            cur_field_value = note[copy_into_note_field]
+        except KeyError:
+            show_error_message(f"Error in copy fields: Field '{copy_into_note_field}' not found in note")
+            return False
+
+        if copy_if_empty and cur_field_value != "":
+            continue
 
         # Step 2.1: Get the value from the notes, usually it's just one note
         result_val = get_field_values_from_notes(
@@ -572,17 +586,9 @@ def copy_for_single_note(
             )
             if result_val is None:
                 return False
-
-        # Step 2.3: Set the value into the target note's field
-        try:
-            # only_empty can override the functionality of ignore_if_cached causing the card to be updated
-            # that's why the default only_empty is False and ignore_if_cached is True
-            if copy_if_empty and note[copy_into_note_field] != "":
-                break
-            note[copy_into_note_field] = result_val
-
-        except ValueError:
-            show_error_message(f"Error copy fields: a field '{copy_into_note_field}' was not found in note")
+            
+        # Finally, copy the value into the note
+        note[copy_into_note_field] = result_val
 
     return True
 
