@@ -105,13 +105,13 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
         copy_fields_menu.addAction(copy_fields_action)
 
 
-browser_will_show_context_menu.append(on_browser_will_show_context_menu)
-
-
 def setup_copy_fields_menu(browser):
+    config.load()
+
     menu = browser.form.menuEdit
     menu.addSeparator()
     open_copy_dialog_action = QAction('Copy anywhere...', browser)
+    open_copy_dialog_action.setShortcut(config.copy_fields_shortcut)
     qconnect(
         open_copy_dialog_action.triggered,
         lambda: show_copy_dialog(browser)
@@ -121,3 +121,4 @@ def setup_copy_fields_menu(browser):
 
 def init_browser_hooks():
     browser_menus_did_init.append(setup_copy_fields_menu)
+    browser_will_show_context_menu.append(on_browser_will_show_context_menu)

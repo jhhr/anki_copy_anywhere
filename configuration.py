@@ -147,6 +147,10 @@ class Config:
         save_config(self.data)
 
     @property
+    def copy_fields_shortcut(self):
+        return self.data["copy_fields_shortcut"]
+
+    @property
     def days_to_cache_fields_menu(self):
         return self.data["days_to_cache_fields_menu"]
 
