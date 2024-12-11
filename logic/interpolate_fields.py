@@ -219,10 +219,10 @@ def get_card_values_dict_for_note(
         note: Note,
         return_str: bool = True
     ) -> dict[
-    str,
-    dict[
         str,
-        Union[str, Callable[[str], Union[str, any]]]
+        dict[
+            str,
+            Union[str, Callable[[str], Union[str, any]]]
         ]
     ]:
     """
@@ -236,17 +236,26 @@ def get_card_values_dict_for_note(
             get_ease: bool = False,
             get_ivl: bool = False,
             get_fct: bool = False,
-    ):
+    ) -> Union[
+            Union[
+                # Return  or a flat list of values
+                List[Union[int, float]],
+                # or a list of lists of values when two or more rev_log fields are requested
+                List[List[Union[int, float]]]
+            ],
+            # or a string representation of those lists
+            str,
+        ]:
         if not get_ease and not get_ivl and not get_fct:
-            return "" if return_str else None
+            return "[]" if return_str else []
         all = rep_count == "all"
         if not all:
             try:
                 rep_count = int(rep_count)
             except ValueError:
-                return "" if return_str else None
+                return "[]" if return_str else []
             if rep_count < 1:
-                return "" if return_str else None
+                return "[]" if return_str else []
         # Get rep eases, excluding manual schedules, identified by ease = 0
         reps = mw.col.db.list(
             f"""SELECT 
@@ -263,6 +272,7 @@ def get_card_values_dict_for_note(
             """
         )
         return str(reps) if return_str else reps
+    
 
     # Add values as a dict by card_type_name
     for card in note.cards():
@@ -276,14 +286,14 @@ def get_card_values_dict_for_note(
             CARD_ID: card.id,
             OTHER_CARD_IDS: [cid for cid in note.card_ids() if cid != card.id],
             CARD_NID: card.nid,
-            CARD_DUE: card.due,
-            CARD_IVL: card.ivl,
-            CARD_EASE: card.factor / 10,
+            CARD_DUE: card.due or 0,
+            CARD_IVL: card.ivl or 0,
+            CARD_EASE: card.factor / 10 or 0,
             # If FSRS is not enabled, memory_state will be None
             CARD_STABILITY: round(card.memory_state.stability, 1) if card.memory_state else 0,
             CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
-            CARD_REP_COUNT: card.reps,
-            CARD_LAPSE_COUNT: card.lapses,
+            CARD_REP_COUNT: card.reps or 0,
+            CARD_LAPSE_COUNT: card.lapses or 0,
             CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "",
             CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "",
             CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "",
@@ -294,7 +304,7 @@ def get_card_values_dict_for_note(
                 else "Relearning" if card.type == CARD_TYPE_RELEARNING \
                 else "",
             CARD_CREATED: format_timestamp(card.nid / 1000),
-            CARD_CUSTOM_DATA: card.custom_data,
+            CARD_CUSTOM_DATA: card.custom_data or "{}",
             CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),
             CARD_LAST_FACTORS: partial(get_card_last_reps, card.id, get_fct=True),
             CARD_LAST_IVLS: partial(get_card_last_reps, card.id, get_ivl=True),
