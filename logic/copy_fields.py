@@ -301,7 +301,8 @@ def copy_fields_in_background(
     # Get from_note_type_id either directly or through copy_into_note_types
     if copy_into_note_types is None:
         show_error_message(
-            f"Error in copy fields: Note type for copy_into_note_types '{copy_into_note_types}' not found, check your spelling",
+            f"""Error in copy fields: Note type for copy_into_note_types '{copy_into_note_types}'
+            not found, check your spelling""",
         )
         return results
 
@@ -339,7 +340,7 @@ def copy_fields_in_background(
         cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
     elif card_ids is None:
         # Otherwise, get all cards of the note type
-        card_ids = mw.col.find_cards(f'{note_type_query} {"prop:cdn:fc=0" if is_sync else ""}')
+        card_ids = mw.col.find_cards(f'({note_type_query}) {"prop:cdn:fc=0" if is_sync else ""}')
         if not is_sync and len(card_ids) == 0:
             show_error_message(
                 f"Error in copy fields: Did not find any cards of note type(s) {copy_into_note_types}")
@@ -397,7 +398,6 @@ def copy_fields_in_background(
         if not success:
             return results
 
-    print(results.get_result_text())
     results.add_result_text(
         f"{time.time() - start_time:.2f}s - <i>{copy_definition['definition_name']}:</i> {card_cnt} cards"
     )
@@ -681,7 +681,8 @@ def get_notes_to_copy_from(
 
     if select_card_by not in PICK_CARD_BY_VALID_VALUES:
         show_error_message(
-            f"Error in copy fields: incorrect 'select_card_by' value '{select_card_by}'. It must be one of {PICK_CARD_BY_VALID_VALUES}",
+            f"""Error in copy fields: incorrect 'select_card_by' value '{select_card_by}'.
+            It must be one of {PICK_CARD_BY_VALID_VALUES}""",
         )
         return []
 
@@ -692,7 +693,8 @@ def get_notes_to_copy_from(
                 raise ValueError
         except ValueError:
             show_error_message(
-                f"Error in copy fields: Incorrect 'select_card_count' value '{select_card_count}' value must be a positive integer"
+                f"""Error in copy fields: Incorrect 'select_card_count' value '{select_card_count}'
+                value must be a positive integer"""
             )
             return []
     else:
