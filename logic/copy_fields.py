@@ -707,7 +707,7 @@ def get_notes_to_copy_from(
     else:
         select_card_count = 1
 
-    if only_copy_into_decks not in [None, "-"]:
+    if only_copy_into_decks and only_copy_into_decks != "-":
         # Check if the current deck is in the white list, otherwise we don't copy into this note
         # whitelist deck is a list of deck or sub deck names
         # parent names can't be included since adding :: would break the filter text
@@ -724,7 +724,7 @@ def get_notes_to_copy_from(
         else:
             for card in copy_into_note.cards():
                 deck_ids.append(card.odid or card.did)
-        if deck_id not in whitelist_dids:
+        if deck_ids and not any(deck_id in whitelist_dids for deck_id in deck_ids):
             return []
 
     interpolated_cards_query, invalid_fields = interpolate_from_text(
@@ -736,7 +736,6 @@ def get_notes_to_copy_from(
     try:
         card_ids = extra_state[cards_query_id]
     except KeyError:
-        # Always exclude suspended cards
         card_ids = mw.col.find_cards(interpolated_cards_query)
         extra_state[cards_query_id] = card_ids
 
