@@ -130,6 +130,12 @@ class MultiComboBoxQt5(QComboBox):
                     break
         self.updateText()
 
+    def addSelectedItem(self, text: str):
+        for i in range(self.model().rowCount()):
+            if self.model().item(i).text() == text:
+                self.model().item(i).setCheckState(Qt.Checked)
+                break
+
     def hasMultipleSelected(self):
         return len(self.currentData()) > 1
 
@@ -196,6 +202,12 @@ class MultiComboBoxQt6(QComboBox):
                     self.model().item(i).setCheckState(Qt.CheckState.Checked)
                     break
         self.updateText()
+
+    def addSelectedItem(self, text: str):
+        for i in range(self.model().rowCount()):
+            if self.model().item(i).text() == text:
+                self.model().item(i).setCheckState(Qt.CheckState.Checked)
+                break
 
     def hasMultipleSelected(self):
         return len(self.currentData()) > 1

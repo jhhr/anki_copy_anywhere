@@ -388,14 +388,18 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             return
 
         if len(models) > 1:
-            text = "When selecting multiple note types, only the fields that are common to all note types will be available as destinations."
+            text = "When selecting multiple note types, only the fields that are common to all" \
+                + "note types will be available as destinations."
             # Check that each model has a single card template only
             models_first_templates = []
             for model in models:
                 if len(model["tmpls"]) > 1:
                     models_first_templates.append((model["name"], model["tmpls"][0]["name"]))
             if models_first_templates:
-                text += f"<br><span style='color: orange'>WARNING:</span> The following note types have multiple card types. Only the first one will be used when applying special card values:<ul>"
+                text += """<br><span style='color: orange'>WARNING:</span>
+                The following note types have multiple card types.
+                Only the first one will be used when applying special card values:
+                <ul>"""
                 for model_name, template_name in models_first_templates:
                     text += f"<li>{model_name}: {template_name}</li>"
                 text += "</ul>"
@@ -416,11 +420,14 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 AND c.nid = n.id
             """)
 
+        current_deck_names = [d.strip('""') for d in self.decks_limit_multibox.currentData()]
         self.decks_limit_multibox.clear()
         self.decks_limit_multibox.addItem("-")
         for deck in [mw.col.decks.get(did) for did in dids]:
             # Wrap name in "" to avoid issues with commas in the name
             self.decks_limit_multibox.addItem(f'"{deck["name"]}"')
+            if deck["name"] in current_deck_names:
+                self.decks_limit_multibox.addSelectedItem(f'"{deck["name"]}"')
 
     def get_copy_definition(self):
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
