@@ -310,49 +310,37 @@ def copy_fields_in_background(
     # Split by comma and remove the first wrapping " but keeping the last one
     note_type_names = copy_into_note_types.strip('""').split('", "')
     # Note: adding "" between each so that we get "note:Some note type" OR "note:Some other note type"
-    note_type_query = '" OR "note:'.join(note_type_names)
-    # Final "" added here!
-    note_type_query = f'"note:{note_type_query}"'
+    note_type_ids = filter(None, [mw.col.models.id_for_name(name) for name in note_type_names])
 
     multiple_note_types = len(note_type_names) > 1
+    fc_query = "AND json_extract(json_extract(c.data, '$.cd'), '$.fc') = 0" if is_sync else ""
 
-    # Get cards of the target note type
     if card_ids is not None and len(card_ids) > 0:
-        # If we received a list of ids, we need to filter them by the note type
-        # as this could include cards of different note types
-        # We'll need to all note_ids as mid is not available in the card object, only in the note
-        note_ids = mw.col.find_notes(note_type_query)
-        if len(note_ids) == 0:
-            show_error_message(
-                f"Error in copy fields: Did not find any notes of note type(s) '{copy_into_note_types}'")
-            return results
-
-        note_ids_str = ids2str(note_ids)
-        card_ids_str = ids2str(card_ids)
-
-        filtered_card_ids = mw.col.db.list(f"""
-            SELECT id
-            FROM cards
-            WHERE nid IN {note_ids_str}
-            AND id IN {card_ids_str}
-            {"AND json_extract(json_extract(data, '$.cd'), '$.fc') = 0" if is_sync else ""}
-        """)
-
-        cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
+        # Filter card_ids further into only the cards of the note type
+        cids_query = f"AND c.id IN {ids2str(card_ids)}"
     elif card_ids is None:
-        # Otherwise, get all cards of the note type
-        card_ids = mw.col.find_cards(f'({note_type_query}) {"prop:cdn:fc=0" if is_sync else ""}')
-        if not is_sync and len(card_ids) == 0:
-            show_error_message(
-                f"Error in copy fields: Did not find any cards of note type(s) {copy_into_note_types}")
-            return results
-
-        cards = [mw.col.get_card(card_id) for card_id in card_ids]
+        # Get all cards of the note type
+        cids_query = ""
     else:
         # This is an error. If card_ids is an empty list, we won't do anything
         # To copy into all cards card_ids should explicitly be None
         return results
 
+    filtered_card_ids = mw.col.db.list(f"""
+            SELECT c.id
+            FROM cards c, notes n
+            WHERE n.mid IN {ids2str(note_type_ids)}
+            AND c.nid = n.id
+            {cids_query}
+            {fc_query}
+            """)
+
+    if not is_sync and len(filtered_card_ids) == 0:
+        show_error_message(
+            f"Error in copy fields: Did not find any cards of note type(s) {copy_into_note_types}")
+        return results
+
+    cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
     total_cards_count = len(cards)
 
     # Cache any opened files, so process chains can use them instead of needing to open them again
