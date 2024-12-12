@@ -156,12 +156,15 @@ def copy_fields(
 
     def on_done(copy_results):
         mw.progress.finish()
-        main_time = f"{time.time() - start_time:.2f}s total time<br>" \
-            if len(copy_definitions) > 1 else "Finished in "
-        tooltip(f"{main_time}{copy_results.get_result_text()}",
-                parent=parent,
-                period=5000 + len(copy_definitions) * 1000
-                )
+        result = copy_results.get_result_text()
+        # Don't show a blank tooltip with just the time
+        if result:
+            main_time = f"{time.time() - start_time:.2f}s total time<br>" \
+                if len(copy_definitions) > 1 else "Finished in "
+            tooltip(f"{main_time}{copy_results.get_result_text()}",
+                    parent=parent,
+                    period=5000 + len(copy_definitions) * 1000
+                    )
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(
                 debug_texts,
@@ -398,9 +401,13 @@ def copy_fields_in_background(
         if not success:
             return results
 
-    results.add_result_text(
-        f"{time.time() - start_time:.2f}s - <i>{copy_definition['definition_name']}:</i> {card_cnt} cards"
-    )
+    # When syncing, don't show a pointless message that nothing was done
+    # Otherwise, when copy fields is run manually, you want to know the result in any case
+    should_report_result = len(cards) > 0 if is_sync else True
+    if should_report_result:
+        results.add_result_text(
+            f"{time.time() - start_time:.2f}s - <i>{copy_definition['definition_name']}:</i> {card_cnt} cards"
+        )
     return results
 
 
@@ -586,7 +593,7 @@ def copy_for_single_note(
             )
             if result_val is None:
                 return False
-            
+
         # Finally, copy the value into the note
         note[copy_into_note_field] = result_val
 
