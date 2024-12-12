@@ -23,6 +23,8 @@ from ..logic.copy_fields import (
     copy_fields,
 )
 
+from ..utils import make_query_string
+
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
 else:
@@ -44,7 +46,7 @@ class PickCopyDefinitionDialog(QDialog):
         self.selected_definitions_applicable_cards = []
         self.selected_copy_definitions = []
         self.remove_row_funcs = []
-        self.models = []
+        self.applicable_note_type_names = []
         self.checkboxes = []
         self.definition_card_ids = []
         self.browser_card_ids = browser_card_ids
@@ -245,47 +247,44 @@ class PickCopyDefinitionDialog(QDialog):
 
         self.selected_definitions_applicable_cards = set()
         total_applicable_cards = []
-        self.models = []
+        self.applicable_note_type_names = []
         nothing_checked = True
         for index, checkbox in enumerate(self.checkboxes):
             if checkbox.isChecked():
                 nothing_checked = False
                 checked_definition = self.copy_definitions[index]
-                limited_dids = []
-                if checked_definition["only_copy_into_decks"]:
+                decks_query = ""
+                whitelist_decknames = checked_definition.get("only_copy_into_decks")
+                if whitelist_decknames and whitelist_decknames != "-":
                     # Remove the quotes and split the string into a list of deck names
-                    deck_names = checked_definition["only_copy_into_decks"].strip('""').split('", "')
-                    for deck_name in deck_names:
-                        did = mw.col.decks.id_for_name(deck_name)
-                        if did is not None:
-                            limited_dids.append(did)
-                if len(limited_dids) > 0:
-                    did_query = f'did:{",".join(map(str, limited_dids))}'
-                else:
-                    did_query = ""
+                    deck_names = whitelist_decknames.strip('""').split('", "')
+                    decks_query = make_query_string("deck", deck_names)
+
+                note_type_query = ""
                 # Split by comma and remove the first wrapping " but keeping the last one
-                note_type_names = checked_definition["copy_into_note_types"].strip('""').split('", "')
-                # Note: adding "" between each so that we get "note:Some note type" OR "note:Some other note type"
-                note_type_query = '" OR "note:'.join(note_type_names)
-                # Final "" added here!
-                note_type_query = f'("note:{note_type_query}")'
+                note_type_names = checked_definition.get("copy_into_note_types")
+                if note_type_names and note_type_names != "-":
+                    note_type_names = note_type_names.strip('""').split('", "')
+                    note_type_query = make_query_string("note", note_type_names)
                 def_card_ids = mw.col.find_cards(
-                    f'{note_type_query} {did_query} {browser_query}')
+                    f'{note_type_query} {decks_query} {browser_query}')
 
                 self.selected_definitions_applicable_cards.update(def_card_ids)
                 self.definition_card_ids[index] = def_card_ids
                 total_applicable_cards.extend(def_card_ids)
-                checkbox.setText(f"{checked_definition['definition_name']} ({len(def_card_ids)})")
-                if checked_definition["copy_into_note_types"] not in self.models:
-                    self.models.append(checked_definition["copy_into_note_types"])
+                definition_name = checked_definition.get("definition_name", "")
+                checkbox.setText(f"{definition_name} ({len(def_card_ids)})")
+                for note_type_name in note_type_names:
+                    if note_type_name not in self.applicable_note_type_names:
+                        self.applicable_note_type_names.append(note_type_name)
             else:
                 self.definition_card_ids[index] = []
         if nothing_checked:
             self.cards_selected_label.setText(DEFAULT_CARDS_SELECTED_LABEL)
         elif len(self.selected_definitions_applicable_cards) > 0:
             self.cards_selected_label.setText(
-                f"""{len(self.selected_definitions_applicable_cards)} cards apply over {len(self.models)} different note types.
-            Total copy operations to be done: {len(total_applicable_cards)}.                
+                f"""{len(self.selected_definitions_applicable_cards)} cards apply over {len(self.applicable_note_type_names)} different note types.
+            Total copy operations to be done: {len(total_applicable_cards)}.
             Click apply to run the selected copy definitions on these cards.""")
             self.apply_button.setEnabled(True)
         else:
