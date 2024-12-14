@@ -163,7 +163,10 @@ def copy_fields(
                 if len(copy_definitions) > 1 else "Finished in "
             tooltip(f"{main_time}{result}",
                     parent=parent,
-                    period=5000 + len(copy_definitions) * 1000
+                    period=5000 + len(copy_definitions) * 1000,
+                    # Position the tooltip higher so other tooltips don't get covered
+                    # 100 is the default offset, see aqt.utils.tooltip
+                    y_offset=200 if is_sync else 100
                     )
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(
@@ -580,6 +583,7 @@ def copy_for_single_note(
             if result_val is None:
                 return False
 
+        print(f"result_val after process chain: {result_val}")
         # Finally, copy the value into the note
         note[copy_into_note_field] = result_val
 
