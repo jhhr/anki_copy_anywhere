@@ -69,7 +69,8 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
         reset_all_action.triggered,
         lambda: replace_custom_field_values(
             card_ids=browser.selectedNotesAsCards(),
-            parent=browser
+            parent=browser,
+            reset_field_key_values="all"
             ),
     )
     custom_data_menu = menu.addMenu("CustomData")

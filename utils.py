@@ -26,7 +26,7 @@ def add_dict_key_value(
     else:
         # remove key
         dict.pop(key, None)
-        
+
 class KeyValueDict(TypedDict):
     key: str
     value: Optional[Union[str, int, float, bool]]
@@ -49,7 +49,7 @@ def write_custom_data(
                 If value is not None, the key will be renamed and the value will changed.
     :param key_values: A list of (key, value, new key) tuples. Used for performance as calling
                 this function multiple times would perform json.loads and json.dumps multiple times.
-    
+
     """
     if card.custom_data != "":
         custom_data = json.loads(card.custom_data)
@@ -71,65 +71,6 @@ def write_custom_data(
     card.custom_data = compressed_data
 
 
-def filter_init(filter_prefix, valid_args, filter_str, context):
-    is_cache = None
-    try:
-        is_cache = context.extra_state["is_cache"]
-    except KeyError:
-        is_cache = False
-
-    def show_error_message(message: str):
-        if not is_cache:
-            tooltip(message, period=10000)
-        else:
-            print(message)
-
-    # extract the field args
-    # args don't have to be in the above order and  not necessarily have new lines
-    args_string = filter_str.strip(f"{filter_prefix}[").strip("]")
-    args_list = args_string.split(";")
-    args_dict = {}
-    for arg_str in args_list:
-        # The last ; will produce an empty string as the last element, skip it
-        if arg_str.strip() != "":
-            try:
-                key, value = arg_str.split("=")
-            except ValueError:
-                show_error_message(
-                    f"Error in '{filter_prefix}[]' field args: Invalid argument '{arg_str}', did you forget '='?")
-                return {}, is_cache, show_error_message
-            # strip extra whitespace
-            key = key.strip()
-            # if the value is wrapped with [], it's an array of ''-wrapped values separated by comma
-            if value.startswith("[") and value.endswith("]"):
-                value = value.strip("[]").split(",")
-                value = [v.strip().strip("'") for v in value]
-            else:
-                # it's a single ''-wrapped value
-                value = value.strip().strip("'")
-            args_dict[key] = value
-
-    # check each arg key is valid, gather a list of the invalid and then show error about those
-    invalid_keys = []
-    for key in args_dict.keys():
-        if key not in valid_args:
-            invalid_keys.append(key)
-    if len(invalid_keys) > 0:
-        show_error_message(
-            f"Error in '{filter_prefix}[]' field args: Unrecognized arguments: {', '.join(invalid_keys)}"
-        )
-        return {}, is_cache, show_error_message
-
-    # No extra invalid keys? Check that we have all valid keys then
-    def check_key(key):
-        try:
-            return args_dict[key]
-        except KeyError:
-            return None
-
-    return {key: check_key(key) for key in valid_args}, is_cache, show_error_message
-
-
 def to_lowercase_dict(d: Dict[str, Any]) -> Dict[str, Any]:
     """Converts a dictionary to lowercase keys"""
     if d is None:
@@ -147,4 +88,3 @@ def make_query_string(prefix: str, values: list[str]) -> str:
             query += " OR "
     query += ")"
     return query
-
