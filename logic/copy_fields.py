@@ -845,7 +845,6 @@ def get_field_values_from_notes(
         copy_from_text: str,
         notes: list[Note],
         dest_note: Optional[Note],
-        count_value: int = 0,
         multiple_note_types: bool = False,
         variable_values_dict: dict = None,
         select_card_separator: str = ', ',
@@ -859,7 +858,6 @@ def get_field_values_from_notes(
     :param notes: The selected notes to get the value from. In the case of COPY_MODE_WITHIN_NOTE,
             this will be a list with only one note
     :param dest_note: The note to copy into, omitted in COPY_MODE_WITHIN_NOTE
-    :param count_value: The value to use for the COUNT special value
     :param multiple_note_types: Whether the copy is into multiple note types
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
@@ -892,7 +890,6 @@ def get_field_values_from_notes(
                 destination_note=dest_note,
                 variable_values_dict=variable_values_dict,
                 multiple_note_types=multiple_note_types,
-                count_value=count_value,
             )
         except ValueError as e:
             show_error_message(f"Error in text interpolation: {e}")

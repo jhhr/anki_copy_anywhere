@@ -11,7 +11,7 @@ from ..logic.copy_fields import copy_for_single_trigger_note
 def run_copy_fields_on_add(note: Note, deck_id: int):
     config = Config()
     config.load()
-    
+
     note_type_name = note.note_type()["name"]
 
     for copy_definition in config.copy_definitions:
@@ -45,7 +45,6 @@ def run_copy_fields_on_review(card: Card):
     """
     config = Config()
     config.load()
-    
     note = card.note()
     note_type_name = note.note_type()["name"]
 
@@ -108,7 +107,7 @@ def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str)
             continue
 
         # Don't need to merge undo entries for unfocusing a field
-        changed = copy_for_single_trigger_note(
+        changed,_,_ = copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
             field_only=field_name,
