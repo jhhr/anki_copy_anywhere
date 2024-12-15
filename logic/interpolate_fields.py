@@ -475,7 +475,7 @@ def interpolate_from_text(
         field_lower = field.lower()
         if value is None:
             value = variable_fields.get(field_lower, None)
-        # value being "" is ok, but None is not
+        # value being "" or 0 is ok, but None is not
         if value is None:
             if field_lower not in invalid_fields:
                 invalid_fields.append(field_lower)

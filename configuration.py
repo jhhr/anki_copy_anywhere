@@ -28,6 +28,8 @@ class KanjiumToJavdejongProcess(TypedDict):
 
 
 REGEX_PROCESS = "Regex replace"
+
+
 class RegexProcess(TypedDict):
     name: str
     regex: str
@@ -43,6 +45,8 @@ def get_regex_process_label(regex_process):
 
 
 FONTS_CHECK_PROCESS = "Fonts check"
+
+
 class FontsCheckProcess(TypedDict):
     name: str
     fonts_dict_file: str
@@ -60,6 +64,8 @@ def get_fonts_check_process_label(fonts_check_process):
 
 
 KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
+
+
 class KanaHighlightProcess(TypedDict):
     name: str
     onyomi_field: str
@@ -106,6 +112,7 @@ MULTIPLE_ALLOWED_PROCESS_NAMES = [
     REGEX_PROCESS,
 ]
 
+
 class CopyFieldToField(TypedDict):
     copy_into_note_field: str
     copy_from_text: str
@@ -128,6 +135,10 @@ DIRECTION_DESTINATION_TO_SOURCES = "Destination to sources"
 DIRECTION_SOURCE_TO_DESTINATIONS = "Source to destinations"
 DirectionType = Literal["Destination to source", "Source to destination"]
 
+SELECT_CARD_BY_VALUES = ('None', 'Random', 'Least_reps')
+SelectCardByType = Literal['None', 'Random', 'Least_reps']
+
+
 class CopyDefinition(TypedDict):
     definition_name: str
     copy_on_sync: bool
@@ -140,7 +151,7 @@ class CopyDefinition(TypedDict):
     field_to_variable_defs: list[CopyFieldToVariable]
     only_copy_into_decks: str
     copy_from_cards_query: Optional[str]
-    select_card_by: Optional[str]
+    select_card_by: SelectCardByType
     select_card_count: Optional[str]
     select_card_separator: Optional[str]
 

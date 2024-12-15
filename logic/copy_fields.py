@@ -36,7 +36,8 @@ from ..configuration import (
     KanjiumToJavdejongProcess,
     RegexProcess,
     FontsCheckProcess,
-    KanaHighlightProcess
+    KanaHighlightProcess,
+    SELECT_CARD_BY_VALUES,
 )
 from ..ui.auto_resizing_text_edit import AutoResizingTextEdit
 from ..utils import (
@@ -72,9 +73,6 @@ class ScrollMessageBox(QDialog):
         screen = QGuiApplication.primaryScreen().availableGeometry()
         self.resize(max(self.sizeHint().height(), int(screen.width() * 0.35)), self.sizeHint().height())
         self.show()
-
-
-PICK_CARD_BY_VALID_VALUES = ('Random', 'Random_stable', 'Least_reps')
 
 
 class CacheResults:
@@ -727,10 +725,10 @@ def get_across_target_notes(
         show_error_message("Error in copy fields: Required value 'select_card_by' was missing.")
         return []
 
-    if select_card_by not in PICK_CARD_BY_VALID_VALUES:
+    if select_card_by not in SELECT_CARD_BY_VALUES:
         show_error_message(
             f"""Error in copy fields: incorrect 'select_card_by' value '{select_card_by}'.
-            It must be one of {PICK_CARD_BY_VALID_VALUES}""",
+            It must be one of {SELECT_CARD_BY_VALUES}""",
         )
         return []
 
@@ -798,6 +796,14 @@ def get_across_target_notes(
     selected_notes = []
     for i in range(select_card_count):
         selected_card_id = None
+        # just iterate the list
+        if select_card_by == "None" and len(card_ids) > 0:
+            selected_card_id = card_ids.pop()
+            if selected_card_id:
+                selected_notes.append(mw.col.get_note(mw.col.get_card(selected_card_id).nid))
+            continue
+        elif len(card_ids) == 0:
+            break
         # We don't make this key entirely unique as we want to cache the selected card for the same
         # deck_id and from_note_type_id combination, so that getting a different field from the same
         # card type will still return the same card
@@ -839,6 +845,7 @@ def get_field_values_from_notes(
         copy_from_text: str,
         notes: list[Note],
         dest_note: Optional[Note],
+        count_value: int = 0,
         multiple_note_types: bool = False,
         variable_values_dict: dict = None,
         select_card_separator: str = ', ',
@@ -852,6 +859,7 @@ def get_field_values_from_notes(
     :param notes: The selected notes to get the value from. In the case of COPY_MODE_WITHIN_NOTE,
             this will be a list with only one note
     :param dest_note: The note to copy into, omitted in COPY_MODE_WITHIN_NOTE
+    :param count_value: The value to use for the COUNT special value
     :param multiple_note_types: Whether the copy is into multiple note types
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param select_card_separator: The separator to use when joining the values from the notes. Irrelevant
@@ -884,6 +892,7 @@ def get_field_values_from_notes(
                 destination_note=dest_note,
                 variable_values_dict=variable_values_dict,
                 multiple_note_types=multiple_note_types,
+                count_value=count_value,
             )
         except ValueError as e:
             show_error_message(f"Error in text interpolation: {e}")

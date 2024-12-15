@@ -52,6 +52,7 @@ from ..configuration import (
     DIRECTION_DESTINATION_TO_SOURCES,
     CopyModeType,
     DirectionType,
+    SELECT_CARD_BY_VALUES,
 )
 from ..logic.interpolate_fields import (
     VARIABLES_KEY,
@@ -330,12 +331,16 @@ class AcrossNotesCopyEditor(QWidget):
 
         self.form.addRow(self.card_query_text_layout)
 
+        self.card_select_hbox = QHBoxLayout()
         self.card_select_cbox = RequiredCombobox()
         self.card_select_cbox.setMaximumWidth(100)
-        self.card_select_cbox.addItem("Random")
-        self.card_select_cbox.addItem("Least_reps")
+        for value in SELECT_CARD_BY_VALUES:
+            self.card_select_cbox.addItem(value)
         self.card_select_cbox.setCurrentText("Random")
-        self.form.addRow("<h4>How to select a card to copy from</h4>", self.card_select_cbox)
+        self.card_select_by_right_label = QLabel("")
+        self.card_select_hbox.addWidget(self.card_select_cbox)
+        self.card_select_hbox.addWidget(self.card_select_by_right_label)
+        self.form.addRow("<h4>How to select a card to copy from</h4>", self.card_select_hbox)
 
         card_select_count_hbox = QHBoxLayout()
         self.card_select_count = QLineEdit()
@@ -403,14 +408,19 @@ class AcrossNotesCopyEditor(QWidget):
             self.card_select_separator.set_required(False)
             self.card_select_count_right_label.setText("")
             self.card_select_separator.setPlaceholderText("Can be empty, if count = 1")
+            self.card_select_by_right_label.setText("")
         elif count > 1:
             self.card_select_separator.set_required(True)
             self.card_select_separator.setPlaceholderText("Required, if count > 1")
+            self.card_select_by_right_label.setText("")
         elif count == 0:
             self.card_select_count_right_label.setText(
                 '<span style="color: orange">All searched cards will be used</span>'
             )
             self.card_select_separator.setPlaceholderText("Required, if count > 1")
+            self.card_select_by_right_label.setText(
+                '<span style="color: darkgray">Does nothing, all cards will be used</span>'
+            )
         else:
             # Shouldn't happen with the validator, but just in case
             self.card_select_count_right_label.setText("Invalid number")
