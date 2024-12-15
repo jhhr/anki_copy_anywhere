@@ -26,6 +26,7 @@ ARG_SEPARATOR = "=="
 SOURCE_NOTE_DATA_KEY = "__Source_Note_Data"
 DESTINATION_NOTE_DATA_KEY = "__Destination_Note_Data"
 DESTINATION_PREFIX = "__Dest__"
+SOURCE_PREFIX = "__Source__"
 
 NOTE_TYPE_ID = "__Note_Type_ID"
 NOTE_ID = "__Note_ID"
@@ -178,7 +179,7 @@ DESTINATION_NOTE_MENU_DICT = {
 def get_note_data_value(
         note: Note,
         field_name: str,
-    ) -> Union[str, int, None, Callable[[str], Union[str, any]]]:
+) -> Union[str, int, None, Callable[[str], Union[str, any]]]:
     """
     Get the value for a single special field.
     """
@@ -211,89 +212,92 @@ def format_timestamp(e, time_format=None):
 def format_timestamp_days(e, time_format=None):
     return time.strftime(time_format or "%Y-%m-%d", time.localtime(e))
 
+
 def get_card_last_reps(
         card_id: str,
         rep_count: str,
         get_ease: bool = False,
         get_ivl: bool = False,
         get_fct: bool = False,
-    ) -> Union[
-                # Return  or a flat list of values
-                List[Union[int, float]],
-                # or a list of lists of values when two or more rev_log fields are requested
-                List[List[Union[int, float]]]
-        ]:
-        if not get_ease and not get_ivl and not get_fct:
+) -> Union[
+    # Return  or a flat list of values
+    List[Union[int, float]],
+        # or a list of lists of values when two or more rev_log fields are requested
+    List[List[Union[int, float]]]
+]:
+    if not get_ease and not get_ivl and not get_fct:
+        return []
+    all = rep_count == "all"
+    if not all:
+        try:
+            rep_count = int(rep_count)
+        except ValueError:
             return []
-        all = rep_count == "all"
-        if not all:
-            try:
-                rep_count = int(rep_count)
-            except ValueError:
-                return []
-            if rep_count < 1:
-                return []
-        # Get rep eases, excluding manual schedules, identified by ease = 0
-        reps = mw.col.db.list(
-            f"""SELECT 
+        if rep_count < 1:
+            return []
+    # Get rep eases, excluding manual schedules, identified by ease = 0
+    reps = mw.col.db.list(
+        f"""SELECT 
                 {",".join(filter(None, [
-                "ease" if get_ease else "",
-                "ivl" if get_ivl else "",
-                "factor" if get_fct else ""
-            ]))}
+            "ease" if get_ease else "",
+            "ivl" if get_ivl else "",
+            "factor" if get_fct else ""
+        ]))}
                 FROM revlog
                 WHERE cid = {card_id}
                 AND ease != 0
                 ORDER BY id
                 {f"DESC LIMIT {rep_count}" if not all else ""}
             """
-        )
-        return reps
+    )
+    return reps
+
 
 def get_value_for_card(
         card: Card,
         note: Note,
-    ) -> dict[str, any]:
+) -> dict[str, any]:
     (first, last, cnt, total) = mw.col.db.first(
         f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card.id}"
     )
     return {
-            CARD_ID: card.id or 0,
-            OTHER_CARD_IDS: [cid for cid in note.card_ids() if cid != card.id],
-            CARD_NID: card.nid or 0,
-            CARD_DUE: card.due or 0,
-            CARD_IVL: card.ivl or 0,
-            CARD_EASE: card.factor / 10 or 0,
-            # If FSRS is not enabled, memory_state will be None
-            CARD_STABILITY: round(card.memory_state.stability, 1) if card.memory_state else 0,
-            CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
-            CARD_REP_COUNT: card.reps or 0,
-            CARD_LAPSE_COUNT: card.lapses or 0,
-            CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "-",
-            CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "-",
-            CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-",
-            CARD_TOTAL_TIME: timespan(total),
-            CARD_TYPE: "Review" if card.type == CARD_TYPE_REV \
-                else "New" if card.type == CARD_TYPE_NEW \
-                else "Learning" if card.type == CARD_TYPE_LRN \
-                else "Relearning" if card.type == CARD_TYPE_RELEARNING \
-                else "",
-            CARD_CREATED: format_timestamp(card.nid / 1000) if card.nid else "-",
-            CARD_CUSTOM_DATA: card.custom_data or {},
-            CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),
-            CARD_LAST_FACTORS: partial(get_card_last_reps, card.id, get_fct=True),
-            CARD_LAST_IVLS: partial(get_card_last_reps, card.id, get_ivl=True),
+        CARD_ID: card.id or 0,
+        OTHER_CARD_IDS: [cid for cid in note.card_ids() if cid != card.id],
+        CARD_NID: card.nid or 0,
+        CARD_DUE: card.due or 0,
+        CARD_IVL: card.ivl or 0,
+        CARD_EASE: card.factor / 10 or 0,
+        # If FSRS is not enabled, memory_state will be None
+        CARD_STABILITY: round(card.memory_state.stability, 1) if card.memory_state else 0,
+        CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
+        CARD_REP_COUNT: card.reps or 0,
+        CARD_LAPSE_COUNT: card.lapses or 0,
+        CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "-",
+        CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "-",
+        CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-",
+        CARD_TOTAL_TIME: timespan(total),
+        CARD_TYPE: "Review" if card.type == CARD_TYPE_REV \
+            else "New" if card.type == CARD_TYPE_NEW \
+            else "Learning" if card.type == CARD_TYPE_LRN \
+            else "Relearning" if card.type == CARD_TYPE_RELEARNING \
+            else "",
+        CARD_CREATED: format_timestamp(card.nid / 1000) if card.nid else "-",
+        CARD_CUSTOM_DATA: card.custom_data or {},
+        CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),
+        CARD_LAST_FACTORS: partial(get_card_last_reps, card.id, get_fct=True),
+        CARD_LAST_IVLS: partial(get_card_last_reps, card.id, get_ivl=True),
     }
+
 
 def get_card_values_dict_for_note(
         note: Note,
-    ) -> dict[
+) -> dict[
+    str,
+    dict[
         str,
-        dict[
-            str,
-            Union[str, Callable[[str], Union[str, any]]]
-        ]
-    ]:
+        Union[str, Callable[[str], Union[str, any]]]
+    ]
+]:
     """
     Get a dictionary of special fields that are card-specific.
     """
@@ -351,7 +355,7 @@ def get_from_note_fields(
         note_fields: dict,
         card_values_dict: dict = None,
         multiple_note_types: bool = False,
-    ) -> Tuple[Union[str, None], Union[dict, None]]:
+) -> Tuple[Union[str, None], Union[dict, None]]:
     """
     Get a value from a note, source or destination. The note's fields or its cards' fields.
     :param field: interpolation field key
@@ -396,7 +400,7 @@ def get_from_note_fields(
             # If we haven't made the card values dict yet, do it now
             if card_values_dict is None:
                 card_values_dict = get_card_values_dict_for_note(note)
-                
+
             # New notes will have no cards, so we can't get a value
             # Return "" so we don't flag this as an invalid field
             if not card_values_dict:
@@ -425,17 +429,17 @@ def get_from_note_fields(
 def interpolate_from_text(
         text: str,
         source_note: Note,
-        dest_note: Optional[Note] = None,
+        destination_note: Optional[Note] = None,
         variable_values_dict: dict = None,
         multiple_note_types: bool = False,
-    ) -> Tuple[Union[str, None], List[str]]:
+) -> Tuple[Union[str, None], List[str]]:
     """
     Interpolates a text that uses curly brace syntax.
     Also returns a list of all invalid fields in the text for debugging.
 
     :param text: The text to interpolate
     :param source_note: The note to get the values from for non-prefixed note fields
-    :param dest_note: The note to get the values from for DESTINATION_PREFIX-ed note fields
+    :param destination_note: The note to get the values from for DESTINATION_PREFIX-ed note fields
     :param variable_values_dict: A dictionary of custom variables to use in the interpolation
     :param multiple_note_types: Whether the copy is into multiple note types
     """
@@ -446,11 +450,11 @@ def interpolate_from_text(
 
     # field.lower() -> value map
     all_note_fields = to_lowercase_dict(source_note)
-    all_dest_note_fields = to_lowercase_dict(dest_note)
+    all_dest_note_fields = to_lowercase_dict(destination_note)
     variable_fields = to_lowercase_dict(variable_values_dict)
 
-    # Lowercase the characters inside {{}} in the from_text
-    text = FROM_TEXT_FIELD_REGEX.sub(lambda x: "{{" + x.group(1).lower() + "}}", text)
+    # Lowercase the characters inside {{}} in the text
+    text = FROM_TEXT_FIELD_REGEX.sub(lambda x: intr_format(x.group(1).lower()), text)
 
     card_values_dict = None
     dest_card_values_dict = None
@@ -459,10 +463,10 @@ def interpolate_from_text(
     invalid_fields = []
     for field in fields:
         # It's possible to input invalid stuff like destination fields in within copy mode
-        if field.startswith(DESTINATION_PREFIX) and dest_note:
-            field = field[len(DESTINATION_PREFIX):]
+        if field.startswith(DESTINATION_PREFIX) and destination_note:
             value, dest_card_values_dict = get_from_note_fields(
-                field, dest_note, all_dest_note_fields, dest_card_values_dict, multiple_note_types
+                field[len(DESTINATION_PREFIX):], destination_note, all_dest_note_fields, dest_card_values_dict,
+                multiple_note_types
             )
         else:
             value, card_values_dict = get_from_note_fields(
@@ -479,6 +483,6 @@ def interpolate_from_text(
             # we don't leave un-interpolated fields
             value = ""
 
-        text = text.replace("{{" + field_lower + "}}", str(value))
+        text = text.replace(intr_format(field_lower), str(value))
 
     return text, invalid_fields

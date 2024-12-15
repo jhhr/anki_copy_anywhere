@@ -21,6 +21,7 @@ from aqt.qt import (
 
 from .add_intersecting_model_field_options_to_dict import get_intersecting_model_fields, \
     add_intersecting_model_field_options_to_dict
+from .required_text_input import RequiredLineEdit
 from ..configuration import ALL_FIELD_TO_VARIABLE_PROCESS_NAMES
 
 if qtmajor > 5:
@@ -123,18 +124,21 @@ class CopyFieldToVariableEditor(QWidget):
         copy_field_inputs_dict = {}
 
         # Variable name
-        variable_name_field = QLineEdit()
+        variable_name_field = RequiredLineEdit(is_required=True)
+        variable_name_field.setPlaceholderText(f"Example name = MyVariable --> Usage: {intr_format('MyVariable')}")
         copy_field_inputs_dict["copy_into_variable"] = variable_name_field
-        row_form.addRow("Variable name", variable_name_field)
+        row_form.addRow("<h4>Variable name</h4>", variable_name_field)
         with suppress(KeyError):
             variable_name_field.setText(copy_field_to_variable_definition["copy_into_variable"])
+            variable_name_field.update_required_style()
 
         # Copy from field
         copy_from_text_layout = InterpolatedTextEditLayout(
-            label="Destination fields' content to store in the variable",
+            is_required=True,
+            label="<h4>Trigger note's fields' content to store in the variable</h4>",
             options_dict=BASE_NOTE_MENU_DICT.copy(),
             description=f"""<ul>
-        <li>Reference the source notes' fields with  {intr_format('Field Name')}.</li>
+        <li>Reference the trigger note's fields with  {intr_format('Field Name')}.</li>
         <li>Right-click to select a  {intr_format('Field Name')} to paste</li>
         <li>There are many other data values you can use, such as the {intr_format(NOTE_ID)}, {intr_format(CARD_IVL)}, {intr_format(CARD_TYPE)} etc.</li>
         </ul>"""
@@ -155,7 +159,7 @@ class CopyFieldToVariableEditor(QWidget):
             ALL_FIELD_TO_VARIABLE_PROCESS_NAMES,
         )
         copy_field_inputs_dict["process_chain"] = process_chain_widget
-        row_form.addRow("Extra processing", process_chain_widget)
+        row_form.addRow(process_chain_widget)
 
         # Remove
         remove_button = QPushButton("Delete")

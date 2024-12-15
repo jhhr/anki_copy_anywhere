@@ -5,7 +5,7 @@ from aqt import mw
 from aqt.gui_hooks import reviewer_did_answer_card, editor_did_unfocus_field
 
 from ..configuration import Config
-from ..logic.copy_fields import copy_for_single_note
+from ..logic.copy_fields import copy_for_single_trigger_note
 
 
 def run_copy_fields_on_add(note: Note, deck_id: int):
@@ -29,9 +29,9 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
 
         # No need to merge undo entries for adding a note as undoing the add
         # will remove the note entirely
-        copy_for_single_note(
+        copy_for_single_trigger_note(
             copy_definition=copy_definition,
-            note=note,
+            trigger_note=note,
             deck_id=deck_id,
             multiple_note_types=multiple_note_types,
         )
@@ -65,9 +65,9 @@ def run_copy_fields_on_review(card: Card):
         # Merge undo entry for the review
         undo_status = mw.col.undo_status()
         undo_entry = undo_status.last_step
-        copy_for_single_note(
+        copy_for_single_trigger_note(
             copy_definition=copy_definition,
-            note=note,
+            trigger_note=note,
             multiple_note_types=multiple_note_types,
         )
         mw.col.update_note(note)
@@ -108,9 +108,9 @@ def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str)
             continue
 
         # Don't need to merge undo entries for unfocusing a field
-        changed = copy_for_single_note(
+        changed = copy_for_single_trigger_note(
             copy_definition=copy_definition,
-            note=note,
+            trigger_note=note,
             field_only=field_name,
             multiple_note_types=multiple_note_types,
         )

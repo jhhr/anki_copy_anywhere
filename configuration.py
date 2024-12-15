@@ -1,5 +1,5 @@
 import html
-from typing import TypedDict, Optional, Union
+from typing import TypedDict, Optional, Union, Literal
 
 # noinspection PyUnresolvedReferences
 from aqt import mw
@@ -122,14 +122,20 @@ class CopyFieldToVariable(TypedDict):
 
 COPY_MODE_WITHIN_NOTE = "Within note"
 COPY_MODE_ACROSS_NOTES = "Across notes"
+CopyModeType = Literal["Within note", "Across notes"]
+
+DIRECTION_DESTINATION_TO_SOURCES = "Destination to sources"
+DIRECTION_SOURCE_TO_DESTINATIONS = "Source to destinations"
+DirectionType = Literal["Destination to source", "Source to destination"]
 
 class CopyDefinition(TypedDict):
     definition_name: str
     copy_on_sync: bool
     copy_on_add: bool
     copy_on_review: bool
-    copy_mode: str
+    copy_mode: CopyModeType
     copy_into_note_types: str
+    across_mode_direction: Optional[DirectionType]
     field_to_field_defs: list[CopyFieldToField]
     field_to_variable_defs: list[CopyFieldToVariable]
     only_copy_into_decks: str

@@ -24,8 +24,11 @@ from .regex_process import regex_process
 from ..configuration import (
     CopyDefinition,
     CopyFieldToVariable,
+    CopyFieldToField,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
+    DIRECTION_SOURCE_TO_DESTINATIONS,
+    DIRECTION_DESTINATION_TO_SOURCES,
     KANA_HIGHLIGHT_PROCESS,
     REGEX_PROCESS,
     FONTS_CHECK_PROCESS,
@@ -50,8 +53,8 @@ class ScrollMessageBox(QDialog):
     :param parent: The parent widget
     """
 
-    def __init__(self, message_list, title, parent=None, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
+    def __init__(self, message_list, title, parent=None, **kwargs):
+        super().__init__(parent, **kwargs)
         self.setWindowTitle(title)
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -69,13 +72,6 @@ class ScrollMessageBox(QDialog):
         screen = QGuiApplication.primaryScreen().availableGeometry()
         self.resize(max(self.sizeHint().height(), int(screen.width() * 0.35)), self.sizeHint().height())
         self.show()
-
-
-def get_ord_from_model(model, fld_name):
-    card_id_fld = next((f for f in model["flds"] if f["name"] == fld_name), None)
-    if card_id_fld is not None:
-        return card_id_fld["ord"]
-    return None
 
 
 PICK_CARD_BY_VALID_VALUES = ('Random', 'Random_stable', 'Least_reps')
@@ -154,7 +150,7 @@ def copy_fields(
         debug_texts.append(message)
         print(message)
 
-    def on_done(copy_results):
+    def on_done(copy_results: CacheResults):
         mw.progress.finish()
         result = copy_results.get_result_text()
         # Don't show a blank tooltip with just the time
@@ -199,7 +195,7 @@ def copy_fields(
             update.max = progress_update_def.max_value
             progress_update_def.clear()
 
-    def op(_):
+    def op(_) -> Union[CacheResults, None]:
         copied_into_cards = []
         if len(copy_definitions) == 1:
             undo_text = f"Copy fields ({copy_definitions[0]['definition_name']})"
@@ -218,7 +214,7 @@ def copy_fields(
                 undo_text += " for all possible target cards"
         else:
             show_error_message("Error in copy fields: No definitions given")
-            return
+            return None
         undo_entry = mw.col.add_custom_undo_entry(undo_text)
         results = CacheResults(
             result_text="",
@@ -267,7 +263,7 @@ def copy_fields_in_background(
         is_sync: Optional[bool] = False,
         card_ids: Optional[list[int]] = None,
         show_message: Optional[Callable[[str], None]] = None,
-):
+) -> CacheResults:
     """
     Function run to copy stuff into many notes at once.
     :param copy_definition: The definition of what to copy, includes process chains
@@ -275,6 +271,7 @@ def copy_fields_in_background(
          that were copied into
     :param undo_entry: The undo entry to merge the changes into
     :param results: The results object to update with the final result text
+    :param progress_update_def: The progress update object to update the progress bar with
     :param card_ids: The card ids to copy into. this would replace the copy_into_field from
        the copy_definition
     :param show_message: Function to show error messages
@@ -351,7 +348,7 @@ def copy_fields_in_background(
     file_cache = {}
 
     for card in cards:
-        if card_cnt % 10 == 0:
+        if card_cnt % 10 == 0 and card_cnt > 0:
             elapsed_s = time.time() - start_time
             elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
             progress_update_def.label = f"""<strong>{definition_name}</strong>:
@@ -368,19 +365,16 @@ def copy_fields_in_background(
 
         copy_into_note = card.note()
 
-        success = copy_for_single_note(
+        success = copy_for_single_trigger_note(
             copy_definition=copy_definition,
-            note=copy_into_note,
+            trigger_note=copy_into_note,
+            results=results,
+            undo_entry=undo_entry,
             deck_id=card.odid or card.did,
             multiple_note_types=multiple_note_types,
             show_error_message=show_error_message,
             file_cache=file_cache,
         )
-
-        mw.col.update_note(copy_into_note)
-        # undo_entry has to be updated after every undoable op or the last_step will
-        # increment causing an "target undo op not found" error!
-        results.changes = mw.col.merge_undo_entries(undo_entry)
 
         copied_into_cards.append(card)
 
@@ -403,7 +397,7 @@ def copy_fields_in_background(
 def apply_process_chain(
         process_chain: list[Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]],
         text: str,
-        note: Note,
+        destination_note: Note,
         show_error_message: Callable[[str], None] = None,
         file_cache: dict = None,
 ) -> Union[str, None]:
@@ -411,7 +405,7 @@ def apply_process_chain(
     Apply a list of processes to a text
     :param process_chain: The list of processes to apply
     :param text: The text to apply the processes to
-    :param note: The note to use for the processes
+    :param destination_note: The note to use for the processes
     :param show_error_message: A function to show error messages
     :param file_cache: A dictionary to cache opened files' content
     :return: The text after the processes have been applied or None if there was an error
@@ -428,7 +422,7 @@ def apply_process_chain(
                     onyomi_field=process.get("onyomi_field", None),
                     kunyomi_field=process.get("kunyomi_field", None),
                     kanji_field=process.get("kanji_field", None),
-                    note=note,
+                    note=destination_note,
                     show_error_message=show_error_message,
                 )
             if process["name"] == REGEX_PROCESS:
@@ -462,19 +456,23 @@ def apply_process_chain(
     return text
 
 
-def copy_for_single_note(
+def copy_for_single_trigger_note(
         copy_definition: CopyDefinition,
-        note: Note,
+        trigger_note: Note,
+        results: CacheResults,
+        undo_entry: int,
         field_only: str = None,
         deck_id: int = None,
         multiple_note_types: bool = False,
         show_error_message: Callable[[str], None] = None,
         file_cache: dict = None,
-):
+) -> bool:
     """
     Copy fields into a single note
     :param copy_definition: The definition of what to copy, includes process chains
-    :param note: Note to copy into
+    :param trigger_note: Note that triggered this copy or was targeted otherwise
+    :param results: The results object to update the changes with
+    :param undo_entry: The undo entry to merge the changes into
     :param field_only: Optional field to limit copying to. Used when copying is applied
       in the note editor
     :param deck_id: Deck ID where the cards are going into, only needed when adding
@@ -483,31 +481,21 @@ def copy_for_single_note(
     :param multiple_note_types: Whether the copy is into multiple note types
     :param show_error_message: Optional function to show error messages
     :param file_cache: A dictionary to cache opened files' content
-    :return:
+    :return: True if the copy was successful, False if there was an error
     """
     if not show_error_message:
         def show_error_message(message: str):
             print(message)
 
-    (
-        field_to_field_defs,
-        field_to_variable_defs,
-        only_copy_into_decks,
-        copy_from_cards_query,
-        select_card_by,
-        select_card_count,
-        select_card_separator,
-        copy_mode,
-    ) = itemgetter(
-        "field_to_field_defs",
-        "field_to_variable_defs",
-        "only_copy_into_decks",
-        "copy_from_cards_query",
-        "select_card_by",
-        "select_card_count",
-        "select_card_separator",
-        "copy_mode"
-    )(copy_definition)
+    field_to_field_defs = copy_definition.get("field_to_field_defs", None)
+    field_to_variable_defs = copy_definition.get("field_to_variable_defs", None)
+    only_copy_into_decks = copy_definition.get("only_copy_into_decks", None)
+    copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
+    select_card_by = copy_definition.get("select_card_by", None)
+    select_card_count = copy_definition.get("select_card_count", None)
+    select_card_separator = copy_definition.get("select_card_separator", None)
+    copy_mode = copy_definition.get("copy_mode", None)
+    across_mode_direction = copy_definition.get("across_mode_direction", None)
 
     extra_state = {}
 
@@ -516,19 +504,24 @@ def copy_for_single_note(
     if field_to_variable_defs is not None:
         variable_values_dict = get_variable_values_for_note(
             field_to_variable_defs=field_to_variable_defs,
-            note=note,
+            note=trigger_note,
             show_error_message=show_error_message,
             file_cache=file_cache,
         )
 
-    # Step 1: get notes to copy from for this card
-    notes_to_copy_from = []
+    # Step 1: get source/destination notes for this card
+    destination_notes = []
+    source_notes = []
     if copy_mode == COPY_MODE_WITHIN_NOTE:
-        notes_to_copy_from = [note]
+        destination_notes = [trigger_note]
+        source_notes = [trigger_note]
     elif copy_mode == COPY_MODE_ACROSS_NOTES:
-        notes_to_copy_from = get_notes_to_copy_from(
+        if across_mode_direction not in [DIRECTION_DESTINATION_TO_SOURCES, DIRECTION_SOURCE_TO_DESTINATIONS]:
+            show_error_message("Error in copy fields: missing across mode direction value")
+            return False
+        target_notes = get_across_target_notes(
             copy_from_cards_query=copy_from_cards_query,
-            copy_into_note=note,
+            trigger_note=trigger_note,
             deck_id=deck_id,
             extra_state=extra_state,
             only_copy_into_decks=only_copy_into_decks,
@@ -537,24 +530,65 @@ def copy_for_single_note(
             show_error_message=show_error_message,
             variable_values_dict=variable_values_dict,
         )
+        if across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES:
+            destination_notes = [trigger_note]
+            source_notes = target_notes
+        elif across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+            destination_notes = target_notes
+            source_notes = [trigger_note]
     else:
         show_error_message("Error in copy fields: missing copy mode value")
         return False
 
-    if len(notes_to_copy_from) == 0:
-        show_error_message(f"Error in copy fields: No notes to copy from for note {note.id}")
+    if len(source_notes) == 0:
+        show_error_message(f"Error in copy fields: No source/destination notes for note {trigger_note.id}")
 
     # Step 2: Get value for each field we are copying into
+    for destination_note in destination_notes:
+        success = copy_into_single_note(
+            field_to_field_defs=field_to_field_defs,
+            destination_note=destination_note,
+            source_notes=source_notes,
+            field_only=field_only,
+            multiple_note_types=multiple_note_types,
+            select_card_separator=select_card_separator,
+            file_cache=file_cache,
+            show_error_message=show_error_message,
+        )
+        mw.col.update_note(destination_note)
+        # undo_entry has to be updated after every undoable op or the last_step will
+        # increment causing an "target undo op not found" error!
+        results.changes = mw.col.merge_undo_entries(undo_entry)
+        if not success:
+            return False
+
+    return True
+
+
+def copy_into_single_note(
+        field_to_field_defs: list[CopyFieldToField],
+        destination_note: Note,
+        source_notes: list[Note],
+        field_only: str = None,
+        multiple_note_types: bool = False,
+        select_card_separator: str = None,
+        file_cache: dict = None,
+        show_error_message: Callable[[str], None] = None,
+) -> bool:
+    if not show_error_message:
+        def show_error_message(message: str):
+            print(message)
+
     for field_to_field_def in field_to_field_defs:
-        copy_into_note_field = field_to_field_def["copy_into_note_field"]
+        copy_into_note_field = field_to_field_def.get("copy_into_note_field")
         if field_only is not None and copy_into_note_field != field_only:
             continue
-        copy_from_text = field_to_field_def["copy_from_text"]
-        copy_if_empty = field_to_field_def["copy_if_empty"]
+        copy_from_text = field_to_field_def.get("copy_from_text")
+        copy_if_empty = field_to_field_def.get("copy_if_empty")
         process_chain = field_to_field_def.get("process_chain", None)
 
         try:
-            cur_field_value = note[copy_into_note_field]
+            cur_field_value = destination_note[copy_into_note_field]
         except KeyError:
             show_error_message(f"Error in copy fields: Field '{copy_into_note_field}' not found in note")
             return False
@@ -565,8 +599,8 @@ def copy_for_single_note(
         # Step 2.1: Get the value from the notes, usually it's just one note
         result_val = get_field_values_from_notes(
             copy_from_text=copy_from_text,
-            notes=notes_to_copy_from,
-            dest_note=note,
+            notes=source_notes,
+            dest_note=destination_note,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
@@ -576,18 +610,17 @@ def copy_for_single_note(
             result_val = apply_process_chain(
                 process_chain=process_chain,
                 text=result_val,
-                note=note,
+                destination_note=destination_note,
                 show_error_message=show_error_message,
                 file_cache=file_cache,
             )
+            # result_val should always be at least "", None indicates an error
             if result_val is None:
                 return False
 
-        print(f"result_val after process chain: {result_val}")
         # Finally, copy the value into the note
-        note[copy_into_note_field] = result_val
-
-    return True
+        destination_note[copy_into_note_field] = result_val
+        return True
 
 
 def get_variable_values_for_note(
@@ -628,7 +661,7 @@ def get_variable_values_for_note(
             interpolated_value = apply_process_chain(
                 process_chain=process_chain,
                 text=interpolated_value,
-                note=note,
+                destination_note=note,
                 show_error_message=show_error_message,
                 file_cache=file_cache,
             )
@@ -640,9 +673,9 @@ def get_variable_values_for_note(
     return variable_values_dict
 
 
-def get_notes_to_copy_from(
+def get_across_target_notes(
         copy_from_cards_query: str,
-        copy_into_note: Note,
+        trigger_note: Note,
         select_card_by: str,
         extra_state: dict,
         deck_id: int = None,
@@ -652,10 +685,12 @@ def get_notes_to_copy_from(
         show_error_message: Callable[[str], None] = None,
 ) -> list[Note]:
     """
-    Get the notes to copy from based on the search value and the query.
+    Get the target notes based on the search value and the query. These will either be
+    the source notes or the destination notes depending on the across mode direction
+
     :param copy_from_cards_query: The query to find the cards to copy from.
             Uses {{}} syntax for note fields and special values
-    :param copy_into_note: The note to copy into, used to interpolate the query
+    :param trigger_note: The note to copy into, used to interpolate the query
     :param select_card_by: How to select the card to copy from, if we get multiple results using the
             the query
     :param deck_id: Optional deck id of the note to copy into
@@ -686,12 +721,12 @@ def get_notes_to_copy_from(
     if select_card_count:
         try:
             select_card_count = int(select_card_count)
-            if select_card_count < 1:
+            if select_card_count < 0:
                 raise ValueError
         except ValueError:
             show_error_message(
                 f"""Error in copy fields: Incorrect 'select_card_count' value '{select_card_count}'
-                value must be a positive integer"""
+                value must be a positive integer or 0"""
             )
             return []
     else:
@@ -712,14 +747,14 @@ def get_notes_to_copy_from(
         if deck_id is not None:
             deck_ids.append(deck_id)
         else:
-            for card in copy_into_note.cards():
+            for card in trigger_note.cards():
                 deck_ids.append(card.odid or card.did)
         if deck_ids and not any(deck_id in whitelist_dids for deck_id in deck_ids):
             return []
 
     interpolated_cards_query, invalid_fields = interpolate_from_text(
         copy_from_cards_query,
-        source_note=copy_into_note,
+        source_note=trigger_note,
         variable_values_dict=variable_values_dict,
     )
     cards_query_id = base64.b64encode(f"cards{interpolated_cards_query}".encode()).decode()
@@ -737,6 +772,11 @@ def get_notes_to_copy_from(
         show_error_message(
             f"Error in copy fields: Did not find any cards with copy_from_cards_query='{interpolated_cards_query}'")
         return []
+
+    # zero is a special value that means all cards
+    if select_card_count == 0:
+        distinct_note_ids = mw.col.db.list(f"SELECT DISTINCT nid FROM cards c WHERE c.id IN {ids2str(card_ids)}")
+        return [mw.col.get_note(note_id) for note_id in distinct_note_ids]
 
     # select a card or cards based on the select_card_by value
     selected_notes = []
@@ -760,8 +800,7 @@ def get_notes_to_copy_from(
             except KeyError:
                 selected_card_id = min(card_ids,
                                        key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c}"))
-                extra_state = {}
-                extra_state[card_select_key] = selected_card_id
+                extra_state = {card_select_key: selected_card_id}
         if selected_card_id is None:
             show_error_message("Error in copy fields: could not select card")
             break
@@ -826,7 +865,7 @@ def get_field_values_from_notes(
             interpolated_value, invalid_fields = interpolate_from_text(
                 copy_from_text,
                 source_note=note,
-                dest_note=dest_note,
+                destination_note=dest_note,
                 variable_values_dict=variable_values_dict,
                 multiple_note_types=multiple_note_types,
             )
