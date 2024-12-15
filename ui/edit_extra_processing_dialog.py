@@ -17,6 +17,7 @@ from aqt.qt import (
     QGridLayout,
     QVBoxLayout,
     QFont,
+    QFontDatabase,
     QToolTip,
     QPoint,
     Qt,
@@ -25,17 +26,20 @@ from aqt.qt import (
 # noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
+from .auto_resizing_text_edit import AutoResizingTextEdit
 from .list_input import ListInputWidget
-from .placeholder_combobox import PlaceholderCombobox
+from .required_combobox import RequiredCombobox
 from ..configuration import CopyDefinition
 
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
 
+    QFixedFont = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
     QAlignLeft = Qt.AlignmentFlag.AlignLeft
 else:
     from .multi_combo_box import MultiComboBoxQt5 as MultiComboBox
 
+    QFixedFont = QFontDatabase.systemFont(QFontDatabase.FixedFont)
     QAlignLeft = Qt.AlignLeft
 
 from ..configuration import (
@@ -122,7 +126,7 @@ class KanjiumToJavdejongProcessDialog(QDialog):
 
 def validate_regex(dialog):
     try:
-        re.compile(dialog.regex_field.text())
+        re.compile(dialog.regex_field.toPlainText())
         dialog.regex_error_display.setText("")
     except re.error as e:
         dialog.regex_error_display.setText(f"Error: {e}")
@@ -153,7 +157,9 @@ class RegexProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.regex_field = QLineEdit()
+        self.regex_field = AutoResizingTextEdit(is_required=True)
+        # Since this is code, set a mono font
+        self.regex_field.setFont(QFixedFont)
         self.form.addRow("Regex", self.regex_field)
         self.regex_field.textChanged.connect(lambda: validate_regex(self))
 
@@ -198,7 +204,7 @@ class RegexProcessDialog(QDialog):
     def save_process(self):
         self.process = {
             "name": REGEX_PROCESS,
-            "regex": self.regex_field.text(),
+            "regex": self.regex_field.toPlainText(),
             "replacement": self.replacement_field.text(),
             "flags": self.flags_field.currentText(),
         }
@@ -238,7 +244,8 @@ class FontsCheckProcess(QDialog):
         You can add multiple fonts at once inputting a single item of comma separated values
         </small>"""))
 
-        self.regex_field = QLineEdit()
+        self.regex_field = AutoResizingTextEdit()
+        self.regex_field.setFont(QFixedFont)
         self.form.addRow("Char limit", self.regex_field)
         self.regex_field.textChanged.connect(lambda: validate_regex(self))
         self.form.addRow("", QLabel("""<small>(Optional) Regex used to limit the characters checked.
@@ -285,7 +292,7 @@ class FontsCheckProcess(QDialog):
             "name": FONTS_CHECK_PROCESS,
             "fonts_dict_file": self.fonts_dict_file_field.text(),
             "limit_to_fonts": self.limit_to_fonts_field.get_items(),
-            "character_limit_regex": self.regex_field.text(),
+            "character_limit_regex": self.regex_field.toPlainText(),
         }
         self.accept()
 
@@ -312,13 +319,13 @@ class KanaHighlightProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.onyomi_field_cbox = PlaceholderCombobox(placeholder_text="Select field (required)")
+        self.onyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Onyomi field", self.onyomi_field_cbox)
 
-        self.kunyomi_field_cbox = PlaceholderCombobox(placeholder_text="Select field (required)")
+        self.kunyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Kunyomi field", self.kunyomi_field_cbox)
 
-        self.kanji_field_cbox = PlaceholderCombobox(placeholder_text="Select field (required)")
+        self.kanji_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Kanji field", self.kanji_field_cbox)
 
         self.update_combobox_options()
@@ -402,7 +409,7 @@ class EditExtraProcessingWidget(QWidget):
         for index, process in enumerate(self.process_chain):
             self.add_process_row(index, process)
 
-        self.add_process_chain_button = PlaceholderCombobox(
+        self.add_process_chain_button = RequiredCombobox(
             placeholder_text="Select process to add (optional)",
         )
         self.add_process_chain_button.setMaximumWidth(250)

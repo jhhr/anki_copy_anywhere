@@ -15,7 +15,7 @@ else:
 
 class AutoResizingTextEdit(RequiredTextEdit):
     def __init__(self, parent=None, **kwargs):
-        super().__init__(parent=parent, **kwargs)
+        super().__init__(parent, **kwargs)
         self.textChanged.connect(self.autoResize)
 
     def autoResize(self):

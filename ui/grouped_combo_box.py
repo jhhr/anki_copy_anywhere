@@ -10,7 +10,7 @@ from aqt.qt import (
     qtmajor,
 )
 
-from .placeholder_combobox import PlaceholderCombobox
+from .required_combobox import RequiredCombobox
 
 if qtmajor > 5:
     QAlignCenter = Qt.AlignmentFlag.AlignCenter
@@ -33,7 +33,7 @@ class CenteredItemDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
 
 
-class GroupedComboBox(PlaceholderCombobox):
+class GroupedComboBox(RequiredCombobox):
     """
     Custom QComboBox that allows for grouping of items.
     """

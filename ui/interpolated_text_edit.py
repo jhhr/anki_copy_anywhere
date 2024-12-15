@@ -89,7 +89,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
     def set_text(self, text):
         """Set the text in the text field."""
         self.text_edit.setText(text)
-        self.text_edit.update_style()
+        self.text_edit.update_required_style()
 
     def update_options(self, new_options_dict):
         """

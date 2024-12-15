@@ -13,7 +13,7 @@ from aqt.qt import (
     qtmajor,
 )
 
-from .placeholder_combobox import PlaceholderCombobox, ComboboxPlaceholderListView
+from .required_combobox import RequiredCombobox, ComboboxPlaceholderListView
 
 if qtmajor > 5:
     QCheckState = Qt.CheckState
@@ -27,7 +27,7 @@ else:
     QEventTypes = QEvent.Type
 
 
-class MultiComboBoxQt5(PlaceholderCombobox):
+class MultiComboBoxQt5(RequiredCombobox):
     """
     from https://gis.stackexchange.com/a/351152
     """
@@ -213,7 +213,7 @@ class CustomCheckboxListView(ComboboxPlaceholderListView):
         super().keyPressEvent(event)
 
 
-class MultiComboBoxQt6(PlaceholderCombobox):
+class MultiComboBoxQt6(RequiredCombobox):
     """
     Originally from https://stackoverflow.com/a/77755095 but much edited
     A QComboBox that allows multiple items to be selected using checkboxes.

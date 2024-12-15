@@ -15,8 +15,6 @@ from aqt.qt import (
     qtmajor,
 )
 
-from .required_text_input import RequiredLineEdit
-
 if qtmajor > 5:
     QtKeys = Qt.Key
     QEventTypes = QEvent.Type
@@ -45,7 +43,7 @@ class ComboboxPlaceholderListView(QListView):
         super().keyPressEvent(event)
 
 
-class ComboBoxPlaceholderLineEdit(RequiredLineEdit):
+class ComboBoxPlaceholderLineEdit(QLineEdit):
     """
     A QLineEdit that is not editable but still shows a placeholder text. Use with QComboBox.
     To allow showing a placeholder test we must have isReadOnly()=false and isEditable()=true.
@@ -60,11 +58,11 @@ class ComboBoxPlaceholderLineEdit(RequiredLineEdit):
     ):
         super().__init__(
             parent,
-            # Set the default style to vertically center the text so that the
-            # text's y's and g's are not cut off at the bottom
-            default_style="padding-bottom: 0px; padding-top: 0px;",
             **kwargs
         )
+        # Set the default style to vertically center the text so that the
+        # text's y's and g's are not cut off at the bottom
+        self.setStyleSheet("padding-bottom: 0px; padding-top: 0px;")
         self.setReadOnly(True)
         self.popup_open = False
         if placeholder_text:
@@ -93,7 +91,7 @@ class ComboBoxPlaceholderLineEdit(RequiredLineEdit):
             self.parent().showPopup()
 
 
-class PlaceholderCombobox(QComboBox):
+class RequiredCombobox(QComboBox):
     def __init__(
             self,
             parent=None,
@@ -107,8 +105,11 @@ class PlaceholderCombobox(QComboBox):
         #### Placeholder management
         self.setLineEdit(ComboBoxPlaceholderLineEdit(
             placeholder_text=placeholder_text,
-            is_required=is_required,
         ))
+        self.is_required = is_required
+        self.was_valid = True
+        self.default_style = self.styleSheet()
+        self.required_style = "QComboBox { border: 1px solid darkred; }"
         # Set current index to -1 to show the placeholder text
         self.setCurrentIndex(-1)
         self.setModel(QStandardItemModel(self))
@@ -119,6 +120,39 @@ class PlaceholderCombobox(QComboBox):
         self.setMinimumWidth(minimum_width)
         if auto_size:
             self.currentTextChanged.connect(self.check_text_width)
+        if is_required:
+            self.update_required_style()
+            # self.currentTextChanged.connect(self.update_required_style)
+
+    def update_required_style(self):
+        if self.is_required and not self.currentText() and self.was_valid:
+            self.setStyleSheet(self.default_style + self.required_style)
+            self.was_valid = False
+        elif (not self.is_required or self.currentText()) and not self.was_valid:
+            self.setStyleSheet(self.default_style)
+            self.was_valid = True
+
+    def set_required_style(self, style: str):
+        self.required_style = style
+        self.update_required_style()
+
+    def set_required(self, is_required: bool):
+        self.is_required = is_required
+        self.update_required_style()
+        # if not is_required and self.currentTextChanged.isConnected():
+        #     self.currentTextChanged.disconnect(self.update_required_style)
+        # elif is_required and not self.currentTextChanged.isConnected():
+        #     self.currentTextChanged.connect(self.update_required_style)
+
+    def event(self, event: QEvent):
+        if hasattr(self, 'is_required') and self.is_required and event.type() in (
+                QEventTypes.FocusIn,
+                QEventTypes.FocusOut,
+                QEventTypes.KeyPress,
+                QEventTypes.KeyRelease
+        ):
+            self.update_required_style()
+        return super().event(event)
 
     def check_text_width(self, text: str):
         item_width = self.view().fontMetrics().boundingRect(text).width()
