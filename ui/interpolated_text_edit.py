@@ -39,12 +39,13 @@ class InterpolatedTextEditLayout(QVBoxLayout):
 
     def __init__(
             self,
-            label: str = "",
-            options_dict=None,
             parent=None,
+            label: Union[QLabel, str] = None,
+            options_dict=None,
             description: str = None,
             height: int = None,
             placeholder_text: str = None,
+            is_required: bool = False,
     ):
         super().__init__(parent)
         # options dict is a 2-level dict
@@ -56,14 +57,17 @@ class InterpolatedTextEditLayout(QVBoxLayout):
         self.validate_dict = {}
 
         self.text_edit = PasteableTextEdit(
+            parent,
             options_dict=options_dict,
             height=height,
             placeholder_text=placeholder_text,
+            is_required=is_required
         )
         self.error_label = QLabel()
         # Connect text changed to validation
         self.text_edit.textChanged.connect(self.validate_text)
-        main_label = QLabel(label)
+        # Allow providing a QLabel that the provider can then modify
+        main_label = QLabel(label) if isinstance(label, str) else label
 
         self.addWidget(main_label)
 
@@ -85,6 +89,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
     def set_text(self, text):
         """Set the text in the text field."""
         self.text_edit.setText(text)
+        self.text_edit.update_style()
 
     def update_options(self, new_options_dict):
         """
@@ -109,6 +114,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
 
         add_options_to_validate_dict(new_options_dict)
         self.text_edit.set_options_dict(new_options_dict)
+        self.validate_text()
 
     def validate_text(self):
         """

@@ -22,7 +22,6 @@ from ..configuration import (
 from ..logic.copy_fields import (
     copy_fields,
 )
-
 from ..utils import make_query_string
 
 if qtmajor > 5:
@@ -105,9 +104,8 @@ class PickCopyDefinitionDialog(QDialog):
         return grid
 
     def add_definition_row(self, index, definition):
-        # By setting the name into a box layout where we'll allow it expand
-        # its empty space rightward also pushing the buttons there to the
-        # edge
+        # By setting the name into a box layout where we'll allow it to expand
+        # its empty space rightward also pushing the buttons there to the edge
         hbox = QHBoxLayout()
         self.middle_grid.addLayout(hbox, index, 1)
         checkbox = QCheckBox(definition["definition_name"])

@@ -1,5 +1,3 @@
-from typing import Union
-
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
     QComboBox,
@@ -12,7 +10,7 @@ from aqt.qt import (
     qtmajor,
 )
 
-from .placeholder_combobox import PlaceHolderCombobox
+from .placeholder_combobox import PlaceholderCombobox
 
 if qtmajor > 5:
     QAlignCenter = Qt.AlignmentFlag.AlignCenter
@@ -35,44 +33,17 @@ class CenteredItemDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
 
 
-class GroupedComboBox(PlaceHolderCombobox):
+class GroupedComboBox(PlaceholderCombobox):
     """
     Custom QComboBox that allows for grouping of items.
     """
 
-    def __init__(self, parent=None, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
+    def __init__(self, parent=None, **kwargs):
+        super().__init__(parent, auto_size=True, **kwargs)
         self.groups = {}
         self.max_width = 0
         self.setModel(QStandardItemModel(self))
         self.setItemDelegate(CenteredItemDelegate(self))  # Set the custom item delegate
-
-    def showPopup(self):
-        self.setPopupAndBoxWidth()
-        super().showPopup()
-
-    def updateMaxWidth(self, width: int):
-        if width > self.max_width:
-            self.max_width = width
-            self.setPopupAndBoxWidth()
-
-    def setPopupAndBoxWidth(self):
-        self.setMaximumWidth(self.max_width + 40)  # Add some padding
-
-    def clear(self):
-        self.max_width = 0
-        super().clear()
-
-    def addItem(self, item: Union[str, QStandardItem]):
-        if isinstance(item, str):
-            text = item
-            item = QStandardItem(item)
-            item.setText(text)
-        else:
-            text = item.text()
-        self.model().appendRow(item)
-        item_width = self.view().fontMetrics().boundingRect(text).width()
-        self.updateMaxWidth(item_width)
 
     def addGroup(self, group_name):
         item = QStandardItem()
@@ -81,9 +52,7 @@ class GroupedComboBox(PlaceHolderCombobox):
         item.setFont(QFont(item.font().family(), item.font().pointSize(), QBold))
         item.setTextAlignment(QAlignCenter)
         self.groups[group_name] = []
-        self.addItem(item)
-        item_width = self.view().fontMetrics().boundingRect(group_name).width()
-        self.updateMaxWidth(item_width)
+        super().addItem(item)
 
     def addItemToGroup(self, group_name, item_name):
         item_name = item_name.strip()
@@ -92,6 +61,8 @@ class GroupedComboBox(PlaceHolderCombobox):
             self.addItem(item_name)
 
     def setCurrentText(self, text):
+        if not text:
+            return
         # Override to handle setting text with consideration for item formatting
         for i in range(self.count()):
             if self.model().item(i).text().strip() == text.strip():

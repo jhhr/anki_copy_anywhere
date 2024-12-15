@@ -1,8 +1,11 @@
 import json
+from contextlib import contextmanager
 from typing import Optional, Dict, Any, Union, TypedDict
 
 # noinspection PyUnresolvedReferences
 from anki.cards import Card
+# noinspection PyUnresolvedReferences
+from aqt.qt import QFontMetrics, QComboBox
 # noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
@@ -88,3 +91,25 @@ def make_query_string(prefix: str, values: list[str]) -> str:
             query += " OR "
     query += ")"
     return query
+
+
+def adjust_width_to_largest_item(combo_box: QComboBox):
+    """Adjusts the width of a standard combo box to the largest item"""
+    max_width = 0
+    for i in range(combo_box.count()):
+        item_text = combo_box.itemText(i)
+        item_width = QFontMetrics(combo_box.font()).width(item_text)
+        if item_width > max_width:
+            max_width = item_width
+    combo_box.view().setMinimumWidth(max_width + 20)
+
+
+@contextmanager
+def block_signals(*widgets):
+    try:
+        for widget in widgets:
+            widget.blockSignals(True)
+        yield
+    finally:
+        for widget in widgets:
+            widget.blockSignals(False)

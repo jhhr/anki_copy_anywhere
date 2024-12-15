@@ -13,7 +13,7 @@ from aqt.qt import (
     qtmajor,
 )
 
-from .placeholder_combobox import PlaceHolderCombobox, ComboboxPlaceholderListView
+from .placeholder_combobox import PlaceholderCombobox, ComboboxPlaceholderListView
 
 if qtmajor > 5:
     QCheckState = Qt.CheckState
@@ -27,7 +27,7 @@ else:
     QEventTypes = QEvent.Type
 
 
-class MultiComboBoxQt5(PlaceHolderCombobox):
+class MultiComboBoxQt5(PlaceholderCombobox):
     """
     from https://gis.stackexchange.com/a/351152
     """
@@ -39,8 +39,8 @@ class MultiComboBoxQt5(PlaceHolderCombobox):
             size.setHeight(20)
             return size
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         # Make the combo editable to set a custom text, but readonly
         self.setEditable(True)
@@ -213,7 +213,7 @@ class CustomCheckboxListView(ComboboxPlaceholderListView):
         super().keyPressEvent(event)
 
 
-class MultiComboBoxQt6(PlaceHolderCombobox):
+class MultiComboBoxQt6(PlaceholderCombobox):
     """
     Originally from https://stackoverflow.com/a/77755095 but much edited
     A QComboBox that allows multiple items to be selected using checkboxes.
@@ -221,8 +221,8 @@ class MultiComboBoxQt6(PlaceHolderCombobox):
     The selected value is a concatenation of the checked items' text in the QLineEdit.
     """
 
-    def __init__(self, parent=None, placeholder_text: str = None, *args, **kwargs):
-        super().__init__(parent, placeholder_text, *args, **kwargs)
+    def __init__(self, parent=None, **kwargs):
+        super().__init__(parent, auto_size=True, **kwargs)
         # self.setEditable(True)
         # Use the custom view
         self.setView(CustomCheckboxListView(self))

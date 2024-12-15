@@ -52,8 +52,9 @@ class PasteableTextEdit(AutoResizingTextEdit):
             options_dict: dict = None,
             height: int = None,
             placeholder_text: str = None,
+            **kwargs
     ):
-        super().__init__(parent)
+        super().__init__(parent, **kwargs)
         # Define predefined options and their associated text
         self.options_dict = options_dict
         # Set the size of the text edit

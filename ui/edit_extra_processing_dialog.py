@@ -26,12 +26,17 @@ from aqt.qt import (
 from aqt.utils import tooltip
 
 from .list_input import ListInputWidget
+from .placeholder_combobox import PlaceholderCombobox
 from ..configuration import CopyDefinition
 
 if qtmajor > 5:
     from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
+
+    QAlignLeft = Qt.AlignmentFlag.AlignLeft
 else:
     from .multi_combo_box import MultiComboBoxQt5 as MultiComboBox
+
+    QAlignLeft = Qt.AlignLeft
 
 from ..configuration import (
     CopyFieldToField,
@@ -159,7 +164,7 @@ class RegexProcessDialog(QDialog):
         self.replacement_field = QLineEdit()
         self.form.addRow("Replacement", self.replacement_field)
 
-        self.flags_field = MultiComboBox()
+        self.flags_field = MultiComboBox(placeholder_text="Select flags (optional)")
         self.flags_field.addItems([
             "ASCII",
             "IGNORECASE",
@@ -307,17 +312,14 @@ class KanaHighlightProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.onyomi_field_cbox = QComboBox()
-        self.onyomi_field_cbox.addItem("-")
-        self.form.addRow("Onyomi field name", self.onyomi_field_cbox)
+        self.onyomi_field_cbox = PlaceholderCombobox(placeholder_text="Select field (required)")
+        self.form.addRow("Onyomi field", self.onyomi_field_cbox)
 
-        self.kunyomi_field_cbox = QComboBox()
-        self.kunyomi_field_cbox.addItem("-")
-        self.form.addRow("Kunyomi field name", self.kunyomi_field_cbox)
+        self.kunyomi_field_cbox = PlaceholderCombobox(placeholder_text="Select field (required)")
+        self.form.addRow("Kunyomi field", self.kunyomi_field_cbox)
 
-        self.kanji_field_cbox = QComboBox()
-        self.kanji_field_cbox.addItem("-")
-        self.form.addRow("Kanji field name", self.kanji_field_cbox)
+        self.kanji_field_cbox = PlaceholderCombobox(placeholder_text="Select field (required)")
+        self.form.addRow("Kanji field", self.kanji_field_cbox)
 
         self.update_combobox_options()
 
@@ -351,6 +353,8 @@ class KanaHighlightProcessDialog(QDialog):
         self.accept()
 
     def update_combobox_options(self):
+        if self.copy_into_note_types is None:
+            return
         for note_type_name in self.copy_into_note_types.strip('""').split('", "'):
             note_type = mw.col.models.by_name(note_type_name)
             for field_name in mw.col.models.field_names(note_type):
@@ -382,7 +386,7 @@ class EditExtraProcessingWidget(QWidget):
 
         def make_grid():
             grid = QGridLayout()
-            grid.setColumnMinimumWidth(0, 25)
+            grid.setColumnMinimumWidth(0, 200)
             grid.setColumnMinimumWidth(1, 200)
             grid.setColumnMinimumWidth(2, 50)
             grid.setColumnMinimumWidth(3, 50)
@@ -390,28 +394,32 @@ class EditExtraProcessingWidget(QWidget):
             self.vbox.addLayout(grid)
             return grid
 
+        left_vbox = QVBoxLayout()
         self.middle_grid = make_grid()
+        self.middle_grid.addLayout(left_vbox, 0, 0, 1, 1, QAlignLeft)
+        left_vbox.addWidget(QLabel("<h4>Extra processing</h4>"))
 
         for index, process in enumerate(self.process_chain):
             self.add_process_row(index, process)
 
-        self.form = QFormLayout()
-        self.vbox.addLayout(self.form)
-        self.add_process_chain_button = QComboBox()
+        self.add_process_chain_button = PlaceholderCombobox(
+            placeholder_text="Select process to add (optional)",
+        )
+        self.add_process_chain_button.setMaximumWidth(250)
         self.init_options_to_process_combobox()
-        self.add_process_chain_button.currentTextChanged.connect(self.add_process)
-        self.form.addRow("Add further processing?", self.add_process_chain_button)
+        left_vbox.addWidget(self.add_process_chain_button)
 
     def init_options_to_process_combobox(self):
         currently_active_processes = [process["name"] for process in self.process_chain]
 
         self.add_process_chain_button.clear()
-        self.add_process_chain_button.addItem("-")
         # Add options not currently active to the combobox
         for process in self.allowed_process_names:
             if (process not in currently_active_processes
                     or process in MULTIPLE_ALLOWED_PROCESS_NAMES):
                 self.add_process_chain_button.addItem(process)
+        # Reconnect signal now that we're done calling addItem
+        self.add_process_chain_button.currentTextChanged.connect(self.add_process)
 
     def remove_process(self, process, process_dialog):
         self.process_chain.remove(process)
@@ -420,6 +428,10 @@ class EditExtraProcessingWidget(QWidget):
         self.update_process_chain()
 
     def update_process_chain(self, ):
+        # Disconnect signal to avoid calling add_process in an infinite loop
+        # because init_options_to_process_combobox calls addItem which
+        # triggers the currentTextChanged signal in the PlaceholderCombobox
+        self.add_process_chain_button.currentTextChanged.disconnect(self.add_process)
         self.field_to_x_def["process_chain"] = self.process_chain
         self.init_options_to_process_combobox()
 
@@ -486,7 +498,8 @@ class EditExtraProcessingWidget(QWidget):
         self.middle_grid.addWidget(remove_button, index, 4)
 
     def add_process(self, process_name):
-        if process_name in ["-", "", None]:
+        self.add_process_chain_button.hidePopup()
+        if not process_name:
             return
         new_process = NEW_PROCESS_DEFAULTS[process_name]
         if new_process is None:
@@ -503,12 +516,13 @@ class EditExtraProcessingWidget(QWidget):
             tooltip(f"Error: Process name not found in process: {process}")
             return None, ""
         if process_name == KANA_HIGHLIGHT_PROCESS:
+            note_types = None
             with suppress(KeyError):
-                note_type = self.copy_definition["copy_into_note_types"]
+                note_types = self.copy_definition["copy_into_note_types"]
             return KanaHighlightProcessDialog(
                 self,
                 process,
-                note_type
+                note_types
             ), lambda _: KANA_HIGHLIGHT_PROCESS
         if process_name == REGEX_PROCESS:
             return RegexProcessDialog(self, process), get_regex_process_label

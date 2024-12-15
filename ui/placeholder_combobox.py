@@ -1,3 +1,5 @@
+from typing import Union
+
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
     QComboBox,
@@ -12,6 +14,8 @@ from aqt.qt import (
     QEvent,
     qtmajor,
 )
+
+from .required_text_input import RequiredLineEdit
 
 if qtmajor > 5:
     QtKeys = Qt.Key
@@ -29,29 +33,38 @@ else:
 #         QEventTypesByNum[value] = name
 
 class ComboboxPlaceholderListView(QListView):
-    def __init__(self, combobox, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, combobox, **kwargs):
+        super().__init__(**kwargs)
         self.combobox = combobox
 
     def keyPressEvent(self, event):
-        print(f"event.key(): {event.key()}")
         # Selecting an item
         if event.key() in (QtKeys.Key_Space, QtKeys.Key_Return, QtKeys.Key_Enter):
-            print("Space, Return, or Enter key pressed")
             self.combobox.lineEdit().popup_open = True
             return
         super().keyPressEvent(event)
 
 
-class ComboBoxPlaceholderLineEdit(QLineEdit):
+class ComboBoxPlaceholderLineEdit(RequiredLineEdit):
     """
     A QLineEdit that is not editable but still shows a placeholder text. Use with QComboBox.
     To allow showing a placeholder test we must have isReadOnly()=false and isEditable()=true.
     This would let the user type in the line edit, so we need to manually ignore input events.
     """
 
-    def __init__(self, placeholder_text: str = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+            self,
+            parent=None,
+            placeholder_text: str = None,
+            **kwargs
+    ):
+        super().__init__(
+            parent,
+            # Set the default style to vertically center the text so that the
+            # text's y's and g's are not cut off at the bottom
+            default_style="padding-bottom: 0px; padding-top: 0px;",
+            **kwargs
+        )
         self.setReadOnly(True)
         self.popup_open = False
         if placeholder_text:
@@ -80,33 +93,86 @@ class ComboBoxPlaceholderLineEdit(QLineEdit):
             self.parent().showPopup()
 
 
-class PlaceHolderCombobox(QComboBox):
-    def __init__(self, parent=None, placeholder_text: str = None, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
-        self.setLineEdit(ComboBoxPlaceholderLineEdit(placeholder_text))
+class PlaceholderCombobox(QComboBox):
+    def __init__(
+            self,
+            parent=None,
+            placeholder_text: str = None,
+            is_required: bool = False,
+            auto_size: bool = False,
+            minimum_width: int = 250,
+            **kwargs
+    ):
+        super().__init__(parent, **kwargs)
+        #### Placeholder management
+        self.setLineEdit(ComboBoxPlaceholderLineEdit(
+            placeholder_text=placeholder_text,
+            is_required=is_required,
+        ))
         # Set current index to -1 to show the placeholder text
         self.setCurrentIndex(-1)
         self.setModel(QStandardItemModel(self))
 
-    def addItem(self, item: QStandardItem):
+        #### Size management
+        self.auto_size = auto_size
+        self.max_width = 0
+        self.setMinimumWidth(minimum_width)
+        if auto_size:
+            self.currentTextChanged.connect(self.check_text_width)
+
+    def check_text_width(self, text: str):
+        item_width = self.view().fontMetrics().boundingRect(text).width()
+        self.update_max_width(item_width)
+
+    def update_max_width(self, width: int):
+        if width > self.max_width:
+            self.max_width = width
+            self.set_popup_and_box_width()
+
+    def set_popup_and_box_width(self):
+        self.setMaximumWidth(max(self.max_width + 40, self.minimumWidth()))
+
+    def clear(self):
+        self.max_width = 0
+        super().clear()
+
+    def setPlaceholderText(self, text: str):
+        self.lineEdit().setPlaceholderText(text)
+
+    def placeholderText(self):
+        return self.lineEdit().placeholderText()
+
+    def unset_current_index(self):
+        self.setCurrentIndex(-1)
+
+    def addItem(self, item: Union[str, QStandardItem]):
+        if isinstance(item, str):
+            item = QStandardItem(item)
         nothing_was_selected = self.currentText() == ""
         self.model().appendRow(item)
         # If there was nothing selected, adding data sets the line edit text to non-empty which
         # hides the placeholder text. Undo this by setting the current index to -1.
         if nothing_was_selected:
-            self.setCurrentIndex(-1)
+            self.unset_current_index()
+
+        if self.auto_size:
+            self.check_text_width(item.text())
 
     def addItems(self, items: list[QStandardItem]):
         nothing_was_selected = self.currentText() == ""
         for item in items:
             self.model().appendRow(item)
+            if self.auto_size:
+                self.check_text_width(item.text())
         if nothing_was_selected:
-            self.setCurrentIndex(-1)
+            self.unset_current_index()
 
     def showPopup(self):
         # When the popup is opened by clicking on the line edit, we need to set a flag to prevent
         # it from closing when clicking anywhere else. We check this flag in hidePopup().
         self.lineEdit().popup_open = True
+        if self.auto_size:
+            self.set_popup_and_box_width()
         super().showPopup()
 
     def hidePopup(self):
