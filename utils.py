@@ -86,7 +86,7 @@ def make_query_string(prefix: str, values: list[str]) -> str:
         return ""
     query = "("
     for i, value in enumerate(values):
-        query += f"{prefix}:{value}"
+        query += f'"{prefix}:{value}"'
         if i < len(values) - 1:
             query += " OR "
     query += ")"
