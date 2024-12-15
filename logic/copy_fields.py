@@ -473,8 +473,8 @@ def apply_process_chain(
 def copy_for_single_trigger_note(
         copy_definition: CopyDefinition,
         trigger_note: Note,
-        results: CacheResults,
-        undo_entry: int,
+        results: CacheResults = None,
+        undo_entry: int = None,
         field_only: str = None,
         deck_id: int = None,
         multiple_note_types: bool = False,
@@ -572,7 +572,11 @@ def copy_for_single_trigger_note(
         mw.col.update_note(destination_note)
         # undo_entry has to be updated after every undoable op or the last_step will
         # increment causing an "target undo op not found" error!
-        results.changes = mw.col.merge_undo_entries(undo_entry)
+        changes = None
+        if undo_entry is not None:
+            changes = mw.col.merge_undo_entries(undo_entry)
+        if results is not None and changes is not None:
+            results.changes = changes
         if not success:
             return False, len(destination_notes), len(source_notes)
 

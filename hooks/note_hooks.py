@@ -68,6 +68,7 @@ def run_copy_fields_on_review(card: Card):
             copy_definition=copy_definition,
             trigger_note=note,
             multiple_note_types=multiple_note_types,
+            undo_entry=undo_entry,
         )
         mw.col.update_note(note)
         mw.col.merge_undo_entries(undo_entry)
@@ -107,7 +108,7 @@ def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str)
             continue
 
         # Don't need to merge undo entries for unfocusing a field
-        changed,_,_ = copy_for_single_trigger_note(
+        changed, _, _ = copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
             field_only=field_name,
