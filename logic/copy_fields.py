@@ -2,7 +2,7 @@ import base64
 import random
 import time
 from operator import itemgetter
-from typing import Callable, Union, Optional
+from typing import Callable, Union, Optional, Tuple
 
 from anki.cards import Card
 from anki.collection import Progress
@@ -347,12 +347,17 @@ def copy_fields_in_background(
     # contents will be cached by file name
     file_cache = {}
 
+    total_processed_sources = 0
+    total_processed_destinations = 0
+    is_across = copy_definition['copy_mode'] == COPY_MODE_ACROSS_NOTES
     for card in cards:
         if card_cnt % 10 == 0 and card_cnt > 0:
             elapsed_s = time.time() - start_time
             elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
             progress_update_def.label = f"""<strong>{definition_name}</strong>:
             <br>Copied {card_cnt}/{total_cards_count} cards
+            <br><small>Notes processed - destinations: {total_processed_destinations}
+                {f', sources: {total_processed_sources}' if is_across else ''}</small>
             <br>Time: {elapsed_time}"""
             if card_cnt / total_cards_count > 0.10 or elapsed_s > 5:
                 eta_s = (elapsed_s / card_cnt) * (total_cards_count - card_cnt)
@@ -365,7 +370,11 @@ def copy_fields_in_background(
 
         copy_into_note = card.note()
 
-        success = copy_for_single_trigger_note(
+        (
+            success,
+            processed_destination_notes,
+            processed_source_notes,
+        ) = copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=copy_into_note,
             results=results,
@@ -375,6 +384,8 @@ def copy_fields_in_background(
             show_error_message=show_error_message,
             file_cache=file_cache,
         )
+        total_processed_sources += processed_source_notes
+        total_processed_destinations += processed_destination_notes
 
         copied_into_cards.append(card)
 
@@ -389,7 +400,12 @@ def copy_fields_in_background(
     should_report_result = len(cards) > 0 if is_sync else True
     if should_report_result:
         results.add_result_text(
-            f"<br>{time.time() - start_time:.2f}s - <i>{copy_definition['definition_name']}:</i> {card_cnt} cards"
+            f"""<br><span>
+            {time.time() - start_time:.2f}s - 
+            <i>{copy_definition['definition_name']}:</i> 
+            {total_processed_destinations} destinations
+            {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
+        </span>"""
         )
     return results
 
@@ -466,7 +482,7 @@ def copy_for_single_trigger_note(
         multiple_note_types: bool = False,
         show_error_message: Callable[[str], None] = None,
         file_cache: dict = None,
-) -> bool:
+) -> Tuple[bool, int, int]:
     """
     Copy fields into a single note
     :param copy_definition: The definition of what to copy, includes process chains
@@ -481,7 +497,7 @@ def copy_for_single_trigger_note(
     :param multiple_note_types: Whether the copy is into multiple note types
     :param show_error_message: Optional function to show error messages
     :param file_cache: A dictionary to cache opened files' content
-    :return: True if the copy was successful, False if there was an error
+    :return: Tuple of the op success + number of destination and source notes processed
     """
     if not show_error_message:
         def show_error_message(message: str):
@@ -518,7 +534,7 @@ def copy_for_single_trigger_note(
     elif copy_mode == COPY_MODE_ACROSS_NOTES:
         if across_mode_direction not in [DIRECTION_DESTINATION_TO_SOURCES, DIRECTION_SOURCE_TO_DESTINATIONS]:
             show_error_message("Error in copy fields: missing across mode direction value")
-            return False
+            return False, len(destination_notes), len(source_notes)
         target_notes = get_across_target_notes(
             copy_from_cards_query=copy_from_cards_query,
             trigger_note=trigger_note,
@@ -538,7 +554,7 @@ def copy_for_single_trigger_note(
             source_notes = [trigger_note]
     else:
         show_error_message("Error in copy fields: missing copy mode value")
-        return False
+        return False, len(destination_notes), len(source_notes)
 
     if len(source_notes) == 0:
         show_error_message(f"Error in copy fields: No source/destination notes for note {trigger_note.id}")
@@ -560,9 +576,9 @@ def copy_for_single_trigger_note(
         # increment causing an "target undo op not found" error!
         results.changes = mw.col.merge_undo_entries(undo_entry)
         if not success:
-            return False
+            return False, len(destination_notes), len(source_notes)
 
-    return True
+    return True, len(destination_notes), len(source_notes)
 
 
 def copy_into_single_note(

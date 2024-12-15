@@ -76,11 +76,12 @@ class CopyFieldToFieldEditor(QWidget):
     Remove button for removing definitions is at the top-right of each definition.
     """
 
-    def __init__(self,
-                 parent,
-                 copy_definition: CopyDefinition,
-                 copy_mode: CopyModeType,
-                 ):
+    def __init__(
+            self,
+            parent,
+            copy_definition: CopyDefinition,
+            copy_mode: CopyModeType,
+    ):
         super().__init__(parent)
         self.field_to_field_defs = copy_definition.get("field_to_field_defs", [])
         self.copy_definition = copy_definition
