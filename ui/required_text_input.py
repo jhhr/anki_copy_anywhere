@@ -76,6 +76,9 @@ class RequiredTextEdit(QTextEdit):
         self.is_required = is_required
         self.required_style = required_style
         self.default_style = default_style
+        # Set this as a default for all text edits as editing fields
+        # with this addons requires plain text pretty much always
+        self.setAcceptRichText(False)
         if default_style:
             self.setStyleSheet(default_style)
         if is_required:
@@ -88,7 +91,7 @@ class RequiredTextEdit(QTextEdit):
             self.setStyleSheet(self.default_style)
 
     def event(self, event: QEvent):
-        if self.is_required and event.type() in (
+        if hasattr(self, 'is_required') and self.is_required and event.type() in (
                 QEventTypes.FocusIn,
                 QEventTypes.FocusOut,
                 QEventTypes.KeyPress,
