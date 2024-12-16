@@ -634,11 +634,12 @@ def copy_into_single_note(
             )
             # result_val should always be at least "", None indicates an error
             if result_val is None:
+                show_error_message(f"Error in copy fields: Process chain failed for field {copy_into_note_field}")
                 return False
 
         # Finally, copy the value into the note
         destination_note[copy_into_note_field] = result_val
-        return True
+    return True
 
 
 def get_variable_values_for_note(
