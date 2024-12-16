@@ -8,8 +8,17 @@ Acknowledgments
 # Roadmap ideas
 
 ## Big features
-- Rework process chains into being interpolated also. Something like `<<<REGEX:My_regex==replacement1==replacement2>{{Some field}} {{Another field}}>><<<SOME_OTHER_PROCESS:My_Process=={{A field as arg}}>{{More fields}} Any text <<<REGEX:My_other_regex>{{Yet more fields}}>>>>` So nesting processes would be allowed. You'd define the processes like currently but also be able to provide arguments to them as interpolated values
-- Field content as python code. This would first be interpolated like normal, then executed. The main idea is being able to call AI APIs to process stuff but any other APIs too. But also perform more complex processing that you can't do with just regex pattern replacement
+- Process field content with python code. The interpolated value is turned into a variable that is passed to the code in `locals`. You could have multiple variables, not just one. Would make sense to declare all variables first, then run evaluate each code block
+  - **Breaking change**: This would replace the current process chain system
+  - Provide code templates for common tasks like regex replace
+  - Provide the current very specific procesors as functions to use in the code
+  - The main idea is being able to call AI APIs to process stuff but any other APIs too. But also perform more complex processing that you can't do with just regex pattern replacement
+  - Saving results into a file in collection.media and allowing reading files while copying.
+- Chaining copy definition results into another definition.
+  - For cases where you first need to query one set of notes, process some values from those, then use those values to further query other notes.
+  - Instead saving results into note fields (or in addition to doin so - drive-by note editing!), they are saved into variables that are passed to the next step and used for querying.
+- **Possible breaking change**: Instead having to choose destinations-to-sources or vice versa, you define a save step where you select notes to edit: the trigger note or the target notes queried. Then you could actually edit both in one definition. Chained definitions would create multiple lists of target notes. Any step could save into any of the so far queried target cards or the initial trigger note.
+
 
 ## Toward actually copying anywhere
 - Copy a note's anything into tags
