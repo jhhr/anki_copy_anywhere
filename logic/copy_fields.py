@@ -563,6 +563,7 @@ def copy_for_single_trigger_note(
             field_to_field_defs=field_to_field_defs,
             destination_note=destination_note,
             source_notes=source_notes,
+            variable_values_dict=variable_values_dict,
             field_only=field_only,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
@@ -587,6 +588,7 @@ def copy_into_single_note(
         field_to_field_defs: list[CopyFieldToField],
         destination_note: Note,
         source_notes: list[Note],
+        variable_values_dict: dict,
         field_only: str = None,
         multiple_note_types: bool = False,
         select_card_separator: str = None,
@@ -622,6 +624,7 @@ def copy_into_single_note(
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
+            variable_values_dict=variable_values_dict
         )
         # Step 2.2: If we have further processing steps, run them
         if process_chain is not None:
