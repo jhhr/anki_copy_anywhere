@@ -4,6 +4,7 @@ from anki.notes import Note
 from aqt import mw
 from aqt.gui_hooks import reviewer_did_answer_card, editor_did_unfocus_field
 
+from ..utils import write_custom_data
 from ..configuration import Config
 from ..logic.copy_fields import copy_for_single_trigger_note
 
@@ -61,17 +62,22 @@ def run_copy_fields_on_review(card: Card):
         if note_type_name not in copy_into_note_types:
             continue
 
-        # Merge undo entry for the review
+        # Get the current Answer card undo entry
         undo_status = mw.col.undo_status()
-        undo_entry = undo_status.last_step
+        answer_card_undo_entry = undo_status.last_step
         copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
             multiple_note_types=multiple_note_types,
-            undo_entry=undo_entry,
+            undo_entry=answer_card_undo_entry,
         )
+        write_custom_data(card, key="fc", value="1")
+        # update_card adds a new undo entry Update card
+        mw.col.update_card(card)
+        # update_note adds a new undo entry Update note
         mw.col.update_note(note)
-        mw.col.merge_undo_entries(undo_entry)
+        # But now they are both merged into the Answer card undo entry
+        mw.col.merge_undo_entries(answer_card_undo_entry)
 
 def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str):
     config = Config()
