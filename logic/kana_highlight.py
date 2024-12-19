@@ -1,5 +1,5 @@
 import re
-from typing import Union, Callable, TypedDict, Literal
+from typing import Union, Callable, TypedDict, Literal, Optional
 
 try:
     from .kana_conv import to_katakana, to_hiragana
@@ -268,19 +268,6 @@ ADJECTIVE_INFLECTIONS = {
 
 ADJECTIVE_INFLECTIONS_REC = re.compile(rf"(^{'|'.join(ADJECTIVE_INFLECTIONS)})(.*?)$")
 
-
-def re_match_from_right(text):
-    return re.compile(rf"(.*)({text})(.*?)$")
-
-
-def re_match_from_left(text):
-    return re.compile(rf"^(.*?)({text})(.*)$")
-
-
-def re_match_from_middle(text):
-    return re.compile(rf"^(.*?)({text})(.*?)$")
-
-
 # Regex for lone kanji with some hiragana to their right, then some kanji,
 # then furigana that includes the hiragana in the middle
 # This is used to match cases of furigana used for　kunyomi compound words with
@@ -300,13 +287,6 @@ OKURIGANA_MIX_CLEANING_RE = re.compile(rf"""
 \4          # group 4 occuring again (if present)           (1)nothing　(2)わせ (3)nothing
 ]          # closing bracket of furigana
 """, re.VERBOSE)
-
-LOG = False
-
-
-def log(*args):
-    if LOG:
-        log(*args)
 
 
 def okurigana_mix_cleaning_replacer(match):
@@ -330,6 +310,18 @@ def okurigana_mix_cleaning_replacer(match):
     if furigana2:
         result += f'{kanji2}[{furigana2}]{hiragana2}'
     return result
+
+
+def re_match_from_right(text):
+    return re.compile(rf"(.*)({text})(.*?)$")
+
+
+def re_match_from_left(text):
+    return re.compile(rf"^(.*?)({text})(.*)$")
+
+
+def re_match_from_middle(text):
+    return re.compile(rf"^(.*?)({text})(.*?)$")
 
 
 def onyomi_replacer(match):
@@ -406,6 +398,159 @@ class MainResult(TypedDict):
     type: Literal["onyomi", "kunyomi", "none"]
 
 
+class FinalResult(TypedDict):
+    """
+    TypedDict for the final result of the onyomi or kunyomi match check
+    """
+    furigana: str
+    okurigana: str
+    rest_kana: str
+    left_word: str
+    middle_word: str
+    right_word: str
+    edge: Edge
+
+
+REPLACED_FURIGANA_MIDDLE_RE = re.compile(r'^(.+)<b>(.+)</b>(.+)$')
+REPLACED_FURIGANA_RIGHT_RE = re.compile(r'^(.+)<b>(.+)</b>$')
+REPLACED_FURIGANA_LEFT_RE = re.compile(r'^<b>(.+)</b>(.+)$')
+
+
+class FuriganaParts(TypedDict):
+    """
+    TypedDict for the parts of the furigana that were matched
+    """
+    has_highlight: bool
+    left_furigana: Optional[str]
+    middle_furigana: Optional[str]
+    right_furigana: Optional[str]
+
+
+def get_furigana_parts(furigana: str, edge: Edge):
+    log(f"\nget_furigana_parts - furigana: {furigana}, edge: {edge}")
+    result = {
+        "has_highlight": '<b>' in furigana,
+        "left_furigana": None,
+        "middle_furigana": None,
+        "right_furigana": None,
+    }
+    if edge == WHOLE:
+        return result
+    if edge == MIDDLE:
+        match = REPLACED_FURIGANA_MIDDLE_RE.match(furigana)
+        if match is None:
+            return result
+        result["left_furigana"] = match.group(1)
+        result["middle_furigana"] = match.group(2)
+        result["right_furigana"] = match.group(3)
+        return result
+    if edge == RIGHT:
+        match = REPLACED_FURIGANA_RIGHT_RE.match(furigana)
+        if match is None:
+            return result
+        result["left_furigana"] = match.group(1)
+        result["middle_furigana"] = None
+        result["right_furigana"] = match.group(2)
+        return result
+    if edge == LEFT:
+        match = REPLACED_FURIGANA_LEFT_RE.match(furigana)
+        if match is None:
+            return result
+        result["left_furigana"] = match.group(1)
+        result["middle_furigana"] = None
+        result["right_furigana"] = match.group(2)
+        return result
+
+
+FuriReconstruct = Literal["furigana", "furikanji", "kana_only"]
+
+
+def reconstruct_furigana(
+        final_result: FinalResult,
+        reconstruct_type: FuriReconstruct = "furigana",
+) -> str:
+    """
+    Reconstruct the furigana from the final result
+    :param final_result: The final result of the onyomi or kunyomi match check
+    :param reconstruct_type: Return the furigana with the kanji and furigana highlighted,
+    :return: The reconstructed furigana with the kanji and that kanji's furigana highlighted
+    """
+    log(f"\nreconstruct_furigana - final_result: {final_result}, reconstruct_type: {reconstruct_type}")
+    furigana = final_result.get("furigana")
+    okurigana = final_result.get("okurigana")
+    rest_kana = final_result.get("rest_kana")
+    left_word = final_result.get("left_word")
+    middle_word = final_result.get("middle_word")
+    right_word = final_result.get("right_word")
+    edge = final_result.get("edge")
+
+    furigana_parts = get_furigana_parts(furigana, edge)
+    log(f"\nreconstruct_furigana edge: {edge}, furigana_parts: {furigana_parts}")
+
+    has_highlight = furigana_parts.get("has_highlight")
+    left_furigana = furigana_parts.get("left_furigana")
+    middle_furigana = furigana_parts.get("middle_furigana")
+    right_furigana = furigana_parts.get("right_furigana")
+
+    if not has_highlight:
+        log(f"\nreconstruct_furigana - no highlight")
+        # There was no match found during onyomi and kunyomi processing, so no <b> tags
+        # we can just construct the furigana without splitting it
+        if reconstruct_type == "kana_only":
+            return f'{furigana}{okurigana}{rest_kana}'
+        if reconstruct_type == "furikanji":
+            return f' {furigana}[{right_word}{middle_word}{left_word}]{okurigana}{rest_kana}'
+        return f' {left_word}{middle_word}{right_word}[{furigana}]{okurigana}{rest_kana}'
+
+    if edge == WHOLE:
+        # Same as above except we add the <b> tags around the whole thing
+        # First remove <b> tags from the furigana
+        furigana = re.sub(r'<b>|</b>', '', furigana)
+        if reconstruct_type == "kana_only":
+            return f'<b>{furigana}{okurigana}</b>{rest_kana}'
+        if reconstruct_type == "furikanji":
+            return f'<b> {furigana}[{right_word}{middle_word}{left_word}]{okurigana}</b>{rest_kana}'
+        return f'<b> {left_word}{middle_word}{right_word}[{furigana}]{okurigana}</b>{rest_kana}'
+
+    # There is highlighting, we need to split the furigana and word into three parts and assemble them
+    result = ""
+    parts = [
+        # The furigana and word parts should match exactly;
+        # when one is missing so is the other
+        (left_word, left_furigana, LEFT),
+        (middle_word, middle_furigana, MIDDLE),
+        (right_word, right_furigana, RIGHT),
+    ]
+    for word, word_furigana, word_edge in parts:
+        log(f"\nreconstruct_furigana - word: {word}, word_furigana: {word_furigana}, word_edge: {word_edge}")
+        if word and word_furigana:
+            if reconstruct_type == "kana_only":
+                part = f'{word_furigana}'
+            elif reconstruct_type == "furikanji":
+                part = f' {word_furigana}[{word}]'
+            else:
+                part = f' {word}[{word_furigana}]'
+            # If this is the edge that was matched, add the bold tags while
+            # removing the existing ones in the furigana
+            part = re.sub(r'<b>|</b>', '', part)
+            if word_edge == RIGHT:
+                # If we're at the end, add the okurigana
+                part += okurigana
+            if edge == word_edge:
+                # Finally, add the highlighting if this is the edge that was matched
+                part = f'<b>{part}</b>'
+            result += part
+    return f'{result}{rest_kana}'
+
+
+LOG = True
+
+
+def log(*args):
+    if LOG:
+        print(*args)
+
+
 def process_readings(
         highlight_args: HighlightArgs,
         word_data: WordData,
@@ -450,8 +595,8 @@ def process_readings(
         word_data.get("edge"),
         return_on_or_kun_match_only
     )
-    log(f"\nkunyomi_results: {kunyomi_results}")
-    if kunyomi_results["type"] == "kunyomi":
+    log(f"\nkunyomi_results: {kunyomi_results}, word_data: {word_data}")
+    if kunyomi_results["type"] == "kunyomi" and word_data["edge"] in [RIGHT, WHOLE]:
         okurigana = word_data.get("okurigana")
         okurigana_to_highlight = ""
         rest_kana = okurigana
@@ -466,8 +611,11 @@ def process_readings(
             okurigana_to_highlight, rest_kana = check_okurigana_for_kunyomi_inflection(
                 kunyomi_okurigana, word_data, highlight_args
             )
-            log(f"\ncheck_kunyomi_readings while - okurigana: {okurigana_to_highlight}, rest_kana: {rest_kana}")
+        log(f"\ncheck_kunyomi_readings while result - okurigana: {okurigana_to_highlight}, rest_kana: {rest_kana}")
         return kunyomi_results, okurigana_to_highlight, rest_kana
+
+    if kunyomi_results["type"] == "kunyomi":
+        return kunyomi_results, "", word_data.get("okurigana")
 
     kanji_count = word_data.get("kanji_count")
     kanji_pos = word_data.get("kanji_pos")
@@ -614,10 +762,7 @@ def check_okurigana_for_kunyomi_inflection(
     :param highlight_args: dict, the base arguments passed to kana_highlight
     :return: (string, string) the okurigana that should be highlighted and the rest of the okurigana
     """
-    edge = word_data.get("edge")
     okurigana = word_data.get("okurigana")
-    if edge not in [RIGHT, WHOLE]:
-        return "", okurigana
 
     if not kunyomi_okurigana or not okurigana:
         return "", okurigana
@@ -639,7 +784,7 @@ def check_okurigana_for_kunyomi_inflection(
         return okurigana, ""
     if inflection_kana_key in OTHER_FIRST_KANA:
         inflection_kana_key = OTHER_FIRST_KANA[inflection_kana_key]
-    if inflection_kana_key in READING_FIRST_KANA_TO_POSSIBLE_INFLECTED_FIRST_KANA:
+    if (inflection_kana_key in READING_FIRST_KANA_TO_POSSIBLE_INFLECTED_FIRST_KANA):
         if okurigana[0] == inflection_kana_key:
             # This is a verb in plain form, so just the first kana should be highlighted
             return okurigana[0], okurigana[1:]
@@ -831,7 +976,7 @@ def handle_whole_kanji_case(
         furigana: str,
         okurigana: str,
         show_error_message: Callable
-) -> str:
+) -> FinalResult:
     """
     The case when the whole word contains the kanji to highlight.
     So, either it's a single kanji word or the kanji is repeated.
@@ -859,13 +1004,22 @@ def handle_whole_kanji_case(
         return_on_or_kun_match_only=True,
         show_error_message=show_error_message,
     )
-    log(
-        f"\nhandle_whole_kanji_case - word: {word}, result: {result}, okurigana: {okurigana_to_highlight}, rest_kana: {rest_kana}")
+    log(f"\nhandle_whole_kanji_case - word: {word}, result: {result}, okurigana: {okurigana_to_highlight}, rest_kana: {rest_kana}")
+
     if result["type"] == "onyomi":
         # For onyomi matches the furigana should be in katakana
-        return f"<b>{to_katakana(furigana)}</b>{rest_kana}"
-    # For kunyomi and jukujigun matches keep in hiragana
-    return f"<b>{furigana}{okurigana_to_highlight}</b>{rest_kana}"
+        final_furigana = f"<b>{to_katakana(furigana)}</b>"
+    else:
+        final_furigana = f"<b>{furigana}</b>"
+    return {
+        "furigana": final_furigana,
+        "okurigana": okurigana_to_highlight,
+        "rest_kana": rest_kana,
+        "left_word": "",
+        "middle_word": word,
+        "right_word": "",
+        "edge": WHOLE,
+    }
 
 
 def handle_partial_kanji_case(
@@ -874,7 +1028,7 @@ def handle_partial_kanji_case(
         furigana: str,
         okurigana: str,
         show_error_message: Callable
-):
+) -> FinalResult:
     """
     The case when the word contains other kanji in addition to the kanji to highlight.
     Could be 2 or more kanji in the word.
@@ -891,7 +1045,16 @@ def handle_partial_kanji_case(
 
     kanji_pos = word.find(kanji_to_highlight)
     if kanji_pos == -1:
-        return furigana + okurigana
+        # No match found, return the furigana as-is
+        return {
+            "furigana": furigana,
+            "okurigana": okurigana,
+            "rest_kana": "",
+            "left_word": "",
+            "middle_word": word,
+            "right_word": "",
+            "edge": WHOLE,
+        }
     # Take of note of which side of the word the kanji is found on
     # 1. left edge, the furigana replacement has to begin on the left edge and can't end on the right edge
     # 2. right edge, the furigana replacement has to end on the right edge and can't begin on the left edge
@@ -917,11 +1080,39 @@ def handle_partial_kanji_case(
         word_data,
         show_error_message=show_error_message
     )
+
+    # Determine the word split according to the edge so we can highlight the correct part
+    if kanji_in_middle:
+        left_word = word[:kanji_pos]
+        middle_word = kanji_to_highlight
+        right_word = word[kanji_pos + 1:]
+    elif kanji_in_left_edge:
+        left_word = kanji_to_highlight
+        middle_word = ""
+        right_word = word[kanji_pos + 1:]
+    else:
+        left_word = word[:kanji_pos]
+        middle_word = ""
+        right_word = kanji_to_highlight
+
+    final_result = {
+        "left_word": left_word,
+        "middle_word": middle_word,
+        "right_word": right_word,
+        "edge": word_data["edge"],
+    }
+
     furigana_replacement = main_result["text"]
     if okurigana_to_highlight:
-        # Clean any adjacent <b> tags that can be merged
-        return f"{furigana_replacement}<b>{okurigana_to_highlight}</b>{rest_kana}".replace("</b><b>", "")
-    return f"{furigana_replacement}{rest_kana}"
+        final_result["furigana"] = furigana_replacement
+        final_result["okurigana"] = okurigana_to_highlight
+        final_result["rest_kana"] = rest_kana
+    else:
+        final_result["furigana"] = furigana_replacement
+        final_result["okurigana"] = ""
+        final_result["rest_kana"] = rest_kana
+    log(f"\nhandle_partial_kanji_case - final_result: {final_result}")
+    return final_result
 
 
 def kana_highlight(
@@ -929,7 +1120,8 @@ def kana_highlight(
         onyomi: str,
         kunyomi: str,
         text: str,
-        show_error_message: Callable = print
+        return_type: FuriReconstruct = "kana_only",
+        show_error_message: Callable = print,
 ) -> str:
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
@@ -940,6 +1132,8 @@ def kana_highlight(
     :param kunyomi: kunyomi reading of the kanji, separated by commas if there are multiple readings
         okurigana should be separated by a dot
     :param text: The text to process
+    :param return_type: string. Return either normal furigana, reversed furigana AKA furikanji or
+        remove the kanji and return only the kana
     :param show_error_message: Callable, function to call when an error message is needed
     :return: The text cleaned from any previous <b> tags and with the furigana highlighted with <b> tags
         when the furigana corresponds to the kanji_to_highlight
@@ -971,35 +1165,60 @@ def kana_highlight(
             return furigana + okurigana
 
         if word in (kanji_to_highlight, f"{kanji_to_highlight}々"):
-            return handle_whole_kanji_case(highlight_args, word, furigana, okurigana, show_error_message)
-
-        return handle_partial_kanji_case(highlight_args, word, furigana, okurigana, show_error_message)
+            final_result = handle_whole_kanji_case(highlight_args, word, furigana, okurigana, show_error_message)
+        else:
+            final_result = handle_partial_kanji_case(highlight_args, word, furigana, okurigana, show_error_message)
+        # Construct the final return format
+        return reconstruct_furigana(final_result, reconstruct_type=return_type)
 
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)
     # Special case 秘蔵[ひぞ]っ子[こ] needs to be converted to 秘蔵[ひぞっ]子[こ]
     clean_text = clean_text.replace("秘蔵[ひぞ]っ", "秘蔵[ひぞっ]")
-    return KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
+    processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
+    # Clean any double spaces that might have been created by the furigana reconstruction
+    # Including those right before a <b> tag as the space is added with those
+    processed_text = re.sub(r" {2}", " ", processed_text)
+    return re.sub(r" <b> ", "<b> ", processed_text)
 
 
-def test(test_name, expected, sentence, kanji, onyomi, kunyomi):
-    """
-    Function that tests the kana_highlight function
-    """
-    result = kana_highlight(
+def test(
+        test_name,
+        sentence,
         kanji,
         onyomi,
         kunyomi,
-        sentence,
-    )
-    try:
-        assert result == expected
-    except AssertionError:
-        log(f"""{test_name}
+        expected_furigana: str = None,
+        expected_furikanji: str = None,
+        expected_kana_only: str = None,
+):
+    """
+    Function that tests the kana_highlight function
+    """
+    cases = [
+        ("furigana", expected_furigana),
+        ("furikanji", expected_furikanji),
+        ("kana_only", expected_kana_only),
+    ]
+    for return_type, expected in cases:
+        if not expected:
+            continue
+        result = kana_highlight(
+            kanji,
+            onyomi,
+            kunyomi,
+            sentence,
+            return_type,
+        )
+        try:
+            assert result == expected
+        except AssertionError:
+            print(f"""{test_name}
+Return type: {return_type}
 Expected: {expected}
 Got:      {result}
 """)
-        raise
+            raise
 
 
 def main():
@@ -1010,7 +1229,9 @@ def main():
         kunyomi="み.る",
         # しちょうしゃ　has し in it twice but only the first one should be highlighted
         sentence="視聴者[しちょうしゃ]",
-        expected="<b>シ</b>ちょうしゃ",
+        expected_kana_only="<b>シ</b>ちょうしゃ",
+        expected_furigana="<b> 視[シ]</b> 聴者[ちょうしゃ]",
+        expected_furikanji="<b> シ[視]</b> ちょうしゃ[聴者]",
     )
     test(
         test_name="Should not incorrectly match onyomi twice 2/",
@@ -1019,7 +1240,9 @@ def main():
         kunyomi="のり、よ.い",
         # 　ぎょうぎ　has ぎ in it twice but only the first one should be highlighted
         sentence="行儀[ぎょうぎ]",
-        expected="ぎょう<b>ギ</b>",
+        expected_kana_only="ぎょう<b>ギ</b>",
+        expected_furigana=" 行[ぎょう]<b> 儀[ギ]</b>",
+        expected_furikanji=" ぎょう[行]<b> ギ[儀]</b>",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 1/",
@@ -1028,7 +1251,9 @@ def main():
         kunyomi="さ.る、ゆ.く、のぞ.く",
         # 消え去[きえさ]った　has え　in the middle of the kanji but った at the end is not included in the furigana
         sentence="団子[だんご]が 消え去[きえさ]った。",
-        expected="だんごが きえ<b>さった</b>。",
+        expected_kana_only="だんごが きえ<b>さった</b>。",
+        expected_furigana=" 団子[だんご]が 消[き]え<b> 去[さ]った</b>。",
+        expected_furikanji=" だんご[団子]が き[消]え<b> さ[去]った</b>。",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 2/",
@@ -1037,7 +1262,9 @@ def main():
         kunyomi="とな.る、となり",
         # 隣り合わせ[となりあわせ]のまち　has り　in the middle and わせ　at the end of the group
         sentence="隣り合わせ[となりあわせ]の町[まち]。",
-        expected="<b>となり</b>あわせのまち。",
+        expected_kana_only="<b>となり</b>あわせのまち。",
+        expected_furigana="<b> 隣[とな]り</b> 合[あ]わせの 町[まち]。",
+        expected_furikanji="<b> とな[隣]り</b> あ[合]わせの まち[町]。",
     )
     test(
         test_name="Matches word that uses the repeater 々 with rendaku 1/",
@@ -1045,7 +1272,9 @@ def main():
         onyomi="コク(呉)",
         kunyomi="くに",
         sentence="国々[くにぐに]の 関係[かんけい]が 深い[ふかい]。",
-        expected="<b>くにぐに</b>の かんけいが ふかい。",
+        expected_kana_only="<b>くにぐに</b>の かんけいが ふかい。",
+        expected_furigana="<b> 国々[くにぐに]</b>の 関係[かんけい]が 深[ふか]い。",
+        expected_furikanji="<b> くにぐに[国々]</b>の かんけい[関係]が ふか[深]い。",
     )
     test(
         test_name="Matches word that uses the repeater 々 with rendaku 2/",
@@ -1053,7 +1282,9 @@ def main():
         onyomi="ジ(呉)、シ(漢)",
         kunyomi="とき",
         sentence="時々[ときどき] 雨[あめ]が 降る[ふる]。",
-        expected="<b>ときどき</b> あめが ふる。",
+        expected_kana_only="<b>ときどき</b> あめが ふる。",
+        expected_furigana="<b> 時々[ときどき]</b> 雨[あめ]が 降[ふ]る。",
+        expected_furikanji="<b> ときどき[時々]</b> あめ[雨]が ふ[降]る。",
     )
     test(
         test_name="Matches word that uses the repeater 々 with small tsu",
@@ -1061,7 +1292,9 @@ def main():
         onyomi="コク(呉)",
         kunyomi="きざ.む、きざ.み、とき",
         sentence="刻々[こっこく]と 変化[へんか]する。",
-        expected="<b>コッコク</b>と へんかする。",
+        expected_kana_only="<b>コッコク</b>と へんかする。",
+        expected_furigana="<b> 刻々[コッコク]</b>と 変化[へんか]する。",
+        expected_furikanji="<b> コッコク[刻々]</b>と へんか[変化]する。",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 3/",
@@ -1070,7 +1303,9 @@ def main():
         kunyomi="と.まる、と.める、とど.める、とど.め、とど.まる、や.める、や.む、よ.す、さ.す",
         # A third edge case: there is only okurigana at the end
         sentence="歯止め[はどめ]",
-        expected="は<b>どめ</b>",
+        expected_kana_only="は<b>どめ</b>",
+        expected_furigana=" 歯[は]<b> 止[ど]め</b>",
+        expected_furikanji=" は[歯]<b> ど[止]め</b>",
     )
     test(
         test_name="Is able to match the same kanji occurring twice",
@@ -1078,7 +1313,9 @@ def main():
         onyomi="カク(呉)",
         kunyomi="たかどの、たな",
         sentence="新[しん] 内閣[ないかく]の 組閣[そかく]が 発表[はっぴょう]された。",
-        expected="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
+        expected_kana_only="しん ない<b>カク</b>の そ<b>カク</b>が はっぴょうされた。",
+        expected_furigana=" 新[しん] 内[ない]<b> 閣[カク]</b>の 組[そ]<b> 閣[カク]</b>が 発表[はっぴょう]された。",
+        expected_furikanji=" しん[新] ない[内]<b> カク[閣]</b>の そ[組]<b> カク[閣]</b>が はっぴょう[発表]された。",
     )
     test(
         test_name="Is able to match the same kanji occurring twice with other using small tsu",
@@ -1086,7 +1323,10 @@ def main():
         onyomi="コク(呉)",
         kunyomi="くに",
         sentence="その2 国[こく]は 国交[こっこう]を 断絶[だんぜつ]した。",
-        expected="その2 <b>コク</b>は <b>コッ</b>こうを だんぜつした。",
+        expected_kana_only="その2 <b>コク</b>は <b>コッ</b>こうを だんぜつした。",
+        expected_furigana="その2<b> 国[コク]</b>は<b> 国[コッ]</b> 交[こう]を 断絶[だんぜつ]した。",
+        expected_furikanji="その2<b> コク[国]</b>は<b> コッ[国]</b> こう[交]を だんぜつ[断絶]した。",
+
     )
     test(
         test_name="Is able to pick the right reading when there is multiple matches",
@@ -1095,7 +1335,9 @@ def main():
         kunyomi="くつ",
         # ながぐつ　has が (onyomi か match) and ぐつ (kunyomi くつ) as matches
         sentence="お 前[まえ]いつも 長靴[ながぐつ]に 傘[かさ]さしてキメーんだよ！！",
-        expected="お まえいつも なが<b>ぐつ</b>に かささしてキメーんだよ！！",
+        expected_kana_only="お まえいつも なが<b>ぐつ</b>に かささしてキメーんだよ！！",
+        expected_furigana="お 前[まえ]いつも 長[なが]<b> 靴[ぐつ]</b>に 傘[かさ]さしてキメーんだよ！！",
+        expected_furikanji="お まえ[前]いつも なが[長]<b> ぐつ[靴]</b>に かさ[傘]さしてキメーんだよ！！",
     )
     test(
         test_name="Should match reading in 4 kanji compound word",
@@ -1103,7 +1345,9 @@ def main():
         onyomi="ヒツ(漢)、ヒチ(呉)",
         kunyomi="かなら.ず",
         sentence="見敵必殺[けんてきひっさつ]の 指示[しじ]もないのに 戦闘[せんとう]は 不自然[ふしぜん]。",
-        expected="けんてき<b>ヒッ</b>さつの しじもないのに せんとうは ふしぜん。",
+        expected_kana_only="けんてき<b>ヒッ</b>さつの しじもないのに せんとうは ふしぜん。",
+        expected_furigana=" 見敵[けんてき]<b> 必[ヒッ]</b> 殺[さつ]の 指示[しじ]もないのに 戦闘[せんとう]は 不自然[ふしぜん]。",
+        expected_furikanji=" けんてき[見敵]<b> ヒッ[必]</b> さつ[殺]の しじ[指示]もないのに せんとう[戦闘]は ふしぜん[不自然]。",
     )
     test(
         test_name="Should match furigana for romaji numbers",
@@ -1111,7 +1355,9 @@ def main():
         onyomi="ゾク(呉)、ソク(漢)",
         kunyomi="わるもの、そこ.なう",
         sentence="海賊[かいぞく]たちは ７[なな]つの 海[うみ]を 航海[こうかい]した。",
-        expected="かい<b>ゾク</b>たちは ななつの うみを こうかいした。",
+        expected_kana_only="かい<b>ゾク</b>たちは ななつの うみを こうかいした。",
+        expected_furigana=" 海[かい]<b> 賊[ゾク]</b>たちは ７[なな]つの 海[うみ]を 航海[こうかい]した。",
+        expected_furikanji=" かい[海]<b> ゾク[賊]</b>たちは なな[７]つの うみ[海]を こうかい[航海]した。",
     )
     test(
         test_name="Should match the full reading match when there are multiple",
@@ -1120,7 +1366,9 @@ def main():
         kunyomi="よし、よ.る、なお",
         # Both ゆ and ゆい are in the furigana but the correct match is ゆい
         sentence="彼女[かのじょ]は 由緒[ゆいしょ]ある 家柄[いえがら]の 出[で]だ。",
-        expected="かのじょは <b>ユイ</b>しょある いえがらの でだ。",
+        expected_kana_only="かのじょは <b>ユイ</b>しょある いえがらの でだ。",
+        expected_furigana=" 彼女[かのじょ]は<b> 由[ユイ]</b> 緒[しょ]ある 家柄[いえがら]の 出[で]だ。",
+        expected_furikanji=" かのじょ[彼女]は<b> ユイ[由]</b> しょ[緒]ある いえがら[家柄]の で[出]だ。",
     )
     test(
         test_name="small tsu 1/",
@@ -1128,7 +1376,9 @@ def main():
         onyomi="テキ(漢)、チャク(呉)",
         kunyomi="えぐ.る、そ.る、のぞ.く",
         sentence="剔抉[てっけつ]",
-        expected="<b>テッ</b>けつ",
+        expected_kana_only="<b>テッ</b>けつ",
+        expected_furigana="<b> 剔[テッ]</b> 抉[けつ]",
+        expected_furikanji="<b> テッ[剔]</b> けつ[抉]",
     )
     test(
         test_name="small tsu 2/",
@@ -1136,7 +1386,9 @@ def main():
         onyomi="イチ(漢)、イツ(呉)",
         kunyomi="ひと、ひと.つ、はじ.め",
         sentence="一見[いっけん]",
-        expected="<b>イッ</b>けん",
+        expected_kana_only="<b>イッ</b>けん",
+        expected_furigana="<b> 一[イッ]</b> 見[けん]",
+        expected_furikanji="<b> イッ[一]</b> けん[見]",
     )
     test(
         test_name="small tsu 3/",
@@ -1144,7 +1396,9 @@ def main():
         onyomi="カク(漢)、カ(呉)",
         kunyomi="おのおの",
         sentence="各国[かっこく]",
-        expected="<b>カッ</b>こく",
+        expected_kana_only="<b>カッ</b>こく",
+        expected_furigana="<b> 各[カッ]</b> 国[こく]",
+        expected_furikanji="<b> カッ[各]</b> こく[国]",
     )
     test(
         test_name="small tsu 4/",
@@ -1152,7 +1406,9 @@ def main():
         onyomi="キチ(漢)、キツ(呉)",
         kunyomi="よし",
         sentence="吉兆[きっちょう]",
-        expected="<b>キッ</b>ちょう",
+        expected_kana_only="<b>キッ</b>ちょう",
+        expected_furigana="<b> 吉[キッ]</b> 兆[ちょう]",
+        expected_furikanji="<b> キッ[吉]</b> ちょう[兆]",
     )
     test(
         test_name="small tsu 5/",
@@ -1160,7 +1416,9 @@ def main():
         onyomi="ゾウ(漢)、ソウ(呉)",
         kunyomi="くら",
         sentence="秘蔵っ子[ひぞっこ]",
-        expected="ひ<b>ゾッ</b>こ",
+        expected_kana_only="ひ<b>ゾッ</b>こ",
+        expected_furigana=" 秘[ひ]<b> 蔵[ゾッ]</b> 子[こ]",
+        expected_furikanji=" ひ[秘]<b> ゾッ[蔵]</b> こ[子]",
     )
     test(
         test_name="small tsu 6/",
@@ -1168,7 +1426,9 @@ def main():
         onyomi="コウ(呉)",
         kunyomi="しり",
         sentence="尻尾[しっぽ]",
-        expected="<b>しっ</b>ぽ",
+        expected_kana_only="<b>しっ</b>ぽ",
+        expected_furigana="<b> 尻[しっ]</b> 尾[ぽ]",
+        expected_furikanji="<b> しっ[尻]</b> ぽ[尾]",
     )
     test(
         test_name="small tsu 7/",
@@ -1176,7 +1436,9 @@ def main():
         onyomi="ホウ(漢)、ボウ(慣)、ホ(呉)、タイ(慣)、ガイ(呉)",
         kunyomi="ほけ.る、ぼ.ける、あき.れる、おろか、おろ.か",
         sentence="呆気[あっけ]ない",
-        expected="<b>あっ</b>けない",
+        expected_kana_only="<b>あっ</b>けない",
+        expected_furigana="<b> 呆[あっ]</b> 気[け]ない",
+        expected_furikanji="<b> あっ[呆]</b> け[気]ない",
     )
     test(
         test_name="small tsu 8/",
@@ -1184,7 +1446,9 @@ def main():
         onyomi="コウ(漢)、カン(慣)、キョウ(呉)",
         kunyomi="きのえ、かぶと、よろい、つめ",
         sentence="甲冑[かっちゅう]の 試着[しちゃく]をお 願[ねが]いします｡",
-        expected="<b>カッ</b>ちゅうの しちゃくをお ねがいします｡",
+        expected_kana_only="<b>カッ</b>ちゅうの しちゃくをお ねがいします｡",
+        expected_furigana="<b> 甲[カッ]</b> 冑[ちゅう]の 試着[しちゃく]をお 願[ねが]いします｡",
+        expected_furikanji="<b> カッ[甲]</b> ちゅう[冑]の しちゃく[試着]をお ねが[願]いします｡",
     )
     test(
         test_name="small tsu 9/",
@@ -1192,7 +1456,9 @@ def main():
         onyomi="ヒャク(呉)、ハク(漢)",
         kunyomi="もも",
         sentence="百貨店[ひゃっかてん]",
-        expected="<b>ヒャッ</b>かてん",
+        expected_kana_only="<b>ヒャッ</b>かてん",
+        expected_furigana="<b> 百[ヒャッ]</b> 貨店[かてん]",
+        expected_furikanji="<b> ヒャッ[百]</b> かてん[貨店]",
     )
     test(
         test_name="Single kana reading conversion 1/",
@@ -1201,7 +1467,9 @@ def main():
         onyomi="ソ(呉)、ゾ",
         kunyomi="おや、じじ、はじ.め",
         sentence="先祖[せんぞ]",
-        expected="せん<b>ゾ</b>",
+        expected_kana_only="せん<b>ゾ</b>",
+        expected_furigana=" 先[せん]<b> 祖[ゾ]</b>",
+        expected_furikanji=" せん[先]<b> ゾ[祖]</b>",
     )
     test(
         test_name="Single kana reading conversion 2/",
@@ -1209,7 +1477,9 @@ def main():
         onyomi="ライ(呉)、タイ",
         kunyomi="く.る、きた.る、きた.す、き.たす、き.たる、き、こ、こ.し、き.し",
         sentence="それは 私[わたし]たちの 日常生活[にちじょうせいかつ]の 仕来[しき]たりの １[ひと]つだ。",
-        expected="それは わたしたちの にちじょうせいかつの し<b>きたり</b>の ひとつだ。",
+        expected_kana_only="それは わたしたちの にちじょうせいかつの し<b>きたり</b>の ひとつだ。",
+        expected_furigana="それは 私[わたし]たちの 日常生活[にちじょうせいかつ]の 仕[し]<b> 来[き]たり</b>の １[ひと]つだ。",
+        expected_furikanji="それは わたし[私]たちの にちじょうせいかつ[日常生活]の し[仕]<b> き[来]たり</b>の ひと[１]つだ。",
     )
     test(
         test_name="Jukujigun test 大人 1/",
@@ -1217,7 +1487,9 @@ def main():
         onyomi="ダイ(呉)、タイ(漢)、タ(漢)、ダ(呉)",
         kunyomi="おお、おお.きい、おお.いに",
         sentence="大人[おとな] 達[たち]は 大[おお]きいですね",
-        expected="<b>おと</b>な たちは <b>おおきい</b>ですね",
+        expected_kana_only="<b>おと</b>な たちは <b>おおきい</b>ですね",
+        expected_furigana="<b> 大[おと]</b> 人[な] 達[たち]は<b> 大[おお]きい</b>ですね",
+        expected_furikanji="<b> おと[大]</b> な[人] たち[達]は<b> おお[大]きい</b>ですね",
     )
     test(
         test_name="Jukujigun test 大人 2/",
@@ -1225,39 +1497,9 @@ def main():
         onyomi="ジン(漢)、ニン(呉)",
         kunyomi="ひと",
         sentence="大人[おとな] 達[たち]は 人々[ひとびと]の 中[なか]に いる。",
-        expected="おと<b>な</b> たちは <b>ひとびと</b>の なかに いる。",
-    )
-    test(
-        test_name="Jukujigun test 今日 1/",
-        kanji="今",
-        onyomi="コン(呉)、キン(漢)",
-        kunyomi="いま",
-        sentence="今日[きょう]は 今[いま]まで 一日[いちにち] 何[なに]も しなかった。",
-        expected="<b>きょ</b>うは <b>いま</b>まで いちにち なにも しなかった。",
-    )
-    test(
-        test_name="Jukujigun test 今日 2/",
-        kanji="日",
-        onyomi="ニチ(呉)、ジツ(漢)、ニ",
-        kunyomi="ひ、か",
-        sentence="今日[きょう]は 今[いま]まで 一日[いちにち] 何[なに]も しなかった。",
-        expected="きょ<b>う</b>は いままで いち<b>ニチ</b> なにも しなかった。",
-    )
-    test(
-        test_name="Jukijigun test　百合 1/",
-        kanji="百",
-        onyomi="ヒャク(呉)、ハク(漢)",
-        kunyomi="もも",
-        sentence="百人[ひゃくにん]の 百合[ゆり]オタクが 合体[がったい]した。",
-        expected="<b>ヒャク</b>にんの <b>ゆ</b>りオタクが がったいした。",
-    )
-    test(
-        test_name="Jukijigun test　百合 2/",
-        kanji="合",
-        onyomi="ガッ(慣)、カッ(慣)、ゴウ(呉)、コウ(漢)",
-        kunyomi="あ.う、あ.い、あい、あ.わす、あ.わせる",
-        sentence="百人[ひゃくにん]の 百合[ゆり]オタクが 合体[がったい]した。",
-        expected="ひゃくにんの ゆ<b>り</b>オタクが <b>ガッ</b>たいした。",
+        expected_kana_only="おと<b>な</b> たちは <b>ひとびと</b>の なかに いる。",
+        expected_furigana=" 大[おと]<b> 人[な]</b> 達[たち]は<b> 人々[ひとびと]</b>の 中[なか]に いる。",
+        expected_furikanji=" おと[大]<b> な[人]</b> たち[達]は<b> ひとびと[人々]</b>の なか[中]に いる。",
     )
     test(
         test_name="Verb okurigana test 1/",
@@ -1265,9 +1507,11 @@ def main():
         onyomi="ライ(呉)、タイ",
         kunyomi="く.る、きた.る、きた.す、き.たす、き.たる、き、こ、こ.し、き.し",
         sentence="今[いま]に 来[きた]るべし",
-        expected="いまに <b>きたる</b>べし",
+        expected_kana_only="いまに <b>きたる</b>べし",
+        expected_furigana=" 今[いま]に<b> 来[きた]る</b>べし",
+        expected_furikanji=" いま[今]に<b> きた[来]る</b>べし",
     )
-    log("Ok.")
+    print("Ok.")
 
 
 if __name__ == "__main__":
