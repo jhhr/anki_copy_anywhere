@@ -195,6 +195,8 @@ class RequiredCombobox(QComboBox):
     def addItems(self, items: list[QStandardItem]):
         nothing_was_selected = self.currentText() == ""
         for item in items:
+            if isinstance(item, str):
+                item = QStandardItem(item)
             self.model().appendRow(item)
             if self.auto_size:
                 self.check_text_width(item.text())

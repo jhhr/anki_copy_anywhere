@@ -328,11 +328,17 @@ class KanaHighlightProcessDialog(QDialog):
         self.kanji_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Kanji field", self.kanji_field_cbox)
 
+        self.return_type_cbox = RequiredCombobox(placeholder_text="Select return type (required")
+        self.return_type_cbox.addItems(["furigana", "furikanji", "kana_only"])
+        self.return_type_cbox.setCurrentText("kana_only")
+        self.form.addRow("Return type", self.return_type_cbox)
+
         self.update_combobox_options()
 
         with suppress(KeyError): self.onyomi_field_cbox.setCurrentText(self.process["onyomi_field"])
         with suppress(KeyError): self.kunyomi_field_cbox.setCurrentText(self.process["kunyomi_field"])
         with suppress(KeyError): self.kanji_field_cbox.setCurrentText(self.process["kanji_field"])
+        with suppress(KeyError): self.return_type_cbox.setCurrentText(self.process["return_type"])
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
@@ -356,6 +362,7 @@ class KanaHighlightProcessDialog(QDialog):
             "onyomi_field": self.onyomi_field_cbox.currentText(),
             "kunyomi_field": self.kunyomi_field_cbox.currentText(),
             "kanji_field": self.kanji_field_cbox.currentText(),
+            "return_type": self.return_type_cbox.currentText(),
         }
         self.accept()
 

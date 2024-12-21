@@ -1,11 +1,17 @@
+
 import re
 from typing import Union, Callable, TypedDict, Literal, Optional
 
 try:
-    from .kana_conv import to_katakana, to_hiragana
+    from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
+    from .jpn_text_processing.get_conjugatable_okurigana_stem import get_conjugatable_okurigana_stem
+    from .jpn_text_processing.starts_with_okurigana_conjugation import starts_with_okurigana_conjugation, OkuriResults
 except ImportError:
     # For testing
-    from kana_conv import to_katakana, to_hiragana
+    import sys
+    from jpn_text_processing.kana_conv import to_katakana, to_hiragana
+    from jpn_text_processing.get_conjugatable_okurigana_stem import get_conjugatable_okurigana_stem
+    from jpn_text_processing.starts_with_okurigana_conjugation import starts_with_okurigana_conjugation, OkuriResults
 
 HIRAGANA_CONVERSION_DICT = {
     "か": ["が"],
@@ -85,188 +91,6 @@ FURIGANA_REC = re.compile(rf"{FURIGANA_RE}")
 # Regex matching any kanji and furigana + hiragana after the furigana
 KANJI_AND_FURIGANA_AND_OKURIGANA_RE = "([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]([ぁ-ん]*)"
 KANJI_AND_FURIGANA_AND_OKURIGANA_REC = re.compile(rf"{KANJI_AND_FURIGANA_AND_OKURIGANA_RE}")
-
-VERB_NOUN_OKURIGANA = {
-    # Eg. 隣る　becomes 隣り
-    "る": "り",
-    # Eg. 読む　becomes 読み
-    "む": "み",
-    # Eg. 死ぬ　becomes 死に
-    "ぬ": "に",
-    # Eg. 泳ぐ　becomes 泳ぎ
-    "ぐ": "ぎ",
-    # Eg. 遊ぶ　becomes 遊び
-    "ぶ": "び",
-    # Eg. 止める　becomes 止め
-    "める": "め",
-}
-
-# Given a hiragana, what are the possible next hiragana,
-# assuming that we are in a verb conjugation okurigana?
-READING_FIRST_KANA_TO_POSSIBLE_INFLECTED_FIRST_KANA = {
-    # う verb, eg. 買う, 言う, 歌う, 彷徨う
-    "う": ["っ", "い", "わ", "お", "え"],
-    # く verb, eg. 書く, 聞く, 咲く、貫く
-    "く": ["き", "か", "け", "こ"],
-    # ぐ verb, eg. 泳ぐ, 騒ぐ, 脱ぐ
-    "ぐ": ["ぎ", "が", "げ", "ご"],
-    # す verb, eg. 話す, 下す, 貸す
-    "す": ["し", "さ", "せ", "そ"],
-    # つ verb, eg. 打つ, 持つ
-    "つ": ["っ", "ち", "た", "て", "と"],
-    # ぬ verb, eg. 死ぬ
-    "ぬ": ["に", "な", "ね", "の"],
-    # ぶ verb, eg. 遊ぶ, 飛ぶ
-    "ぶ": ["び", "ば", "べ", "ぼ"],
-    # む verb, eg. 読む, 飲む
-    "む": ["み", "ま", "め", "も"],
-    # る verb, eg. 見る, 走る
-    "る": ["り", "ら", "れ", "ろ"],
-    # める verb, eg. 止める
-    "める": ["め"],
-}
-# Other kana that could lead to one of the above
-OTHER_FIRST_KANA = {
-    # べる verb, eg. 食べる
-    "べ": "る",
-    # かす　verb, eg. 負かす
-    "か": "す",
-    # げる verb, eg. 負ける
-    "げ": "る",
-    # たる　verb, eg. 来る
-    "た": "る",
-}
-# Kana that can't be the beginning of a verb okurigana
-NOT_FIRST_KANA = {"を", "ぽ", "ぷ", "ぴ", "ぱ", "へ", "ぺ", "あ", "お", "や", "ゆ", "よ", "ろ", "ふ", "ゐ"}
-
-# Okurigana endings for verbs that follow the same pattern as the plain form
-VERB_ALL_OKURIGANA = {
-    # Formal
-    "ます",  # polite positive non-past
-    "ました",  # polite positive past
-    "ません",  # polite negative non-past
-    "ませんでした",  # polite negative past
-    # Plain
-    "った",  # past
-    "いた",  # past
-    "んだ",  # past
-    "た",  # plain positive past
-    "ない",  # plain negative non-past
-    "なかった",  # plain negative past
-    # Te-form
-    "て",  # te-form
-    # Conditional
-    "ましたら",  # polite positive conditional
-    "ませんでしたら",  # polite negative conditional
-    "たら",  # plain positive conditional
-    "なかったら",  # plain negative conditional
-    # Volitional
-    "ましょう",  # polite positive volitional
-    "ませんか",  # polite negative volitional
-    "よう",  # plain positive volitional
-    "まい",  # plain negative volitional
-    # Potential
-    "れる",  # potential
-    "れない",  # potential negative
-    "れた",  # potential past
-    "れなかった",  # potential negative past
-    "れます",  # polite potential
-    "れません",  # polite potential negative
-    "る",  # potential (short)
-    "ない",  # potential negative (short)
-    "なかった",  # potential negative past (short)
-    "ません",  # polite potential negative (short)
-    # Imperative
-    "ろ",  # imperative
-    "ろう",  # volitional
-    "るな",  # imperative negative
-    "なさい",  # imperative polite
-    "な",  # imperative negative polite
-    # Causative
-    "させる",  # causative
-    "させない",  # causative negative
-    "させた",  # causative past
-    "させなかった",  # causative negative past
-    "させます",  # polite causative
-    "させません",  # polite causative negative
-    "せる",  # causative (short)
-    "せない",  # causative negative (short)
-    "せた",  # causative past (short)
-    "せなかった",  # causative negative past (short)
-    "せます",  # polite causative (short)
-    "せません",  # polite causative negative (short)
-    # Passive
-    "られる",  # passive
-    "られない",  # passive negative
-    "られた",  # passive past
-    "られます",  # polite passive
-    "られなかった",  # passive negative past
-    "られません",  # polite passive negative
-    "れる",  # passive (short)
-    "れない",  # passive negative (short)
-    "れた",  # passive past (short)
-    "れなかった",  # passive negative past (short)
-    "れます",  # polite passive (short)
-    "れません",  # polite passive negative (short)
-    # Provisional
-    "えば",  # provisional
-    "れば",  # provisional passive
-    "えなければ",  # provisional negative
-    "えたら",  # provisional past
-    "えなかったら",  # provisional negative past
-    # Progressive
-    "ている",  # progressive
-    "ていない",  # progressive negative
-    "ていた",  # progressive past
-    "ていなかった",  # progressive negative past
-    "ています",  # polite progressive
-    "ていません",  # polite progressive negative
-    "てる",  # progressive (short)
-    "てない",  # progressive negative (short)
-    "てた",  # progressive past (short)
-    "てなかった",  # progressive negative past (short)
-    "てます",  # polite progressive (short)
-    "てません",  # polite progressive negative (short)
-
-    # Irregular okurigana for 為る
-    "きる",
-}
-
-IRREGULAR_VERB_INFLECTIONS = {
-    "来": {
-        "たす",
-        "たる",
-        "たり",
-        "なければ",
-        "なくて",
-        "き",
-    },
-}
-
-IRREGULAR_VERB_INFLECTIONS_REC = {
-    kanji: re.compile(rf"^({'|'.join(inflections)})(.*)$")
-    for kanji, inflections in IRREGULAR_VERB_INFLECTIONS.items()
-}
-
-VERB_INFLECTIONS_REC = re.compile(rf"(^{'|'.join(VERB_ALL_OKURIGANA)})(.*?)$")
-
-ADJECTIVE_INFLECTIONS = {
-    "い",
-    "く",
-    "かった",
-    "くない",
-    "くなかった",
-    "くて",
-    "ければ",
-    "けれど",
-    "かろう",
-    "かろうか",
-    "かれ",
-    "かれば",
-    "かれど"
-}
-
-ADJECTIVE_INFLECTIONS_REC = re.compile(rf"(^{'|'.join(ADJECTIVE_INFLECTIONS)})(.*?)$")
 
 # Regex for lone kanji with some hiragana to their right, then some kanji,
 # then furigana that includes the hiragana in the middle
@@ -358,6 +182,22 @@ def kana_filter(text):
     # First remove all brackets and then remove all kanji
     # Assuming every kanji had furigana, we'll be left with the correct kana
     return KANJI_REC.sub("", FURIGANA_REC.sub(bracket_replace, text.replace("&nbsp;", " ")))
+
+def furigana_reverser(text):
+    """
+    Reverse the position of kanji and furigana in the text.
+    :param text: The text to process
+    :return: The text with kanji and furigana reversed
+    """
+    def bracket_reverser(match):
+        if match.group(1).startswith("sound:"):
+            # [sound:...] should not be reversed, do nothing
+            return match.group(0)
+        kanji = match.group(1)
+        furigana = match.group(2)
+        return f'{furigana}[{kanji}]'
+
+    return re.sub(FURIGANA_RE, bracket_reverser, text.replace("&nbsp;", " "))
 
 
 # Arg typing
@@ -493,7 +333,7 @@ def reconstruct_furigana(
     right_furigana = furigana_parts.get("right_furigana")
 
     if not has_highlight:
-        log(f"\nreconstruct_furigana - no highlight")
+        log("\nreconstruct_furigana - no highlight")
         # There was no match found during onyomi and kunyomi processing, so no <b> tags
         # we can just construct the furigana without splitting it
         if reconstruct_type == "kana_only":
@@ -543,8 +383,7 @@ def reconstruct_furigana(
     return f'{result}{rest_kana}'
 
 
-LOG = True
-
+LOG = False
 
 def log(*args):
     if LOG:
@@ -595,22 +434,39 @@ def process_readings(
         word_data.get("edge"),
         return_on_or_kun_match_only
     )
-    log(f"\nkunyomi_results: {kunyomi_results}, word_data: {word_data}")
+    log(f"\nkunyomi_results: {kunyomi_results}, word_data: {word_data}, kana_highlight: {highlight_args}")
     if kunyomi_results["type"] == "kunyomi" and word_data["edge"] in [RIGHT, WHOLE]:
         okurigana = word_data.get("okurigana")
         okurigana_to_highlight = ""
+        partial_okuri = None
+        partial_okuri_rest = None
         rest_kana = okurigana
         kunyomi_readings = iter(highlight_args.get("kunyomi").split("、"))
         while not okurigana_to_highlight and (next_kunyomi := next(kunyomi_readings, None)):
             log(f"\ncheck_kunyomi_readings - okurigana: {not okurigana_to_highlight}, next_kunyomi: {next_kunyomi}")
             try:
                 log(f"\ncheck_kunyomi_readings while - next_kunyomi: {next_kunyomi}")
-                _, kunyomi_okurigana = next_kunyomi.split(".")
+                kunyomi_reading, kunyomi_okurigana = next_kunyomi.split(".")
             except ValueError:
                 continue
-            okurigana_to_highlight, rest_kana = check_okurigana_for_kunyomi_inflection(
-                kunyomi_okurigana, word_data, highlight_args
+            res = check_okurigana_for_kunyomi_inflection(
+                kunyomi_okurigana, kunyomi_reading, word_data, highlight_args
             )
+            if res.result == 'partial_okuri' or res.result == 'empty_okuri':
+                # If we only got a partial or empty okurigana match, continue looking
+                # in case we get a full match instead
+                partial_okuri = res.okurigana
+                partial_okuri_rest = res.rest_kana
+                log(f"\ncheck_kunyomi_readings while got a partial_okuri: {partial_okuri}, rest_kana: {partial_okuri_rest}")
+                continue
+            if res.result == 'full_okuri':
+                log(f"\ncheck_kunyomi_readings while got a full_okuri: {res.okurigana}, rest_kana: {res.rest_kana}")
+                okurigana_to_highlight = res.okurigana
+                rest_kana = res.rest_kana
+        if partial_okuri and not okurigana_to_highlight:
+            log(f"\ncheck_kunyomi_readings while final partial_okuri: {partial_okuri}, rest_kana: {partial_okuri_rest}")
+            okurigana_to_highlight = partial_okuri
+            rest_kana = partial_okuri_rest
         log(f"\ncheck_kunyomi_readings while result - okurigana: {okurigana_to_highlight}, rest_kana: {rest_kana}")
         return kunyomi_results, okurigana_to_highlight, rest_kana
 
@@ -751,10 +607,10 @@ def replace_onyomi_match(
 
 def check_okurigana_for_kunyomi_inflection(
         kunyomi_okurigana: str,
+        kunyomi_reading: str,
         word_data: WordData,
-        highlight_args: HighlightArgs,
-
-) -> (str, str):
+        highlight_args: HighlightArgs
+) -> OkuriResults:
     """
     Function that checks the okurigana for a match with the kunyomi okurigana
     :param kunyomi_okurigana: string, the okurigana from the kunyomi reading
@@ -762,73 +618,51 @@ def check_okurigana_for_kunyomi_inflection(
     :param highlight_args: dict, the base arguments passed to kana_highlight
     :return: (string, string) the okurigana that should be highlighted and the rest of the okurigana
     """
-    okurigana = word_data.get("okurigana")
+    # Kana text occurring after the kanji in the word, may not be okurigana and can
+    # contain other kana after the okurigana
+    maybe_okuri_text = word_data.get("okurigana")
+    log(f"\ncheck okurigana 0 - kunyomi_okurigana: {kunyomi_okurigana}, maybe_okurigana: {maybe_okuri_text}")
 
-    if not kunyomi_okurigana or not okurigana:
-        return "", okurigana
+    if not kunyomi_okurigana or not maybe_okuri_text:
+        return OkuriResults("", "", "no_okuri")
 
-    if kunyomi_okurigana == okurigana:
-        return okurigana, ""
-
-    if okurigana[0] in NOT_FIRST_KANA:
-        return "", okurigana
-
-    log(f"\ncheck okurigana 0 - kunyomi_okurigana: {kunyomi_okurigana}")
-
-    kanji_to_highlight = highlight_args.get("kanji_to_highlight")
+    # Simple case, exact match, no need to check conjugations
+    if kunyomi_okurigana == maybe_okuri_text:
+        return OkuriResults(kunyomi_okurigana, "", "full_okuri")
 
     # Check what kind of inflections we should be looking for from the kunyomi okurigana
-    inflection_kana_key = kunyomi_okurigana[0]
-    if okurigana == VERB_NOUN_OKURIGANA.get(kunyomi_okurigana):
-        log(f"\ncheck okurigana 1 : {okurigana}")
-        return okurigana, ""
-    if inflection_kana_key in OTHER_FIRST_KANA:
-        inflection_kana_key = OTHER_FIRST_KANA[inflection_kana_key]
-    if (inflection_kana_key in READING_FIRST_KANA_TO_POSSIBLE_INFLECTED_FIRST_KANA):
-        if okurigana[0] == inflection_kana_key:
-            # This is a verb in plain form, so just the first kana should be highlighted
-            return okurigana[0], okurigana[1:]
-        # Ok, first kana wasn't already a plain form verb ending, maybe it's a 2-kana plain form verb ending?
-        log(f"\ncheck okurigana 2 : {okurigana}")
-        if len(okurigana) > 1 and okurigana[1] == OTHER_FIRST_KANA.get(okurigana[0]):
-            return okurigana[:2], okurigana[2:]
-        # Ok, then check all the verb inflections
-        okurigana_inflection_target = okurigana
-        log(f"\ncheck okurigana 3 : {okurigana}")
-        start = ""
-        possible_second_kana = READING_FIRST_KANA_TO_POSSIBLE_INFLECTED_FIRST_KANA[inflection_kana_key]
-        log(f"\ncheck okurigana 4 - possible_second_kana: {possible_second_kana}")
-        if okurigana[0] in possible_second_kana:
-            start = okurigana[0]
-            okurigana_inflection_target = okurigana[1:]
-            log(f"\ncheck okurigana 4 - start: {start}")
-        log(f"\ncheck okurigana 5 - okurigana_inflection_target: {okurigana_inflection_target}")
-        # check if okurigana_inflection_target starts with one of the verb inflections
-        # and return the part that matches and the rest
-        if kanji_to_highlight in IRREGULAR_VERB_INFLECTIONS \
-                and (match := IRREGULAR_VERB_INFLECTIONS_REC[kanji_to_highlight].match(okurigana_inflection_target)):
-            log(f"\ncheck okurigana 6 - match: {match.group(1)}")
-            return start + match.group(1), match.group(2)
-        if match := VERB_INFLECTIONS_REC.match(okurigana_inflection_target):
-            log(f"\ncheck okurigana 7 - match: {match.group(1)}")
-            return start + match.group(1), match.group(2)
-        # No match? Then the okurigana doesn't match the kunyomi okurigana
-        return "", okurigana
-    elif kunyomi_okurigana.endswith("い"):
-        log(f"\ncheck okurigana 8 - is adjective: {kunyomi_okurigana}")
-        # This is an i-adjective, so the okurigana should start with し,き or い
-        okurigana_inflection_target = okurigana
-        start = ""
-        if okurigana[0] in {"し", "き"}:
-            start = okurigana[0]
-            okurigana_inflection_target = okurigana[1:]
-        log(f"\ncheck okurigana 9 - okurigana_inflection_target: {okurigana_inflection_target}")
-        # check inflections same as for verbs
-        match = ADJECTIVE_INFLECTIONS_REC.match(okurigana_inflection_target)
-        if match:
-            return start + match.group(1), match.group(2)
-    # No match? Then the okurigana doesn't match the kunyomi okurigana
-    return "", okurigana
+    conjugatable_stem = get_conjugatable_okurigana_stem(kunyomi_okurigana)
+    log(f"\ncheck okurigana 1 - conjugatable_stem: {conjugatable_stem}")
+    if conjugatable_stem is None or not maybe_okuri_text.startswith(conjugatable_stem):
+        log(f"\ncheck okurigana 2 - no conjugatable_stem")
+        # Not a verb or i-adjective, so just check for an exact match within the okurigana
+        if maybe_okuri_text.startswith(kunyomi_okurigana):
+            log(f"\ncheck okurigana 3 - maybe_okuri_text: {maybe_okuri_text}")
+            return OkuriResults(kunyomi_okurigana, maybe_okuri_text[len(kunyomi_okurigana):], "full_okuri")
+        log(f"\ncheck okurigana 4 - no match")
+        return OkuriResults("", maybe_okuri_text, "no_okuri")
+
+    # Remove the conjugatable_stem from maybe_okurigana
+    trimmed_maybe_okuri = maybe_okuri_text[len(conjugatable_stem):]
+    log(f"\ncheck okurigana 5 - trimmed_maybe_okuri: {trimmed_maybe_okuri}")
+
+    # Then check if that contains a conjugation for what we're looking for
+    conjugated_okuri, rest, return_type = starts_with_okurigana_conjugation(
+        trimmed_maybe_okuri,
+        kunyomi_okurigana,
+        highlight_args["kanji_to_highlight"],
+        kunyomi_reading,
+    )
+    log(f"\ncheck okurigana 6 - conjugated_okuri: {conjugated_okuri}, rest: {rest}, return_type: {return_type}")
+
+    if return_type != "no_okuri":
+        log(f"\ncheck okurigana 7 - result: {conjugatable_stem + conjugated_okuri}, rest: {rest}")
+        # remember to add the stem back!
+        return OkuriResults(conjugatable_stem + conjugated_okuri, rest, return_type)
+
+    # No match, this text doesn't contain okurigana for the kunyomi word
+    log(f"\ncheck okurigana 8 - no match")
+    return OkuriResults("", maybe_okuri_text, "no_okuri")
 
 
 def check_kunyomi_readings(
@@ -901,7 +735,7 @@ def check_kunyomi_readings(
                         converted_kunyomi,
                         edge,
                     )
-    log(f"\ncheck_kunyomi_readings - no match")
+    log("\ncheck_kunyomi_readings - no match")
     return {"text": "", "type": "none"}
 
 
@@ -1213,12 +1047,26 @@ def test(
         try:
             assert result == expected
         except AssertionError:
-            print(f"""{test_name}
+            # Re-run with logging enabled to see what went wrong
+            global LOG
+            LOG = True
+            kana_highlight(
+                kanji,
+                onyomi,
+                kunyomi,
+                sentence,
+                return_type,
+            )
+            # Highlight the diff between the expected and the result
+            print(f"""\033[91m{test_name}
 Return type: {return_type}
-Expected: {expected}
-Got:      {result}
-""")
-            raise
+\033[93mExpected: {expected}
+\033[92mGot:      {result}
+\033[0m""")
+            # Stop testing here
+            sys.exit(1)
+        finally:
+            LOG = False
 
 
 def main():
@@ -1510,6 +1358,147 @@ def main():
         expected_kana_only="いまに <b>きたる</b>べし",
         expected_furigana=" 今[いま]に<b> 来[きた]る</b>べし",
         expected_furikanji=" いま[今]に<b> きた[来]る</b>べし",
+    )
+    test(
+        test_name="Verb okurigana test 2/",
+        kanji="書",
+        onyomi="ショ(呉)",
+        kunyomi="か.く、ふみ",
+        sentence="日記[にっき]を 書[か]いた。",
+        expected_kana_only="にっきを <b>かいた</b>。",
+        expected_furigana=" 日記[にっき]を<b> 書[か]いた</b>。",
+        expected_furikanji=" にっき[日記]を<b> か[書]いた</b>。",
+    )
+    test(
+        test_name="Verb okurigana test 3/",
+        kanji="話",
+        onyomi="ワ(呉)",
+        kunyomi="はな.す、はなし",
+        sentence="友達[ともだち]と 話[はな]している。",
+        expected_kana_only="ともだちと <b>はなして</b>いる。",
+        expected_furigana=" 友達[ともだち]と<b> 話[はな]して</b>いる。",
+        expected_furikanji=" ともだち[友達]と<b> はな[話]して</b>いる。",
+    )
+    test(
+        test_name="Verb okurigana test 4/",
+        kanji="聞",
+        onyomi="ブン(漢)、モン(呉)",
+        kunyomi="き.く、き.こえる",
+        sentence="ニュースを 聞[き]きました。",
+        expected_kana_only="ニュースを <b>ききました</b>。",
+        expected_furigana="ニュースを<b> 聞[き]きました</b>。",
+        expected_furikanji="ニュースを<b> き[聞]きました</b>。",
+    )
+    test(
+        test_name="Verb okurigana test 5/",
+        kanji="走",
+        onyomi="ソウ(呉)",
+        kunyomi="はし.る",
+        sentence="公園[こうえん]で 走[はし]ろう。",
+        expected_kana_only="こうえんで <b>はしろう</b>。",
+        expected_furigana=" 公園[こうえん]で<b> 走[はし]ろう</b>。",
+        expected_furikanji=" こうえん[公園]で<b> はし[走]ろう</b>。",
+    )
+    test(
+        test_name="Verb okurigana test 6/",
+        kanji="待",
+        onyomi="タイ(呉)",
+        kunyomi="ま.つ、もてな.す",
+        sentence="友達[ともだち]を 待[ま]つ。",
+        expected_kana_only="ともだちを <b>まつ</b>。",
+        expected_furigana=" 友達[ともだち]を<b> 待[ま]つ</b>。",
+        expected_furikanji=" ともだち[友達]を<b> ま[待]つ</b>。",
+    )
+    test(
+        test_name="Verb okurigana test 7/",
+        kanji="泳",
+        onyomi="エイ(呉)",
+        kunyomi="およ.ぐ",
+        sentence="海[うみ]で 泳[およ]ぐ。",
+        expected_kana_only="うみで <b>およぐ</b>。",
+        expected_furigana=" 海[うみ]で<b> 泳[およ]ぐ</b>。",
+        expected_furikanji=" うみ[海]で<b> およ[泳]ぐ</b>。",
+    )
+    test(
+        test_name="Verb okurigana test 8/",
+        kanji="作",
+        onyomi="サク(漢)、サ(呉)",
+        kunyomi="つく.る、つく.り、な.す",
+        sentence="料理[りょうり]を 作[つく]る。",
+        expected_kana_only="りょうりを <b>つくる</b>。",
+        expected_furigana=" 料理[りょうり]を<b> 作[つく]る</b>。",
+        expected_furikanji=" りょうり[料理]を<b> つく[作]る</b>。",
+    )
+    test(
+        test_name="Verb okurigana test 9/",
+        kanji="遊",
+        onyomi="ユウ(漢)、ユ(呉)",
+        kunyomi="あそ.ぶ、あそ.ばす、すさ.び、すさ.ぶ",
+        sentence="子供[こども]と 遊[あそ]んでいるぞ。",
+        expected_kana_only="こどもと <b>あそんで</b>いるぞ。",
+        expected_furigana=" 子供[こども]と<b> 遊[あそ]んで</b>いるぞ。",
+        expected_furikanji=" こども[子供]と<b> あそ[遊]んで</b>いるぞ。",
+    )
+    test(
+        test_name="Verb okurigana test 10/",
+        kanji="聞",
+        onyomi="ブン(漢)、モン(呉)",
+        # Both 聞く and 聞こえる will produce an okuri match but the correct should be 聞こえる
+        kunyomi="き.く、き.こえる",
+        sentence="音[おと]を 聞[き]こえたか？何[なに]も 聞[き]いていないよ",
+        expected_kana_only="おとを <b>きこえた</b>か？なにも <b>きいて</b>いないよ",
+        expected_furigana=" 音[おと]を<b> 聞[き]こえた</b>か？ 何[なに]も<b> 聞[き]いて</b>いないよ",
+        expected_furikanji=" おと[音]を<b> き[聞]こえた</b>か？ なに[何]も<b> き[聞]いて</b>いないよ",
+    )
+    test(
+        test_name="Adjective okurigana test 1/",
+        kanji="悲",
+        onyomi="ヒ(呉)",
+        kunyomi="かな.しい、かな.しむ",
+        sentence="彼[かれ]は 悲[かな]しくすぎるので、 悲[かな]しみの 悲[かな]しさを 悲[かな]しんでいる。",
+        expected_kana_only="かれは <b>かなしく</b>すぎるので、 <b>かなしみ</b>の <b>かなしさ</b>を <b>かなしんで</b>いる。",
+        expected_furigana=" 彼[かれ]は<b> 悲[かな]しく</b>すぎるので、<b> 悲[かな]しみ</b>の<b> 悲[かな]しさ</b>を<b> 悲[かな]しんで</b>いる。",
+        expected_furikanji=" かれ[彼]は<b> かな[悲]しく</b>すぎるので、<b> かな[悲]しみ</b>の<b> かな[悲]しさ</b>を<b> かな[悲]しんで</b>いる。",
+    )
+    test(
+        test_name="Adjective okurigana test 2/",
+        kanji="青",
+        onyomi="セイ(漢)、ショウ(呉)",
+        kunyomi="あお.い",
+        sentence="空[そら]が 青[あお]かったら、 青[あお]くない 海[うみ]に 行[い]こう",
+        expected_kana_only="そらが <b>あおかったら</b>、 <b>あおくない</b> うみに いこう",
+        expected_furigana=" 空[そら]が<b> 青[あお]かったら</b>、<b> 青[あお]くない</b> 海[うみ]に 行[い]こう",
+        expected_furikanji=" そら[空]が<b> あお[青]かったら</b>、<b> あお[青]くない</b> うみ[海]に い[行]こう",
+    )
+    test(
+        test_name="Adjective okurigana test 3/",
+        kanji="高",
+        onyomi="コウ(呉)",
+        kunyomi="たか.い、たか、だか、たか.まる、たか.める、たか.ぶる",
+        sentence="山[やま]が 高[たか]ければ、 高層[こうそう]ビルが 高[たか]めてと 高[たか]ぶり",
+        expected_kana_only="やまが <b>たかければ</b>、 <b>コウ</b>そうビルが <b>たかめて</b>と <b>たかぶり</b>",
+        expected_furigana=" 山[やま]が<b> 高[たか]ければ</b>、<b> 高[コウ]</b> 層[そう]ビルが<b> 高[たか]めて</b>と<b> 高[たか]ぶり</b>",
+        expected_furikanji=" やま[山]が<b> たか[高]ければ</b>、<b> コウ[高]</b> そう[層]ビルが<b> たか[高]めて</b>と<b> たか[高]ぶり</b>",
+    )
+    test(
+        test_name="Adjective okurigana test 4/",
+        kanji="厚",
+        onyomi="コウ(呉)",
+        kunyomi="あつ.かましい",
+        sentence="彼[かれ]は 厚かましい[あつかましい]。",
+        expected_kana_only="かれは <b>あつかましい</b>。",
+        expected_furigana=" 彼[かれ]は<b> 厚[あつ]かましい</b>。",
+        expected_furikanji=" かれ[彼]は<b> あつ[厚]かましい</b>。",
+    )
+    test(
+        test_name="Adjective okurigana test 5/",
+        kanji="恥",
+        onyomi="チ(呉)",
+        kunyomi="は.じる、はじ、は.じらう、は.ずかしい",
+        sentence="恥[は]ずかしげな 顔[かお]で 恥[はじ]を 知[し]らない 振[ふ]りで 恥[は]じらってください。",
+        expected_kana_only="<b>はずかし</b>げな かおで <b>はじ</b>を しらない ふりで <b>はじらって</b>ください。",
+        expected_furigana="<b> 恥[は]ずかし</b>げな 顔[かお]で<b> 恥[はじ]</b>を 知[し]らない 振[ふ]りで<b> 恥[は]じらって</b>ください。",
+        expected_furikanji="<b> は[恥]ずかし</b>げな かお[顔]で<b> はじ[恥]</b>を し[知]らない ふ[振]りで<b> は[恥]じらって</b>ください。",
     )
     print("Ok.")
 

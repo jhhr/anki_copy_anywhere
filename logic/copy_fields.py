@@ -436,6 +436,7 @@ def apply_process_chain(
                     onyomi_field=process.get("onyomi_field", None),
                     kunyomi_field=process.get("kunyomi_field", None),
                     kanji_field=process.get("kanji_field", None),
+                    return_type=process.get("return_type", None),
                     note=destination_note,
                     show_error_message=show_error_message,
                 )

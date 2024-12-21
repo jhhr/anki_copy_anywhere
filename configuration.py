@@ -4,6 +4,8 @@ from typing import TypedDict, Optional, Union, Literal
 # noinspection PyUnresolvedReferences
 from aqt import mw
 
+from .logic.kana_highlight import FuriReconstruct
+
 tag = mw.addonManager.addonFromModule(__name__)
 
 
@@ -71,6 +73,7 @@ class KanaHighlightProcess(TypedDict):
     onyomi_field: str
     kunyomi_field: str
     kanji_field: str
+    return_type: FuriReconstruct
 
 
 ALL_FIELD_TO_FIELD_PROCESS_NAMES = [
