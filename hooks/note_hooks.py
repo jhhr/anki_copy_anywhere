@@ -79,12 +79,12 @@ def run_copy_fields_on_review(card: Card):
         # But now they are both merged into the Answer card undo entry
         mw.col.merge_undo_entries(answer_card_undo_entry)
 
+
 def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str):
     config = Config()
     config.load()
     note_type_name = note.note_type()["name"]
     changed = False
-
 
     for copy_definition in config.copy_definitions:
         copy_into_note_types = copy_definition.get("copy_into_note_types", None)
@@ -123,6 +123,7 @@ def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str)
 
     return changed
 
+
 def init_note_hooks():
     hooks.note_will_be_added.append(
         lambda _col, note, deck_id: run_copy_fields_on_add(note, deck_id)
@@ -131,5 +132,7 @@ def init_note_hooks():
         lambda reviewer, card, ease: run_copy_fields_on_review(card)
     )
     editor_did_unfocus_field.append(
-        lambda changed, note, field_idx: run_copy_fields_on_unfocus_field(changed, note, note.keys()[field_idx])
+        lambda changed, note, field_idx: run_copy_fields_on_unfocus_field(
+            changed, note, note.keys()[field_idx]
+        )
     )

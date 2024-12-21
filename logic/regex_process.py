@@ -3,17 +3,18 @@ from typing import Callable, Optional
 
 
 def regex_process(
-        text: str,
-        regex: str,
-        replacement: str,
-        flags: Optional[str],
-        show_error_message: Callable[[str], None] = None
+    text: str,
+    regex: str,
+    replacement: str,
+    flags: Optional[str],
+    show_error_message: Callable[[str], None] = None,
 ) -> str:
     """
-     Basic regex processing step that replaces the text that matches the regex with the replacement.
-     If no replacement is provided, instead only the match is returned.
+    Basic regex processing step that replaces the text that matches the regex with the replacement.
+    If no replacement is provided, instead only the match is returned.
     """
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
@@ -39,15 +40,24 @@ def regex_process(
     return regex.sub(replacement, text)
 
 
-def test(test_name: str, text: str, regex: str, replacement: str, flags: Optional[str], expected: str):
+def test(
+    test_name: str,
+    text: str,
+    regex: str,
+    replacement: str,
+    flags: Optional[str],
+    expected: str,
+):
     result = regex_process(text, regex, replacement, flags, None)
     try:
         assert result == expected
     except AssertionError:
-        print(f"""{test_name}
+        print(
+            f"""{test_name}
 Expected: {expected}
 Got: {result}
-""")
+"""
+        )
         raise
 
 

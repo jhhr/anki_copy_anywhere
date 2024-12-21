@@ -30,6 +30,7 @@ else:
 #     if isinstance(value, int):
 #         QEventTypesByNum[value] = name
 
+
 class ComboboxPlaceholderListView(QListView):
     def __init__(self, combobox, **kwargs):
         super().__init__(**kwargs)
@@ -50,16 +51,8 @@ class ComboBoxPlaceholderLineEdit(QLineEdit):
     This would let the user type in the line edit, so we need to manually ignore input events.
     """
 
-    def __init__(
-            self,
-            parent=None,
-            placeholder_text: str = None,
-            **kwargs
-    ):
-        super().__init__(
-            parent,
-            **kwargs
-        )
+    def __init__(self, parent=None, placeholder_text: str = None, **kwargs):
+        super().__init__(parent, **kwargs)
         # Set the default style to vertically center the text so that the
         # text's y's and g's are not cut off at the bottom
         self.setStyleSheet("padding-bottom: 0px; padding-top: 0px;")
@@ -75,9 +68,9 @@ class ComboBoxPlaceholderLineEdit(QLineEdit):
             return super().event(event)
         # Ignore other key events to prevent user input
         if event.type() in (
-                QEventTypes.KeyPress,
-                QEventTypes.KeyRelease,
-                QEventTypes.InputMethodQuery
+            QEventTypes.KeyPress,
+            QEventTypes.KeyRelease,
+            QEventTypes.InputMethodQuery,
         ):
             return True
         return super().event(event)
@@ -93,19 +86,21 @@ class ComboBoxPlaceholderLineEdit(QLineEdit):
 
 class RequiredCombobox(QComboBox):
     def __init__(
-            self,
-            parent=None,
-            placeholder_text: str = None,
-            is_required: bool = False,
-            auto_size: bool = False,
-            minimum_width: int = 250,
-            **kwargs
+        self,
+        parent=None,
+        placeholder_text: str = None,
+        is_required: bool = False,
+        auto_size: bool = False,
+        minimum_width: int = 250,
+        **kwargs
     ):
         super().__init__(parent, **kwargs)
         #### Placeholder management
-        self.setLineEdit(ComboBoxPlaceholderLineEdit(
-            placeholder_text=placeholder_text,
-        ))
+        self.setLineEdit(
+            ComboBoxPlaceholderLineEdit(
+                placeholder_text=placeholder_text,
+            )
+        )
         self.is_required = is_required
         self.was_valid = True
         self.default_style = self.styleSheet()
@@ -145,11 +140,16 @@ class RequiredCombobox(QComboBox):
         #     self.currentTextChanged.connect(self.update_required_style)
 
     def event(self, event: QEvent):
-        if hasattr(self, 'is_required') and self.is_required and event.type() in (
+        if (
+            hasattr(self, "is_required")
+            and self.is_required
+            and event.type()
+            in (
                 QEventTypes.FocusIn,
                 QEventTypes.FocusOut,
                 QEventTypes.KeyPress,
-                QEventTypes.KeyRelease
+                QEventTypes.KeyRelease,
+            )
         ):
             self.update_required_style()
         return super().event(event)

@@ -47,12 +47,12 @@ class PasteableTextEdit(AutoResizingTextEdit):
     """
 
     def __init__(
-            self,
-            parent=None,
-            options_dict: dict = None,
-            height: int = None,
-            placeholder_text: str = None,
-            **kwargs
+        self,
+        parent=None,
+        options_dict: dict = None,
+        height: int = None,
+        placeholder_text: str = None,
+        **kwargs
     ):
         super().__init__(parent, **kwargs)
         # Define predefined options and their associated text
@@ -95,7 +95,10 @@ class PasteableTextEdit(AutoResizingTextEdit):
             for option in option_list:
                 add_option_to_menu(menu, option, option)
 
-        def populate_menu(menu: QMenu, options: Union[list, dict, str], ):
+        def populate_menu(
+            menu: QMenu,
+            options: Union[list, dict, str],
+        ):
             """
             Recursively add options to the context menu to
             allow arbitrary nesting of options and submenus.
@@ -145,8 +148,14 @@ class PasteableTextEdit(AutoResizingTextEdit):
         self.options_dict[group_name] = {}
         return self.options_dict[group_name]
 
-    def add_option_to_group(self, group_name: str, option_name: str, option_text: str, target_level: dict = None):
-        current_level = (self.options_dict if target_level is None else target_level)
+    def add_option_to_group(
+        self,
+        group_name: str,
+        option_name: str,
+        option_text: str,
+        target_level: dict = None,
+    ):
+        current_level = self.options_dict if target_level is None else target_level
         if group_name not in current_level:
             current_level[group_name] = {}
         current_level[group_name][option_name] = option_text

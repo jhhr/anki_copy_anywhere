@@ -5,6 +5,7 @@ from typing import Tuple, Union, List, Optional, Callable
 
 # noinspection PyUnresolvedReferences
 from anki.cards import Card
+
 # noinspection PyUnresolvedReferences
 from anki.consts import (
     CARD_TYPE_NEW,
@@ -12,8 +13,10 @@ from anki.consts import (
     CARD_TYPE_REV,
     CARD_TYPE_RELEARNING,
 )
+
 # noinspection PyUnresolvedReferences
 from anki.notes import Note
+
 # noinspection PyUnresolvedReferences
 from aqt import mw
 
@@ -128,14 +131,14 @@ def basic_arg_validator(arg: str) -> str:
     """
     # Should not use the interpolation syntax or the arg will get interpolated!
     if INTR_PREFIX in arg or INTR_SUFFIX in arg:
-        return f'should not contain {INTR_PREFIX} or {INTR_SUFFIX}'
+        return f"should not contain {INTR_PREFIX} or {INTR_SUFFIX}"
     return ""
 
 
 # Basic query for how many to get should either "all"
 # #or parseable as an integer and > 0
 def BASE_NUM_ARG_VALIDATOR(arg):
-    if ((arg.isdigit() and int(arg) > 0) or arg == "all"):
+    if (arg.isdigit() and int(arg) > 0) or arg == "all":
         return ""
     else:
         return "should be a positive integer"
@@ -167,18 +170,22 @@ BASE_NOTE_MENU_DICT = {
 DESTINATION_NOTE_MENU_DICT = {
     # The note being used to query
     DESTINATION_NOTE_DATA_KEY: {
-        "Destination Note Type ID (mid:)": intr_format(f"{DESTINATION_PREFIX}{NOTE_TYPE_ID}"),
+        "Destination Note Type ID (mid:)": intr_format(
+            f"{DESTINATION_PREFIX}{NOTE_TYPE_ID}"
+        ),
         "Destination Note ID (nid:)": intr_format(f"{DESTINATION_PREFIX}{NOTE_ID}"),
         "Destination note all tags": intr_format(f"{DESTINATION_PREFIX}{NOTE_TAGS}"),
         "Destination note has tag": intr_format(f"{DESTINATION_PREFIX}{NOTE_HAS_TAG}"),
-        "Destination No. different card types": intr_format(f"{DESTINATION_PREFIX}{NOTE_CARD_COUNT}"),
+        "Destination No. different card types": intr_format(
+            f"{DESTINATION_PREFIX}{NOTE_CARD_COUNT}"
+        ),
     },
 }
 
 
 def get_note_data_value(
-        note: Note,
-        field_name: str,
+    note: Note,
+    field_name: str,
 ) -> Union[str, int, None, Callable[[str], Union[str, any]]]:
     """
     Get the value for a single special field.
@@ -214,16 +221,16 @@ def format_timestamp_days(e, time_format=None):
 
 
 def get_card_last_reps(
-        card_id: str,
-        rep_count: str,
-        get_ease: bool = False,
-        get_ivl: bool = False,
-        get_fct: bool = False,
+    card_id: str,
+    rep_count: str,
+    get_ease: bool = False,
+    get_ivl: bool = False,
+    get_fct: bool = False,
 ) -> Union[
     # Return  or a flat list of values
     List[Union[int, float]],
-        # or a list of lists of values when two or more rev_log fields are requested
-    List[List[Union[int, float]]]
+    # or a list of lists of values when two or more rev_log fields are requested
+    List[List[Union[int, float]]],
 ]:
     if not get_ease and not get_ivl and not get_fct:
         return []
@@ -254,8 +261,8 @@ def get_card_last_reps(
 
 
 def get_value_for_card(
-        card: Card,
-        note: Note,
+    card: Card,
+    note: Note,
 ) -> dict[str, any]:
     (first, last, cnt, total) = mw.col.db.first(
         f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card.id}"
@@ -268,19 +275,33 @@ def get_value_for_card(
         CARD_IVL: card.ivl or 0,
         CARD_EASE: card.factor / 10 or 0,
         # If FSRS is not enabled, memory_state will be None
-        CARD_STABILITY: round(card.memory_state.stability, 1) if card.memory_state else 0,
-        CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
+        CARD_STABILITY: (
+            round(card.memory_state.stability, 1) if card.memory_state else 0
+        ),
+        CARD_DIFFICULTY: (
+            round(card.memory_state.difficulty, 1) if card.memory_state else 0
+        ),
         CARD_REP_COUNT: card.reps or 0,
         CARD_LAPSE_COUNT: card.lapses or 0,
         CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "-",
         CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "-",
-        CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-",
+        CARD_AVERAGE_TIME: (
+            timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-"
+        ),
         CARD_TOTAL_TIME: timespan(total),
-        CARD_TYPE: "Review" if card.type == CARD_TYPE_REV \
-            else "New" if card.type == CARD_TYPE_NEW \
-            else "Learning" if card.type == CARD_TYPE_LRN \
-            else "Relearning" if card.type == CARD_TYPE_RELEARNING \
-            else "",
+        CARD_TYPE: (
+            "Review"
+            if card.type == CARD_TYPE_REV
+            else (
+                "New"
+                if card.type == CARD_TYPE_NEW
+                else (
+                    "Learning"
+                    if card.type == CARD_TYPE_LRN
+                    else "Relearning" if card.type == CARD_TYPE_RELEARNING else ""
+                )
+            )
+        ),
         CARD_CREATED: format_timestamp(card.nid / 1000) if card.nid else "-",
         CARD_CUSTOM_DATA: card.custom_data or {},
         CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),
@@ -290,14 +311,8 @@ def get_value_for_card(
 
 
 def get_card_values_dict_for_note(
-        note: Note,
-) -> dict[
-    str,
-    dict[
-        str,
-        Union[str, Callable[[str], Union[str, any]]]
-    ]
-]:
+    note: Note,
+) -> dict[str, dict[str, Union[str, Callable[[str], Union[str, any]]]]]:
     """
     Get a dictionary of special fields that are card-specific.
     """
@@ -317,17 +332,21 @@ def get_card_values_dict_for_note(
     return card_values
 
 
-NOTE_VALUE_RE = re.compile(rf"""
+NOTE_VALUE_RE = re.compile(
+    rf"""
 ^ # must start with __ or this is not a note value
 (__\w+ # match group 1, the note value key
     (?:{ARG_SEPARATOR})? # the arg separator, optional
 )
 (.*)? # match group 2, the note value arg, only present when the arg separator is present
 $
-""", re.VERBOSE)
+""",
+    re.VERBOSE,
+)
 
 # Normal card values have to specify the card type name
-CARD_VALUE_RE = re.compile(rf"""
+CARD_VALUE_RE = re.compile(
+    rf"""
 ^
 (.+) # match group 1, the card type name
 (__\w+ # match group 2, the card value key
@@ -335,26 +354,31 @@ CARD_VALUE_RE = re.compile(rf"""
 )
 (.*)? # match group 3, the card value arg, only present when the arg separator is present
 $
-""", re.VERBOSE)
+""",
+    re.VERBOSE,
+)
 
 # In multi note type definitions, the card type name is omitted, as we just assume there is only one
 # Same as above but actually simpler as the card type is omitted
-MULTI_CARD_VALUE_RE = re.compile(rf"""
+MULTI_CARD_VALUE_RE = re.compile(
+    rf"""
 ^
 (__\w+ # match group 1, the card value key
   (?:{ARG_SEPARATOR})? # the arg separator, optional
 )
 (.*)? # match group 2, the card value arg, only present when the arg separator is present
 $
-""", re.VERBOSE)
+""",
+    re.VERBOSE,
+)
 
 
 def get_from_note_fields(
-        field: str,
-        note: Note,
-        note_fields: dict,
-        card_values_dict: dict = None,
-        multiple_note_types: bool = False,
+    field: str,
+    note: Note,
+    note_fields: dict,
+    card_values_dict: dict = None,
+    multiple_note_types: bool = False,
 ) -> Tuple[Union[str, None], Union[dict, None]]:
     """
     Get a value from a note, source or destination. The note's fields or its cards' fields.
@@ -387,14 +411,19 @@ def get_from_note_fields(
                 return value(maybe_note_value_arg), card_values_dict
             return value, card_values_dict
     # And last, cards are harder since they need to specify the card type name too
-    card_match = CARD_VALUE_RE.match(field) if not multiple_note_types \
+    card_match = (
+        CARD_VALUE_RE.match(field)
+        if not multiple_note_types
         else MULTI_CARD_VALUE_RE.match(field)
+    )
     if card_match:
         if multiple_note_types:
             maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2)
             maybe_card_type_name = None
         else:
-            maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2, 3)
+            maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = (
+                card_match.group(1, 2, 3)
+            )
         # Check if the card type name is valid
         if maybe_card_value_key in CARD_VALUES_DICT:
             # If we haven't made the card values dict yet, do it now
@@ -412,7 +441,9 @@ def get_from_note_fields(
                 if len(dict_keys) == 1:
                     maybe_card_type_name = dict_keys[0]
                 elif len(dict_keys) > 1:
-                    raise ValueError("ERROR: Multiple target note types should each only have a single card type")
+                    raise ValueError(
+                        "ERROR: Multiple target note types should each only have a single card type"
+                    )
                 # If there somehow are zero card types, we of course can't get a value
 
             value_dict = card_values_dict.get(maybe_card_type_name)
@@ -427,11 +458,11 @@ def get_from_note_fields(
 
 
 def interpolate_from_text(
-        text: str,
-        source_note: Note,
-        destination_note: Optional[Note] = None,
-        variable_values_dict: dict = None,
-        multiple_note_types: bool = False,
+    text: str,
+    source_note: Note,
+    destination_note: Optional[Note] = None,
+    variable_values_dict: dict = None,
+    multiple_note_types: bool = False,
 ) -> Tuple[Union[str, None], List[str]]:
     """
     Interpolates a text that uses curly brace syntax.
@@ -465,12 +496,19 @@ def interpolate_from_text(
         # It's possible to input invalid stuff like destination fields in within copy mode
         if field.startswith(DESTINATION_PREFIX) and destination_note:
             value, dest_card_values_dict = get_from_note_fields(
-                field[len(DESTINATION_PREFIX):], destination_note, all_dest_note_fields, dest_card_values_dict,
-                multiple_note_types
+                field[len(DESTINATION_PREFIX) :],
+                destination_note,
+                all_dest_note_fields,
+                dest_card_values_dict,
+                multiple_note_types,
             )
         else:
             value, card_values_dict = get_from_note_fields(
-                field, source_note, all_note_fields, card_values_dict, multiple_note_types
+                field,
+                source_note,
+                all_note_fields,
+                card_values_dict,
+                multiple_note_types,
             )
         field_lower = field.lower()
         if value is None:

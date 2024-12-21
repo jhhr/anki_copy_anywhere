@@ -250,8 +250,11 @@ class MultiComboBoxQt6(RequiredCombobox):
         super().addItems(items)
 
     def updateText(self):
-        selected_items = [self.model().item(i).text() for i in range(self.model().rowCount())
-                          if self.model().item(i).checkState() == QCheckState.Checked]
+        selected_items = [
+            self.model().item(i).text()
+            for i in range(self.model().rowCount())
+            if self.model().item(i).checkState() == QCheckState.Checked
+        ]
         self.lineEdit().setText(", ".join(selected_items))
 
     def showPopup(self):
@@ -272,7 +275,11 @@ class MultiComboBoxQt6(RequiredCombobox):
             combo_box_view = self.view()
             check_box = combo_box_view.indexWidget(item.index())
             if check_box:
-                item.setCheckState(QCheckState.Checked if check_box.isChecked() else QCheckState.Unchecked)
+                item.setCheckState(
+                    QCheckState.Checked
+                    if check_box.isChecked()
+                    else QCheckState.Unchecked
+                )
         super().hidePopup()
 
     def setCurrentText(self, selected_text: str):

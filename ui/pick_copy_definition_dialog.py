@@ -1,5 +1,6 @@
 # noinspection PyUnresolvedReferences
 from aqt import mw
+
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
     QDialog,
@@ -29,7 +30,9 @@ if qtmajor > 5:
 else:
     WindowModal = Qt.WindowModal
 
-DEFAULT_CARDS_SELECTED_LABEL = "Select some copy definitions to show what cards would apply."
+DEFAULT_CARDS_SELECTED_LABEL = (
+    "Select some copy definitions to show what cards would apply."
+)
 
 
 class PickCopyDefinitionDialog(QDialog):
@@ -38,7 +41,13 @@ class PickCopyDefinitionDialog(QDialog):
     Includes a button start the edit dialog for a new copy definition.
     """
 
-    def __init__(self, parent, copy_definitions: [CopyDefinition], browser_card_ids, browser_search):
+    def __init__(
+        self,
+        parent,
+        copy_definitions: [CopyDefinition],
+        browser_card_ids,
+        browser_search,
+    ):
         super().__init__(parent)
 
         self.copy_definitions = copy_definitions
@@ -56,11 +65,16 @@ class PickCopyDefinitionDialog(QDialog):
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
 
-        self.use_selected_cards_button = QPushButton(f"Use selected cards ({len(browser_card_ids)})")
+        self.use_selected_cards_button = QPushButton(
+            f"Use selected cards ({len(browser_card_ids)})"
+        )
         self.use_selected_cards_button.clicked.connect(
-            lambda: self.toggle_card_selected_button(self.use_selected_cards_button))
+            lambda: self.toggle_card_selected_button(self.use_selected_cards_button)
+        )
         self.use_all_cards_button = QPushButton("Use all cards from current search")
-        self.use_all_cards_button.clicked.connect(lambda: self.toggle_card_selected_button(self.use_all_cards_button))
+        self.use_all_cards_button.clicked.connect(
+            lambda: self.toggle_card_selected_button(self.use_all_cards_button)
+        )
         self.vbox.addWidget(self.use_selected_cards_button)
         self.vbox.addWidget(self.use_all_cards_button)
 
@@ -185,7 +199,9 @@ class PickCopyDefinitionDialog(QDialog):
         # Since we're creating an identical copy of an existing definition,
         # the applicable cards aren't changing this time
 
-    def edit_definition(self, index: int = None, copy_definition: CopyDefinition = None):
+    def edit_definition(
+        self, index: int = None, copy_definition: CopyDefinition = None
+    ):
         """
         Opens the edit dialog for the selected copy definition
         """
@@ -237,7 +253,11 @@ class PickCopyDefinitionDialog(QDialog):
         Sets the cards that would be applicable for the selected copy definitions
         """
         browser_query = ""
-        if self.use_selected_cards and self.browser_card_ids is not None and len(self.browser_card_ids):
+        if (
+            self.use_selected_cards
+            and self.browser_card_ids is not None
+            and len(self.browser_card_ids)
+        ):
             card_ids = self.browser_card_ids
             browser_query = f"cid:{','.join(map(str, card_ids))}"
         elif self.browser_search:
@@ -265,7 +285,8 @@ class PickCopyDefinitionDialog(QDialog):
                     note_type_names = note_type_names.strip('""').split('", "')
                     note_type_query = make_query_string("note", note_type_names)
                 def_card_ids = mw.col.find_cards(
-                    f'{note_type_query} {decks_query} {browser_query}')
+                    f"{note_type_query} {decks_query} {browser_query}"
+                )
 
                 self.selected_definitions_applicable_cards.update(def_card_ids)
                 self.definition_card_ids[index] = def_card_ids
@@ -283,10 +304,13 @@ class PickCopyDefinitionDialog(QDialog):
             self.cards_selected_label.setText(
                 f"""{len(self.selected_definitions_applicable_cards)} cards apply over {len(self.applicable_note_type_names)} different note types.
             Total copy operations to be done: {len(total_applicable_cards)}.
-            Click apply to run the selected copy definitions on these cards.""")
+            Click apply to run the selected copy definitions on these cards."""
+            )
             self.apply_button.setEnabled(True)
         else:
-            self.cards_selected_label.setText("No cards applicable for the selected copy definitions.")
+            self.cards_selected_label.setText(
+                "No cards applicable for the selected copy definitions."
+            )
             self.apply_button.setEnabled(False)
 
     def get_selected_definition_index(self):

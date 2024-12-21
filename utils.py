@@ -4,8 +4,10 @@ from typing import Optional, Dict, Any, Union, TypedDict
 
 # noinspection PyUnresolvedReferences
 from anki.cards import Card
+
 # noinspection PyUnresolvedReferences
 from aqt.qt import QFontMetrics, QComboBox
+
 # noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
@@ -15,7 +17,7 @@ def add_dict_key_value(
     key: str,
     value: Optional[str] = None,
     new_key: Optional[str] = None,
-    ):
+):
     if new_key is not None and value is None:
         # rename key
         dict[new_key] = dict.pop(key, None)
@@ -30,10 +32,12 @@ def add_dict_key_value(
         # remove key
         dict.pop(key, None)
 
+
 class KeyValueDict(TypedDict):
     key: str
     value: Optional[Union[str, int, float, bool]]
     new_key: Optional[str]
+
 
 def write_custom_data(
     card: Card,
@@ -68,7 +72,7 @@ def write_custom_data(
             )
     else:
         add_dict_key_value(custom_data, key, value, new_key)
-    compressed_data = json.dumps(custom_data, separators=(',', ':'))
+    compressed_data = json.dumps(custom_data, separators=(",", ":"))
     if len(compressed_data) > 100:
         raise ValueError("Custom data exceeds 100 bytes after compression.")
     card.custom_data = compressed_data
@@ -79,6 +83,7 @@ def to_lowercase_dict(d: Dict[str, Any]) -> Dict[str, Any]:
     if d is None:
         return {}
     return {k.lower(): v for k, v in d.items()}
+
 
 def make_query_string(prefix: str, values: list[str]) -> str:
     """Converts a list of values to a query string for the card browser"""

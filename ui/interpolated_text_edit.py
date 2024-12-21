@@ -38,14 +38,14 @@ class InterpolatedTextEditLayout(QVBoxLayout):
     """
 
     def __init__(
-            self,
-            parent=None,
-            label: Union[QLabel, str] = None,
-            options_dict=None,
-            description: str = None,
-            height: int = None,
-            placeholder_text: str = None,
-            is_required: bool = False,
+        self,
+        parent=None,
+        label: Union[QLabel, str] = None,
+        options_dict=None,
+        description: str = None,
+        height: int = None,
+        placeholder_text: str = None,
+        is_required: bool = False,
     ):
         super().__init__(parent)
         # options dict is a 2-level dict
@@ -61,7 +61,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
             options_dict=options_dict,
             height=height,
             placeholder_text=placeholder_text,
-            is_required=is_required
+            is_required=is_required,
         )
         self.error_label = QLabel()
         # Connect text changed to validation
@@ -118,8 +118,8 @@ class InterpolatedTextEditLayout(QVBoxLayout):
 
     def validate_text(self):
         """
-         Validates text that's using interpolation syntax for note fields.
-         Returns none if a source field is empty.
+        Validates text that's using interpolation syntax for note fields.
+        Returns none if a source field is empty.
         """
         fields = get_fields_from_text(self.text_edit.toPlainText())
 
@@ -128,7 +128,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
         for field in fields:
             arg = None
             card_type_name = None
-            if ARG_SEPARATOR in field and '__' in field:
+            if ARG_SEPARATOR in field and "__" in field:
                 match = NOTE_VALUE_RE.match(field)
                 if match:
                     field, arg = match.group(1, 2)
@@ -141,14 +141,16 @@ class InterpolatedTextEditLayout(QVBoxLayout):
             try:
                 self.validate_dict[intr_format(field.lower())]
             except KeyError:
-                invalid_fields.append(f'<b style="color:red">{field}</b>: Not a valid field')
+                invalid_fields.append(
+                    f'<b style="color:red">{field}</b>: Not a valid field'
+                )
                 continue
 
             if arg is not None:
                 validator = None
                 if card_type_name is not None:
                     # ARG_VALIDATORS is a dict with the card value key only, no card type name
-                    validator = ARG_VALIDATORS.get(field[len(card_type_name):], None)
+                    validator = ARG_VALIDATORS.get(field[len(card_type_name) :], None)
                 else:
                     validator = ARG_VALIDATORS.get(field, None)
 
@@ -156,10 +158,11 @@ class InterpolatedTextEditLayout(QVBoxLayout):
                     error_msg = basic_arg_validator(arg) or validator(arg)
                     if error_msg:
                         invalid_fields.append(
-                            f'''{field}
+                            f"""{field}
                             <span style="color: orange;"><b style="color:red">
                               {arg or "[blank]"}</b>: {error_msg}
-                            </span>''')
+                            </span>"""
+                        )
 
         if len(invalid_fields) > 0:
             self.error_label.setText("<br/>".join(invalid_fields))

@@ -8,19 +8,21 @@ from aqt.qt import QWidget
 from aqt.utils import tooltip
 
 from .utils import write_custom_data
-    
+
 
 def replace_custom_field_values(
-        *,
-        parent: QWidget,
-        reset_field_key_values: Union[
-            Sequence[tuple[str, Union[str, int, None], Union[str, int, None], Union[str, None]]],
-            "all"
+    *,
+    parent: QWidget,
+    reset_field_key_values: Union[
+        Sequence[
+            tuple[str, Union[str, int, None], Union[str, int, None], Union[str, None]]
         ],
-        card_ids: Sequence[CardId] = None,
+        "all",
+    ],
+    card_ids: Sequence[CardId] = None,
 ):
     """
-     Reset values of custom_data fields for cards that have them
+    Reset values of custom_data fields for cards that have them
     """
     edited_cids = []
     card_count = 0
@@ -29,7 +31,7 @@ def replace_custom_field_values(
         nonlocal card_count
         if edited_cids is None:
             edited_cids = []
-        card_ids_query = ''
+        card_ids_query = ""
         if card_ids and len(card_ids) > 0:
             card_ids_query = f"AND id IN {ids2str(card_ids)}"
 
@@ -70,21 +72,22 @@ def replace_custom_field_values(
             for card in cards_to_update:
                 edited_cids.append(card.id)
                 write_custom_data(
-                    card,
-                    key=reset_field,
-                    value=new_value,
-                    new_key=new_field
+                    card, key=reset_field, value=new_value, new_key=new_field
                 )
             col.update_cards(cards_to_update)
         return col.merge_undo_entries(undo_entry)
 
-    return CollectionOp(
-        parent=parent,
-        op=lambda col: update_op(col, edited_cids),
-    ).success(
-        lambda out: tooltip(
-            f"Reset customData for in {len(edited_cids)}/{card_count} selected notes.",
+    return (
+        CollectionOp(
             parent=parent,
-            period=5000,
+            op=lambda col: update_op(col, edited_cids),
         )
-    ).run_in_background()
+        .success(
+            lambda out: tooltip(
+                f"Reset customData for in {len(edited_cids)}/{card_count} selected notes.",
+                parent=parent,
+                period=5000,
+            )
+        )
+        .run_in_background()
+    )

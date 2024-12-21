@@ -18,12 +18,12 @@ class RequiredLineEdit(QLineEdit):
     """
 
     def __init__(
-            self,
-            parent=None,
-            is_required: bool = False,
-            required_style: str = "border: 1px solid darkred;",
-            default_style: str = "",
-            **kwargs
+        self,
+        parent=None,
+        is_required: bool = False,
+        required_style: str = "border: 1px solid darkred;",
+        default_style: str = "",
+        **kwargs
     ):
         super().__init__(parent, **kwargs)
         self.is_required = is_required
@@ -45,11 +45,16 @@ class RequiredLineEdit(QLineEdit):
             self.was_valid = True
 
     def event(self, event: QEvent):
-        if hasattr(self, 'is_required') and self.is_required and event.type() in (
+        if (
+            hasattr(self, "is_required")
+            and self.is_required
+            and event.type()
+            in (
                 QEventTypes.FocusIn,
                 QEventTypes.FocusOut,
                 QEventTypes.KeyPress,
-                QEventTypes.KeyRelease
+                QEventTypes.KeyRelease,
+            )
         ):
             self.update_required_style()
         return super().event(event)
@@ -73,12 +78,12 @@ class RequiredTextEdit(QTextEdit):
     """
 
     def __init__(
-            self,
-            parent=None,
-            is_required: bool = False,
-            required_style: str = "border: 1px solid darkred;",
-            default_style: str = "",
-            **kwargs
+        self,
+        parent=None,
+        is_required: bool = False,
+        required_style: str = "border: 1px solid darkred;",
+        default_style: str = "",
+        **kwargs
     ):
         super().__init__(parent, **kwargs)
         self.is_required = is_required
@@ -103,11 +108,16 @@ class RequiredTextEdit(QTextEdit):
             self.was_valid = True
 
     def event(self, event: QEvent):
-        if hasattr(self, 'is_required') and self.is_required and event.type() in (
+        if (
+            hasattr(self, "is_required")
+            and self.is_required
+            and event.type()
+            in (
                 QEventTypes.FocusIn,
                 QEventTypes.FocusOut,
                 QEventTypes.KeyPress,
-                QEventTypes.KeyRelease
+                QEventTypes.KeyRelease,
+            )
         ):
             self.update_required_style()
         return super().event(event)

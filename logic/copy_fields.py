@@ -11,8 +11,17 @@ from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
 from aqt.progress import ProgressUpdate
+
 # noinspection PyUnresolvedReferences
-from aqt.qt import QWidget, QDialog, QVBoxLayout, QLabel, QScrollArea, QGuiApplication, QTextEdit
+from aqt.qt import (
+    QWidget,
+    QDialog,
+    QVBoxLayout,
+    QLabel,
+    QScrollArea,
+    QGuiApplication,
+    QTextEdit,
+)
 from aqt.utils import tooltip
 
 from .FatalProcessError import FatalProcessError
@@ -71,7 +80,10 @@ class ScrollMessageBox(QDialog):
         # resize horizontally to a percentage of screen width or sizeHint, whichever is larger
         # but allow vertical resizing to follow sizeHint
         screen = QGuiApplication.primaryScreen().availableGeometry()
-        self.resize(max(self.sizeHint().height(), int(screen.width() * 0.35)), self.sizeHint().height())
+        self.resize(
+            max(self.sizeHint().height(), int(screen.width() * 0.35)),
+            self.sizeHint().height(),
+        )
         self.show()
 
 
@@ -103,7 +115,7 @@ class CacheResults:
         return self.result_text
 
 
-class ProgressUpdateDef():
+class ProgressUpdateDef:
     """
     Helper class used with CollectionOp.with_backend_progress(progress_update) to
     update the progress bar and its label. In qt/aqt/progress.py the progress-update
@@ -125,7 +137,11 @@ class ProgressUpdateDef():
         self.max_value = max_value
 
     def has_update(self):
-        return self.label is not None or self.value is not None or self.max_value is not None
+        return (
+            self.label is not None
+            or self.value is not None
+            or self.max_value is not None
+        )
 
     def clear(self):
         self.label = None
@@ -134,11 +150,11 @@ class ProgressUpdateDef():
 
 
 def copy_fields(
-        copy_definitions: list[CopyDefinition],
-        card_ids=None,
-        card_ids_per_definition: list[list[int]] = None,
-        parent=None,
-        is_sync: bool = False,
+    copy_definitions: list[CopyDefinition],
+    card_ids=None,
+    card_ids_per_definition: list[list[int]] = None,
+    parent=None,
+    is_sync: bool = False,
 ):
     start_time = time.time()
     debug_texts = []
@@ -153,29 +169,31 @@ def copy_fields(
         result = copy_results.get_result_text()
         # Don't show a blank tooltip with just the time
         if result:
-            main_time = f"{time.time() - start_time:.2f}s total time<br>" \
-                if len(copy_definitions) > 1 else "Finished in "
-            tooltip(f"{main_time}{result}",
-                    parent=parent,
-                    period=5000 + len(copy_definitions) * 1000,
-                    # Position the tooltip higher so other tooltips don't get covered
-                    # 100 is the default offset, see aqt.utils.tooltip
-                    y_offset=200 if is_sync else 100
-                    )
+            main_time = (
+                f"{time.time() - start_time:.2f}s total time<br>"
+                if len(copy_definitions) > 1
+                else "Finished in "
+            )
+            tooltip(
+                f"{main_time}{result}",
+                parent=parent,
+                period=5000 + len(copy_definitions) * 1000,
+                # Position the tooltip higher so other tooltips don't get covered
+                # 100 is the default offset, see aqt.utils.tooltip
+                y_offset=200 if is_sync else 100,
+            )
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(
-                debug_texts,
-                title="Copy fields debug Messages",
-                parent=parent)
+                debug_texts, title="Copy fields debug Messages", parent=parent
+            )
 
     def on_failure(exception):
         mw.progress.finish()
         show_error_message(f"Copying failed: {exception}")
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(
-                debug_texts,
-                title="Copy Fields debug Messages",
-                parent=parent)
+                debug_texts, title="Copy Fields debug Messages", parent=parent
+            )
         # Need to raise the exception to get the traceback to the cause in the console
         raise exception
 
@@ -222,7 +240,11 @@ def copy_fields(
         for i, copy_definition in enumerate(copy_definitions):
             results = copy_fields_in_background(
                 copy_definition=copy_definition,
-                card_ids=card_ids_per_definition[i] if card_ids_per_definition is not None else card_ids,
+                card_ids=(
+                    card_ids_per_definition[i]
+                    if card_ids_per_definition is not None
+                    else card_ids
+                ),
                 show_message=show_error_message,
                 is_sync=is_sync,
                 copied_into_cards=copied_into_cards,
@@ -253,14 +275,14 @@ def copy_fields(
 
 
 def copy_fields_in_background(
-        copy_definition: CopyDefinition,
-        copied_into_cards: list[Card],
-        undo_entry: int,
-        results: CacheResults,
-        progress_update_def: ProgressUpdateDef,
-        is_sync: Optional[bool] = False,
-        card_ids: Optional[list[int]] = None,
-        show_message: Optional[Callable[[str], None]] = None,
+    copy_definition: CopyDefinition,
+    copied_into_cards: list[Card],
+    undo_entry: int,
+    results: CacheResults,
+    progress_update_def: ProgressUpdateDef,
+    is_sync: Optional[bool] = False,
+    card_ids: Optional[list[int]] = None,
+    show_message: Optional[Callable[[str], None]] = None,
 ) -> CacheResults:
     """
     Function run to copy stuff into many notes at once.
@@ -276,12 +298,8 @@ def copy_fields_in_background(
     :param is_sync: Whether this is a sync operation or not
     :return: the CacheResults object passed as results
     """
-    (
-        copy_into_note_types,
-        definition_name
-    ) = itemgetter(
-        "copy_into_note_types",
-        "definition_name"
+    (copy_into_note_types, definition_name) = itemgetter(
+        "copy_into_note_types", "definition_name"
     )(copy_definition)
 
     start_time = time.time()
@@ -289,11 +307,14 @@ def copy_fields_in_background(
     card_cnt = 0
     debug_text = ""
     if not show_message:
+
         def show_error_message(message: str):
             nonlocal debug_text
             debug_text += f"<br/>{card_cnt}--{message}"
             print(message)
+
     else:
+
         def show_error_message(message: str):
             show_message(f"\n{card_cnt}--{message}")
 
@@ -308,10 +329,14 @@ def copy_fields_in_background(
     # Split by comma and remove the first wrapping " but keeping the last one
     note_type_names = copy_into_note_types.strip('""').split('", "')
     # Note: adding "" between each so that we get "note:Some note type" OR "note:Some other note type"
-    note_type_ids = filter(None, [mw.col.models.id_for_name(name) for name in note_type_names])
+    note_type_ids = filter(
+        None, [mw.col.models.id_for_name(name) for name in note_type_names]
+    )
 
     multiple_note_types = len(note_type_names) > 1
-    fc_query = "AND json_extract(json_extract(c.data, '$.cd'), '$.fc') = 0" if is_sync else ""
+    fc_query = (
+        "AND json_extract(json_extract(c.data, '$.cd'), '$.fc') = 0" if is_sync else ""
+    )
 
     if card_ids is not None and len(card_ids) > 0:
         # Filter card_ids further into only the cards of the note type
@@ -324,18 +349,21 @@ def copy_fields_in_background(
         # To copy into all cards card_ids should explicitly be None
         return results
 
-    filtered_card_ids = mw.col.db.list(f"""
+    filtered_card_ids = mw.col.db.list(
+        f"""
             SELECT c.id
             FROM cards c, notes n
             WHERE n.mid IN {ids2str(note_type_ids)}
             AND c.nid = n.id
             {cids_query}
             {fc_query}
-            """)
+            """
+    )
 
     if not is_sync and len(filtered_card_ids) == 0:
         show_error_message(
-            f"Error in copy fields: Did not find any cards of note type(s) {copy_into_note_types}")
+            f"Error in copy fields: Did not find any cards of note type(s) {copy_into_note_types}"
+        )
         return results
 
     cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
@@ -347,7 +375,7 @@ def copy_fields_in_background(
 
     total_processed_sources = 0
     total_processed_destinations = 0
-    is_across = copy_definition['copy_mode'] == COPY_MODE_ACROSS_NOTES
+    is_across = copy_definition["copy_mode"] == COPY_MODE_ACROSS_NOTES
     for card in cards:
         if card_cnt % 10 == 0 and card_cnt > 0:
             elapsed_s = time.time() - start_time
@@ -409,11 +437,18 @@ def copy_fields_in_background(
 
 
 def apply_process_chain(
-        process_chain: list[Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]],
-        text: str,
-        destination_note: Note,
-        show_error_message: Callable[[str], None] = None,
-        file_cache: dict = None,
+    process_chain: list[
+        Union[
+            KanjiumToJavdejongProcess,
+            RegexProcess,
+            FontsCheckProcess,
+            KanaHighlightProcess,
+        ]
+    ],
+    text: str,
+    destination_note: Note,
+    show_error_message: Callable[[str], None] = None,
+    file_cache: dict = None,
 ) -> Union[str, None]:
     """
     Apply a list of processes to a text
@@ -425,6 +460,7 @@ def apply_process_chain(
     :return: The text after the processes have been applied or None if there was an error
     """
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
@@ -472,15 +508,15 @@ def apply_process_chain(
 
 
 def copy_for_single_trigger_note(
-        copy_definition: CopyDefinition,
-        trigger_note: Note,
-        results: CacheResults = None,
-        undo_entry: int = None,
-        field_only: str = None,
-        deck_id: int = None,
-        multiple_note_types: bool = False,
-        show_error_message: Callable[[str], None] = None,
-        file_cache: dict = None,
+    copy_definition: CopyDefinition,
+    trigger_note: Note,
+    results: CacheResults = None,
+    undo_entry: int = None,
+    field_only: str = None,
+    deck_id: int = None,
+    multiple_note_types: bool = False,
+    show_error_message: Callable[[str], None] = None,
+    file_cache: dict = None,
 ) -> Tuple[bool, int, int]:
     """
     Copy fields into a single note
@@ -499,6 +535,7 @@ def copy_for_single_trigger_note(
     :return: Tuple of the op success + number of destination and source notes processed
     """
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
@@ -531,8 +568,13 @@ def copy_for_single_trigger_note(
         destination_notes = [trigger_note]
         source_notes = [trigger_note]
     elif copy_mode == COPY_MODE_ACROSS_NOTES:
-        if across_mode_direction not in [DIRECTION_DESTINATION_TO_SOURCES, DIRECTION_SOURCE_TO_DESTINATIONS]:
-            show_error_message("Error in copy fields: missing across mode direction value")
+        if across_mode_direction not in [
+            DIRECTION_DESTINATION_TO_SOURCES,
+            DIRECTION_SOURCE_TO_DESTINATIONS,
+        ]:
+            show_error_message(
+                "Error in copy fields: missing across mode direction value"
+            )
             return False, len(destination_notes), len(source_notes)
         target_notes = get_across_target_notes(
             copy_from_cards_query=copy_from_cards_query,
@@ -556,7 +598,9 @@ def copy_for_single_trigger_note(
         return False, len(destination_notes), len(source_notes)
 
     if len(source_notes) == 0:
-        show_error_message(f"Error in copy fields: No source/destination notes for note {trigger_note.id}")
+        show_error_message(
+            f"Error in copy fields: No source/destination notes for note {trigger_note.id}"
+        )
 
     # Step 2: Get value for each field we are copying into
     for destination_note in destination_notes:
@@ -586,17 +630,18 @@ def copy_for_single_trigger_note(
 
 
 def copy_into_single_note(
-        field_to_field_defs: list[CopyFieldToField],
-        destination_note: Note,
-        source_notes: list[Note],
-        variable_values_dict: dict,
-        field_only: str = None,
-        multiple_note_types: bool = False,
-        select_card_separator: str = None,
-        file_cache: dict = None,
-        show_error_message: Callable[[str], None] = None,
+    field_to_field_defs: list[CopyFieldToField],
+    destination_note: Note,
+    source_notes: list[Note],
+    variable_values_dict: dict,
+    field_only: str = None,
+    multiple_note_types: bool = False,
+    select_card_separator: str = None,
+    file_cache: dict = None,
+    show_error_message: Callable[[str], None] = None,
 ) -> bool:
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
@@ -611,7 +656,9 @@ def copy_into_single_note(
         try:
             cur_field_value = destination_note[copy_into_note_field]
         except KeyError:
-            show_error_message(f"Error in copy fields: Field '{copy_into_note_field}' not found in note")
+            show_error_message(
+                f"Error in copy fields: Field '{copy_into_note_field}' not found in note"
+            )
             return False
 
         if copy_if_empty and cur_field_value != "":
@@ -625,7 +672,7 @@ def copy_into_single_note(
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
-            variable_values_dict=variable_values_dict
+            variable_values_dict=variable_values_dict,
         )
         # Step 2.2: If we have further processing steps, run them
         if process_chain is not None:
@@ -638,7 +685,9 @@ def copy_into_single_note(
             )
             # result_val should always be at least "", None indicates an error
             if result_val is None:
-                show_error_message(f"Error in copy fields: Process chain failed for field {copy_into_note_field}")
+                show_error_message(
+                    f"Error in copy fields: Process chain failed for field {copy_into_note_field}"
+                )
                 return False
 
         # Finally, copy the value into the note
@@ -647,10 +696,10 @@ def copy_into_single_note(
 
 
 def get_variable_values_for_note(
-        field_to_variable_defs: list[CopyFieldToVariable],
-        note: Note,
-        file_cache: dict = None,
-        show_error_message: Callable[[str], None] = None,
+    field_to_variable_defs: list[CopyFieldToVariable],
+    note: Note,
+    file_cache: dict = None,
+    show_error_message: Callable[[str], None] = None,
 ) -> Union[dict, None]:
     """
     Get the values for the variables from the note
@@ -661,6 +710,7 @@ def get_variable_values_for_note(
     :return: A dictionary of the values for the variables or None if there was an error
     """
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
@@ -677,7 +727,8 @@ def get_variable_values_for_note(
         )
         if len(invalid_fields) > 0:
             show_error_message(
-                f"Error getting variable values: Invalid fields in copy_from_text: {', '.join(invalid_fields)}")
+                f"Error getting variable values: Invalid fields in copy_from_text: {', '.join(invalid_fields)}"
+            )
 
         # Step 2: If we have further processing steps, run them
         if process_chain is not None:
@@ -697,15 +748,15 @@ def get_variable_values_for_note(
 
 
 def get_across_target_notes(
-        copy_from_cards_query: str,
-        trigger_note: Note,
-        select_card_by: str,
-        extra_state: dict,
-        deck_id: int = None,
-        variable_values_dict: dict = None,
-        only_copy_into_decks: str = None,
-        select_card_count: str = '1',
-        show_error_message: Callable[[str], None] = None,
+    copy_from_cards_query: str,
+    trigger_note: Note,
+    select_card_by: str,
+    extra_state: dict,
+    deck_id: int = None,
+    variable_values_dict: dict = None,
+    only_copy_into_decks: str = None,
+    select_card_count: str = "1",
+    show_error_message: Callable[[str], None] = None,
 ) -> list[Note]:
     """
     Get the target notes based on the search value and the query. These will either be
@@ -727,11 +778,14 @@ def get_across_target_notes(
     :return: A list of notes to copy from
     """
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
     if select_card_by is None:
-        show_error_message("Error in copy fields: Required value 'select_card_by' was missing.")
+        show_error_message(
+            "Error in copy fields: Required value 'select_card_by' was missing."
+        )
         return []
 
     if select_card_by not in SELECT_CARD_BY_VALUES:
@@ -762,8 +816,8 @@ def get_across_target_notes(
         target_deck_names = only_copy_into_decks.strip('""').split('", "')
 
         whitelist_dids = [
-            mw.col.decks.id_for_name(target_deck_name) for
-            target_deck_name in target_deck_names
+            mw.col.decks.id_for_name(target_deck_name)
+            for target_deck_name in target_deck_names
         ]
         whitelist_dids = set(whitelist_dids)
         deck_ids = []
@@ -780,7 +834,9 @@ def get_across_target_notes(
         source_note=trigger_note,
         variable_values_dict=variable_values_dict,
     )
-    cards_query_id = base64.b64encode(f"cards{interpolated_cards_query}".encode()).decode()
+    cards_query_id = base64.b64encode(
+        f"cards{interpolated_cards_query}".encode()
+    ).decode()
     try:
         card_ids = extra_state[cards_query_id]
     except KeyError:
@@ -789,16 +845,20 @@ def get_across_target_notes(
 
     if len(invalid_fields) > 0:
         show_error_message(
-            f"Error in copy fields: Invalid fields in copy_from_cards_query: {', '.join(invalid_fields)}")
+            f"Error in copy fields: Invalid fields in copy_from_cards_query: {', '.join(invalid_fields)}"
+        )
 
-    if (len(card_ids) == 0):
+    if len(card_ids) == 0:
         show_error_message(
-            f"Error in copy fields: Did not find any cards with copy_from_cards_query='{interpolated_cards_query}'")
+            f"Error in copy fields: Did not find any cards with copy_from_cards_query='{interpolated_cards_query}'"
+        )
         return []
 
     # zero is a special value that means all cards
     if select_card_count == 0:
-        distinct_note_ids = mw.col.db.list(f"SELECT DISTINCT nid FROM cards c WHERE c.id IN {ids2str(card_ids)}")
+        distinct_note_ids = mw.col.db.list(
+            f"SELECT DISTINCT nid FROM cards c WHERE c.id IN {ids2str(card_ids)}"
+        )
         return [mw.col.get_note(note_id) for note_id in distinct_note_ids]
 
     # select a card or cards based on the select_card_by value
@@ -809,7 +869,9 @@ def get_across_target_notes(
         if select_card_by == "None" and len(card_ids) > 0:
             selected_card_id = card_ids.pop()
             if selected_card_id:
-                selected_notes.append(mw.col.get_note(mw.col.get_card(selected_card_id).nid))
+                selected_notes.append(
+                    mw.col.get_note(mw.col.get_card(selected_card_id).nid)
+                )
             continue
         elif len(card_ids) == 0:
             break
@@ -818,19 +880,24 @@ def get_across_target_notes(
         # card type will still return the same card
 
         card_select_key = base64.b64encode(
-            f"selected_card{interpolated_cards_query}{select_card_by}{i}".encode()).decode()
+            f"selected_card{interpolated_cards_query}{select_card_by}{i}".encode()
+        ).decode()
 
-        if select_card_by == 'Random':
+        if select_card_by == "Random":
             # We don't want to cache this as it should in fact be different each time
             selected_card_id = random.choice(card_ids)
-        elif select_card_by == 'Least_reps':
+        elif select_card_by == "Least_reps":
             # Loop through cards and find the one with the least reviews
             # Check cache first
             try:
                 selected_card_id = extra_state[card_select_key]
             except KeyError:
-                selected_card_id = min(card_ids,
-                                       key=lambda c: mw.col.db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c}"))
+                selected_card_id = min(
+                    card_ids,
+                    key=lambda c: mw.col.db.scalar(
+                        f"SELECT COUNT() FROM revlog WHERE cid = {c}"
+                    ),
+                )
                 extra_state = {card_select_key: selected_card_id}
         if selected_card_id is None:
             show_error_message("Error in copy fields: could not select card")
@@ -851,13 +918,13 @@ def get_across_target_notes(
 
 
 def get_field_values_from_notes(
-        copy_from_text: str,
-        notes: list[Note],
-        dest_note: Optional[Note],
-        multiple_note_types: bool = False,
-        variable_values_dict: dict = None,
-        select_card_separator: str = ', ',
-        show_error_message: Callable[[str], None] = None,
+    copy_from_text: str,
+    notes: list[Note],
+    dest_note: Optional[Note],
+    multiple_note_types: bool = False,
+    variable_values_dict: dict = None,
+    select_card_separator: str = ", ",
+    show_error_message: Callable[[str], None] = None,
 ) -> str:
     """
     Get the value from the field in the selected notes gotten with get_notes_to_copy_from.
@@ -876,6 +943,7 @@ def get_field_values_from_notes(
     :return: String with the values from the field in the notes
     """
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
@@ -906,7 +974,8 @@ def get_field_values_from_notes(
 
         if len(invalid_fields) > 0:
             show_error_message(
-                f"Error in copy fields: Invalid fields in copy_from_text: {', '.join(invalid_fields)}")
+                f"Error in copy fields: Invalid fields in copy_from_text: {', '.join(invalid_fields)}"
+            )
 
         result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
 

@@ -35,7 +35,9 @@ def auto_copy_definitions(texts: List[str]):
     config.load()
 
     copy_on_sync_definitions = [
-        definition for definition in config.copy_definitions if definition.get("copy_on_sync", False)
+        definition
+        for definition in config.copy_definitions
+        if definition.get("copy_on_sync", False)
     ]
     if not copy_on_sync_definitions:
         return

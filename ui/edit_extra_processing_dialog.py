@@ -4,6 +4,7 @@ from typing import Union
 
 # noinspection PyUnresolvedReferences
 from aqt import mw
+
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
     QWidget,
@@ -23,6 +24,7 @@ from aqt.qt import (
     Qt,
     qtmajor,
 )
+
 # noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
@@ -67,16 +69,16 @@ else:
 
 class ClickableLabel(QLabel):
     def __init__(self, text, tooltip_text, parent=None):
-        super().__init__(f'{text} (?)', parent)
+        super().__init__(f"{text} (?)", parent)
         self.tooltip_text = tooltip_text
-        self.setFont(QFont('SansSerif', 10))
+        self.setFont(QFont("SansSerif", 10))
 
     def mousePressEvent(self, event):
         # Show tooltip near the label when clicked
         QToolTip.showText(self.mapToGlobal(QPoint(0, self.height())), self.tooltip_text)
 
     def setLabelText(self, text):
-        self.setText(f'{text} (?)')
+        self.setText(f"{text} (?)")
 
 
 class KanjiumToJavdejongProcessDialog(QDialog):
@@ -96,9 +98,12 @@ class KanjiumToJavdejongProcessDialog(QDialog):
         self.form.addRow(self.top_label)
 
         self.delimiter_field = QLineEdit()
-        self.form.addRow("Delimiter between multiple pitch accents", self.delimiter_field)
+        self.form.addRow(
+            "Delimiter between multiple pitch accents", self.delimiter_field
+        )
 
-        with suppress(KeyError): self.delimiter_field.setText(self.process["delimiter"])
+        with suppress(KeyError):
+            self.delimiter_field.setText(self.process["delimiter"])
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
@@ -142,6 +147,7 @@ MULTILINE - M: Make ^ and $ match the start/end of each line.<br/>
 DOTALL - S: Make . match any character, including newlines. Use to match across multiple lines.<br/>
 """
 
+
 class RegexProcessDialog(QDialog):
     def __init__(self, parent, process: RegexProcess):
         super().__init__(parent)
@@ -171,19 +177,24 @@ class RegexProcessDialog(QDialog):
         self.form.addRow("Replacement", self.replacement_field)
 
         self.flags_field = MultiComboBox(placeholder_text="Select flags (optional)")
-        self.flags_field.addItems([
-            "ASCII",
-            "IGNORECASE",
-            "VERBOSE",
-            "MULTILINE",
-            "DOTALL",
-        ])
+        self.flags_field.addItems(
+            [
+                "ASCII",
+                "IGNORECASE",
+                "VERBOSE",
+                "MULTILINE",
+                "DOTALL",
+            ]
+        )
         regex_label = ClickableLabel("Flags", REGEX_FLAGS_DESCRIPTION, self)
         self.form.addRow(regex_label, self.flags_field)
 
-        with suppress(KeyError): self.regex_field.setText(self.process["regex"])
-        with suppress(KeyError): self.replacement_field.setText(self.process["replacement"])
-        with suppress(KeyError): self.flags_field.setCurrentText(self.process["flags"])
+        with suppress(KeyError):
+            self.regex_field.setText(self.process["regex"])
+        with suppress(KeyError):
+            self.replacement_field.setText(self.process["replacement"])
+        with suppress(KeyError):
+            self.flags_field.setCurrentText(self.process["flags"])
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
@@ -229,26 +240,39 @@ class FontsCheckProcess(QDialog):
 
         self.fonts_dict_file_field = QLineEdit()
         self.form.addRow("Fonts dict JSON file", self.fonts_dict_file_field)
-        self.form.addRow("", QLabel("""<small>Provide the file name only, e.g. 'fonts_by_char.json'.
+        self.form.addRow(
+            "",
+            QLabel(
+                """<small>Provide the file name only, e.g. 'fonts_by_char.json'.
         <br/>
         The file is assumed to be in your Anki collection.media folder.
         <br/>
         The content should be <code>{"char": ["font1", "font2", ...], "char2": ...}</code>
-        </small>"""))
+        </small>"""
+            ),
+        )
 
         self.limit_to_fonts_field = ListInputWidget()
         self.form.addRow("Limit to fonts", self.limit_to_fonts_field)
-        self.form.addRow("", QLabel("""<small>
+        self.form.addRow(
+            "",
+            QLabel(
+                """<small>
         (Optional) A list of font file names (without the file ending) to limit the output to.
         <br/>
         You can add multiple fonts at once inputting a single item of comma separated values
-        </small>"""))
+        </small>"""
+            ),
+        )
 
         self.regex_field = AutoResizingTextEdit()
         self.regex_field.setFont(QFixedFont)
         self.form.addRow("Char limit", self.regex_field)
         self.regex_field.textChanged.connect(lambda: validate_regex(self))
-        self.form.addRow("", QLabel("""<small>(Optional) Regex used to limit the characters checked.
+        self.form.addRow(
+            "",
+            QLabel(
+                """<small>(Optional) Regex used to limit the characters checked.
         <br/>
         When using regex your dictionary should contain an "all_fonts" key that contains all possible fonts.
         <br/>
@@ -259,17 +283,21 @@ class FontsCheckProcess(QDialog):
         You probably want this to be a character range
         <br/>
         e.g. <code>[a-z]</code> or <code>[\u4E00-\u9FFF]</code>.
-        </small>"""))
+        </small>"""
+            ),
+        )
 
         self.regex_error_display = QLabel()
         self.regex_error_display.setStyleSheet("color: red;")
         self.form.addRow("", self.regex_error_display)
 
-        with suppress(KeyError): self.fonts_dict_file_field.setText(self.process["fonts_dict_file"])
+        with suppress(KeyError):
+            self.fonts_dict_file_field.setText(self.process["fonts_dict_file"])
         with suppress(KeyError):
             for font in self.process["limit_to_fonts"]:
                 self.limit_to_fonts_field.add_item(font)
-        with suppress(KeyError): self.regex_field.setText(self.process["character_limit_regex"])
+        with suppress(KeyError):
+            self.regex_field.setText(self.process["character_limit_regex"])
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
@@ -319,26 +347,38 @@ class KanaHighlightProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.onyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
+        self.onyomi_field_cbox = RequiredCombobox(
+            placeholder_text="Select field (required)"
+        )
         self.form.addRow("Onyomi field", self.onyomi_field_cbox)
 
-        self.kunyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
+        self.kunyomi_field_cbox = RequiredCombobox(
+            placeholder_text="Select field (required)"
+        )
         self.form.addRow("Kunyomi field", self.kunyomi_field_cbox)
 
-        self.kanji_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
+        self.kanji_field_cbox = RequiredCombobox(
+            placeholder_text="Select field (required)"
+        )
         self.form.addRow("Kanji field", self.kanji_field_cbox)
 
-        self.return_type_cbox = RequiredCombobox(placeholder_text="Select return type (required")
+        self.return_type_cbox = RequiredCombobox(
+            placeholder_text="Select return type (required"
+        )
         self.return_type_cbox.addItems(["furigana", "furikanji", "kana_only"])
         self.return_type_cbox.setCurrentText("kana_only")
         self.form.addRow("Return type", self.return_type_cbox)
 
         self.update_combobox_options()
 
-        with suppress(KeyError): self.onyomi_field_cbox.setCurrentText(self.process["onyomi_field"])
-        with suppress(KeyError): self.kunyomi_field_cbox.setCurrentText(self.process["kunyomi_field"])
-        with suppress(KeyError): self.kanji_field_cbox.setCurrentText(self.process["kanji_field"])
-        with suppress(KeyError): self.return_type_cbox.setCurrentText(self.process["return_type"])
+        with suppress(KeyError):
+            self.onyomi_field_cbox.setCurrentText(self.process["onyomi_field"])
+        with suppress(KeyError):
+            self.kunyomi_field_cbox.setCurrentText(self.process["kunyomi_field"])
+        with suppress(KeyError):
+            self.kanji_field_cbox.setCurrentText(self.process["kanji_field"])
+        with suppress(KeyError):
+            self.return_type_cbox.setCurrentText(self.process["return_type"])
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
@@ -379,11 +419,11 @@ class KanaHighlightProcessDialog(QDialog):
 
 class EditExtraProcessingWidget(QWidget):
     def __init__(
-            self,
-            parent,
-            copy_definition: CopyDefinition,
-            field_to_x_def: Union[CopyFieldToField, CopyFieldToVariable],
-            allowed_process_names: list[str],
+        self,
+        parent,
+        copy_definition: CopyDefinition,
+        field_to_x_def: Union[CopyFieldToField, CopyFieldToVariable],
+        allowed_process_names: list[str],
     ):
         super().__init__(parent)
         self.field_to_x_def = field_to_x_def
@@ -429,8 +469,10 @@ class EditExtraProcessingWidget(QWidget):
         self.add_process_chain_button.clear()
         # Add options not currently active to the combobox
         for process in self.allowed_process_names:
-            if (process not in currently_active_processes
-                    or process in MULTIPLE_ALLOWED_PROCESS_NAMES):
+            if (
+                process not in currently_active_processes
+                or process in MULTIPLE_ALLOWED_PROCESS_NAMES
+            ):
                 self.add_process_chain_button.addItem(process)
         # Reconnect signal now that we're done calling addItem
         self.add_process_chain_button.currentTextChanged.connect(self.add_process)
@@ -441,7 +483,9 @@ class EditExtraProcessingWidget(QWidget):
         self.process_dialogs.remove(process_dialog)
         self.update_process_chain()
 
-    def update_process_chain(self, ):
+    def update_process_chain(
+        self,
+    ):
         # Disconnect signal to avoid calling add_process in an infinite loop
         # because init_options_to_process_combobox calls addItem which
         # triggers the currentTextChanged signal in the PlaceholderCombobox
@@ -469,7 +513,9 @@ class EditExtraProcessingWidget(QWidget):
         hbox = QHBoxLayout()
         self.middle_grid.addLayout(hbox, index, 1)
 
-        process_label = ClickableLabel(get_process_name(process), process_dialog.description, self)
+        process_label = ClickableLabel(
+            get_process_name(process), process_dialog.description, self
+        )
         hbox.addStretch(1)
         hbox.addWidget(process_label)
 
@@ -533,16 +579,18 @@ class EditExtraProcessingWidget(QWidget):
             note_types = None
             with suppress(KeyError):
                 note_types = self.copy_definition["copy_into_note_types"]
-            return KanaHighlightProcessDialog(
-                self,
-                process,
-                note_types
-            ), lambda _: KANA_HIGHLIGHT_PROCESS
+            return (
+                KanaHighlightProcessDialog(self, process, note_types),
+                lambda _: KANA_HIGHLIGHT_PROCESS,
+            )
         if process_name == REGEX_PROCESS:
             return RegexProcessDialog(self, process), get_regex_process_label
         if process_name == FONTS_CHECK_PROCESS:
             return FontsCheckProcess(self, process), get_fonts_check_process_label
         if process_name == KANJIUM_TO_JAVDEJONG_PROCESS:
-            return KanjiumToJavdejongProcessDialog(self, process), lambda _: KANJIUM_TO_JAVDEJONG_PROCESS
+            return (
+                KanjiumToJavdejongProcessDialog(self, process),
+                lambda _: KANJIUM_TO_JAVDEJONG_PROCESS,
+            )
 
         return None, ""

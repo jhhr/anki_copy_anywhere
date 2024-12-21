@@ -7,7 +7,7 @@ from ..logic.interpolate_fields import CARD_VALUES, intr_format
 
 
 def get_intersecting_model_fields(
-        models: list[NotetypeDict],
+    models: list[NotetypeDict],
 ) -> set[str]:
     """
     Get the fields that are common to all the models.
@@ -21,10 +21,10 @@ def get_intersecting_model_fields(
 
 
 def add_intersecting_model_field_options_to_dict(
-        models: list[NotetypeDict],
-        target_dict: dict,
-        intersecting_fields: Optional[set[str]] = None,
-        prefix: Optional[str] = None,
+    models: list[NotetypeDict],
+    target_dict: dict,
+    intersecting_fields: Optional[set[str]] = None,
+    prefix: Optional[str] = None,
 ):
     """
     Get the fields that are common to all the models.
@@ -41,7 +41,7 @@ def add_intersecting_model_field_options_to_dict(
     if intersecting_fields is None:
         intersecting_fields = get_intersecting_model_fields(models)
 
-    cards_key = 'Card values'
+    cards_key = "Card values"
 
     target_dict[cards_key] = {}
     cards_target = target_dict[cards_key]
@@ -51,10 +51,10 @@ def add_intersecting_model_field_options_to_dict(
     for card_value in CARD_VALUES:
         value = card_value
         if prefix:
-            value = f'{prefix}{card_value}'
+            value = f"{prefix}{card_value}"
         cards_target[card_value] = intr_format(value)
 
     if intersecting_fields:
         for field_name in intersecting_fields:
-            field_value = field_name if prefix is None else f'{prefix}{field_name}'
+            field_value = field_name if prefix is None else f"{prefix}{field_name}"
             fields_target[field_name] = intr_format(field_value)

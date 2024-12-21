@@ -34,7 +34,24 @@ PART_OF_SPEECH_NUM = {
     48: ["vs-i", "suru verb - included"],
 }
 
-E_I_ENDING_KANA = {"い", "え", "き", "け", "し", "せ", "ち", "て", "に", "ね", "ひ", "へ", "み", "め", "り", "れ"}
+E_I_ENDING_KANA = {
+    "い",
+    "え",
+    "き",
+    "け",
+    "し",
+    "せ",
+    "ち",
+    "て",
+    "に",
+    "ね",
+    "ひ",
+    "へ",
+    "み",
+    "め",
+    "り",
+    "れ",
+}
 
 GODAN_ENDINGS = {
     "う": "u",
@@ -52,9 +69,9 @@ GODAN_ENDINGS = {
 # For getting the conjugation dict in POSSIBLE_OKURIGANA_PROGRESSION_DICT
 # we need to determine the word's part of speech.
 def get_part_of_speech(
-        okurigana: str,
-        kanji: str,
-        kanji_reading: str,
+    okurigana: str,
+    kanji: str,
+    kanji_reading: str,
 ) -> Union[str, None]:
     """
     Get the part of speech key for POSSIBLE_OKURIGANA_PROGRESSION_DICT for a word.
@@ -98,9 +115,11 @@ def get_part_of_speech(
 
     # Regular verb patterns
     # Check ichidan vs godan
-    if (len(okurigana) >= 2
-            and okurigana.endswith("る")
-            and okurigana[-2] in E_I_ENDING_KANA):
+    if (
+        len(okurigana) >= 2
+        and okurigana.endswith("る")
+        and okurigana[-2] in E_I_ENDING_KANA
+    ):
         # Most verbs ending in eru/iru are ichidan
         return "v1"
 
@@ -113,9 +132,9 @@ def get_part_of_speech(
 
 
 def get_okuri_dict_for_okurigana(
-        okurigana: str,
-        kanji: str,
-        kanji_reading: str,
+    okurigana: str,
+    kanji: str,
+    kanji_reading: str,
 ) -> Union[dict, None]:
     """
     Get the okurigana progression dict for a dictionary form word.
@@ -130,7 +149,6 @@ def get_okuri_dict_for_okurigana(
         kanji=kanji,
         kanji_reading=kanji_reading,
     )
-    print("part_of_speech", part_of_speech)
     if part_of_speech is None:
         return None
     return POSSIBLE_OKURIGANA_PROGRESSION_DICT[part_of_speech]
@@ -1213,4 +1231,4 @@ for item in ALL_OKURI_BY_PART_OF_SPEECH:
     add_char_dict("", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id], is_last=True)
     # If this okuri had a euphonic change entry, add the same progression for it too
     if euph:
-        add_chars_to_dict(f'{euph}{okuri}', POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id])
+        add_chars_to_dict(f"{euph}{okuri}", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id])

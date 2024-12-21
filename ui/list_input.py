@@ -5,7 +5,7 @@ from aqt.qt import (
     QListWidget,
     QPushButton,
     QLineEdit,
-    QHBoxLayout
+    QHBoxLayout,
 )
 
 

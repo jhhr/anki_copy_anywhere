@@ -10,31 +10,32 @@ from .FatalProcessError import FatalProcessError
 
 
 def fonts_check_process(
-        text: str,
-        fonts_dict_file: str,
-        limit_to_fonts: Optional[list[str]],
-        character_limit_regex: Optional[str],
-        show_error_message: Callable[[str], None] = None,
-        file_cache: dict = None
+    text: str,
+    fonts_dict_file: str,
+    limit_to_fonts: Optional[list[str]],
+    character_limit_regex: Optional[str],
+    show_error_message: Callable[[str], None] = None,
+    file_cache: dict = None,
 ) -> str:
     """
-     Go through all the characters in the text and return the fonts that all have an entry in the fonts_dict_file.
-     The fonts_dict_file should be a json file of the form {char: [font1, font2, ...], ...}. Additionally it should
-     contain a list of all the fonts that are used in the collection in the key "all_fonts".
+    Go through all the characters in the text and return the fonts that all have an entry in the fonts_dict_file.
+    The fonts_dict_file should be a json file of the form {char: [font1, font2, ...], ...}. Additionally it should
+    contain a list of all the fonts that are used in the collection in the key "all_fonts".
 
-     :param text: The text to check
-     :param fonts_dict_file: The path to the json file with the fonts dictionary
-     :param limit_to_fonts: A list of font file names to limit the output to
-     :param character_limit_regex: A regex to limit the characters to check
-     :param show_error_message: A function that takes a string and shows an error message
-     :param file_cache: A dictionary to cache the open JSON file contents, to avoid opening the file multiple times
+    :param text: The text to check
+    :param fonts_dict_file: The path to the json file with the fonts dictionary
+    :param limit_to_fonts: A list of font file names to limit the output to
+    :param character_limit_regex: A regex to limit the characters to check
+    :param show_error_message: A function that takes a string and shows an error message
+    :param file_cache: A dictionary to cache the open JSON file contents, to avoid opening the file multiple times
 
-     :return A string that can be parsed as an array of strings, e.g. '["font1", "font2", ...]'
+    :return A string that can be parsed as an array of strings, e.g. '["font1", "font2", ...]'
 
-     :raises FatalProcessError: If the file is not found, empty, or has invalid JSON content
+    :raises FatalProcessError: If the file is not found, empty, or has invalid JSON content
     """
 
     if not show_error_message:
+
         def show_error_message(message: str):
             print(message)
 
@@ -54,13 +55,13 @@ def fonts_check_process(
 
     # if we didn't get the dict from cache, read the file
     if fonts_dict is None:
-        media_path = Path(mw.pm.profileFolder(), 'collection.media')
+        media_path = Path(mw.pm.profileFolder(), "collection.media")
 
         fonts_dict_file_full = media_path / fonts_dict_file
         if not fonts_dict_file_full.is_file():
             raise FatalProcessError(f"File '{fonts_dict_file_full}' does not exist")
 
-        with open(fonts_dict_file_full, "r", encoding='utf-8') as f:
+        with open(fonts_dict_file_full, "r", encoding="utf-8") as f:
             file_content = f.read().strip()
             if not file_content:
                 raise FatalProcessError(f"File '{fonts_dict_file_full}' is empty")
@@ -71,7 +72,9 @@ def fonts_check_process(
                 if file_cache is not None:
                     file_cache[fonts_dict_file] = fonts_dict
             except json.JSONDecodeError as e:
-                raise FatalProcessError(f"Error parsing JSON in file '{fonts_dict_file_full}': {e}")
+                raise FatalProcessError(
+                    f"Error parsing JSON in file '{fonts_dict_file_full}': {e}"
+                )
 
     if text is None or text == "":
         show_error_message("Text was empty")
@@ -101,7 +104,7 @@ def fonts_check_process(
     if limit_to_fonts is not None and valid_fonts is not None:
         valid_fonts = valid_fonts.intersection(limit_to_fonts)
 
-    join_str = "\", \""
+    join_str = '", "'
 
     if not some_chars_found:
         if all_chars_excluded_by_regex:
@@ -109,7 +112,8 @@ def fonts_check_process(
         else:
             show_error_message(
                 f"{text} - No characters had a match in the fonts dictionary, check that your "
-                +" dictionary has entries for the expected characters")
+                + " dictionary has entries for the expected characters"
+            )
             return ""
 
         # All characters were excluded by the regex, so we assume they are all ok to be displayed by all the fonts
@@ -121,7 +125,9 @@ def fonts_check_process(
         if all_fonts is not None:
             return f'["{join_str.join(all_fonts)}"]'
 
-        show_error_message(f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key")
+        show_error_message(
+            f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key"
+        )
         return ""
 
     if valid_fonts is None:
@@ -131,7 +137,9 @@ def fonts_check_process(
         if (len(text)) == 1:
             show_error_message(f"{text} - No fonts were valid for this character")
         else:
-            show_error_message(f"{text} - Some characters had valid fonts but no fonts were valid for every character")
+            show_error_message(
+                f"{text} - Some characters had valid fonts but no fonts were valid for every character"
+            )
         return ""
 
     return f'["{join_str.join(valid_fonts)}"]'

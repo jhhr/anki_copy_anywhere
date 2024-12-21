@@ -1,11 +1,13 @@
 # noinspection PyUnresolvedReferences
 from aqt.browser import Browser
+
 # noinspection PyUnresolvedReferences
 from aqt.gui_hooks import (
     browser_menus_did_init,
     browser_will_show_context_menu,
-    deck_browser_will_show_options_menu
+    deck_browser_will_show_options_menu,
 )
+
 # noinspection PyUnresolvedReferences
 from aqt.qt import QAction, qconnect, QMenu
 
@@ -61,8 +63,8 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
         lambda: replace_custom_field_values(
             card_ids=browser.selectedNotesAsCards(),
             parent=browser,
-            reset_field_key_values=[('fc', None, None, None)]
-            )
+            reset_field_key_values=[("fc", None, None, None)],
+        ),
     )
     reset_all_action = QAction("Reset all fields", browser)
     qconnect(
@@ -70,8 +72,8 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
         lambda: replace_custom_field_values(
             card_ids=browser.selectedNotesAsCards(),
             parent=browser,
-            reset_field_key_values="all"
-            ),
+            reset_field_key_values="all",
+        ),
     )
     custom_data_menu = menu.addMenu("CustomData")
     # Add the actions to the browser's card context menu
@@ -91,11 +93,8 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
         )
 
     for copy_definition in config.copy_definitions:
-        copy_fields_action = QAction(copy_definition['definition_name'], browser)
-        qconnect(
-            copy_fields_action.triggered,
-            make_copy_fields_lambda(copy_definition)
-        )
+        copy_fields_action = QAction(copy_definition["definition_name"], browser)
+        qconnect(copy_fields_action.triggered, make_copy_fields_lambda(copy_definition))
         copy_fields_menu.addAction(copy_fields_action)
 
 
@@ -104,12 +103,9 @@ def setup_copy_fields_menu(browser):
 
     menu = browser.form.menuEdit
     menu.addSeparator()
-    open_copy_dialog_action = QAction('Copy anywhere...', browser)
+    open_copy_dialog_action = QAction("Copy anywhere...", browser)
     open_copy_dialog_action.setShortcut(config.copy_fields_shortcut)
-    qconnect(
-        open_copy_dialog_action.triggered,
-        lambda: show_copy_dialog(browser)
-    )
+    qconnect(open_copy_dialog_action.triggered, lambda: show_copy_dialog(browser))
     menu.addAction(open_copy_dialog_action)
 
 

@@ -40,7 +40,7 @@ class RegexProcess(TypedDict):
 
 
 def get_regex_process_label(regex_process):
-    regex = regex_process['regex']
+    regex = regex_process["regex"]
     if len(regex) > 40:
         regex = regex[:20] + "..."
     return f"{REGEX_PROCESS}: <code>{html.escape(regex)}</code>"
@@ -57,12 +57,14 @@ class FontsCheckProcess(TypedDict):
 
 
 def get_fonts_check_process_label(fonts_check_process):
-    fonts_limit = fonts_check_process.get('limit_to_fonts', None)
+    fonts_limit = fonts_check_process.get("limit_to_fonts", None)
     if fonts_limit:
         fonts_limit = f", (limit {len(fonts_limit)} fonts)"
     else:
         fonts_limit = ""
-    return f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
+    return (
+        f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
+    )
 
 
 KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
@@ -121,7 +123,14 @@ class CopyFieldToField(TypedDict):
     copy_from_text: str
     copy_if_empty: bool
     copy_on_unfocus: bool
-    process_chain: list[Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]]
+    process_chain: list[
+        Union[
+            KanjiumToJavdejongProcess,
+            RegexProcess,
+            FontsCheckProcess,
+            KanaHighlightProcess,
+        ]
+    ]
 
 
 class CopyFieldToVariable(TypedDict):
@@ -138,8 +147,8 @@ DIRECTION_DESTINATION_TO_SOURCES = "Destination to sources"
 DIRECTION_SOURCE_TO_DESTINATIONS = "Source to destinations"
 DirectionType = Literal["Destination to source", "Source to destination"]
 
-SELECT_CARD_BY_VALUES = ('None', 'Random', 'Least_reps')
-SelectCardByType = Literal['None', 'Random', 'Least_reps']
+SELECT_CARD_BY_VALUES = ("None", "Random", "Least_reps")
+SelectCardByType = Literal["None", "Random", "Least_reps"]
 
 
 class CopyDefinition(TypedDict):
@@ -199,7 +208,9 @@ class Config:
         self.data["copy_definitions"].pop(index)
         self.save()
 
-    def update_definition_by_name(self, name: str, new_definition: dict) -> Union[int, None]:
+    def update_definition_by_name(
+        self, name: str, new_definition: dict
+    ) -> Union[int, None]:
         for index, definition in enumerate(self.data["copy_definitions"]):
             if definition["definition_name"] == name:
                 self.update_definition_by_index(index, new_definition)
