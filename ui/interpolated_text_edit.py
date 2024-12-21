@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
@@ -40,11 +40,11 @@ class InterpolatedTextEditLayout(QVBoxLayout):
     def __init__(
         self,
         parent=None,
-        label: Union[QLabel, str] = None,
+        label: Optional[Union[QLabel, str]] = None,
         options_dict=None,
-        description: str = None,
-        height: int = None,
-        placeholder_text: str = None,
+        description: Optional[str] = None,
+        height: Optional[int] = None,
+        placeholder_text: Optional[str] = None,
         is_required: bool = False,
     ):
         super().__init__(parent)

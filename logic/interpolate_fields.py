@@ -377,7 +377,7 @@ def get_from_note_fields(
     field: str,
     note: Note,
     note_fields: dict,
-    card_values_dict: dict = None,
+    card_values_dict: Optional[dict] = None,
     multiple_note_types: bool = False,
 ) -> Tuple[Union[str, None], Union[dict, None]]:
     """
@@ -461,7 +461,7 @@ def interpolate_from_text(
     text: str,
     source_note: Note,
     destination_note: Optional[Note] = None,
-    variable_values_dict: dict = None,
+    variable_values_dict: Optional[dict] = None,
     multiple_note_types: bool = False,
 ) -> Tuple[Union[str, None], List[str]]:
     """

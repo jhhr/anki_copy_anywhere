@@ -1,4 +1,4 @@
-from typing import Sequence, Union
+from typing import Optional, Sequence, Union
 
 from anki.cards import CardId, Card
 from anki.utils import ids2str
@@ -19,7 +19,7 @@ def replace_custom_field_values(
         ],
         "all",
     ],
-    card_ids: Sequence[CardId] = None,
+    card_ids: Optional[Sequence[CardId]] = None,
 ):
     """
     Reset values of custom_data fields for cards that have them

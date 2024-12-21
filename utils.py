@@ -41,7 +41,7 @@ class KeyValueDict(TypedDict):
 
 def write_custom_data(
     card: Card,
-    key: str = None,
+    key: Optional[str] = None,
     value: Optional[Union[str, int, float, bool]] = None,
     new_key: Optional[str] = None,
     key_values: Optional[list[KeyValueDict]] = None,

@@ -7,7 +7,7 @@ def regex_process(
     regex: str,
     replacement: str,
     flags: Optional[str],
-    show_error_message: Callable[[str], None] = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
 ) -> str:
     """
     Basic regex processing step that replaces the text that matches the regex with the replacement.

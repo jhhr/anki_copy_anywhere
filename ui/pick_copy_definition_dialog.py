@@ -24,6 +24,7 @@ from ..logic.copy_fields import (
     copy_fields,
 )
 from ..utils import make_query_string
+from typing import Optional
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
@@ -200,7 +201,7 @@ class PickCopyDefinitionDialog(QDialog):
         # the applicable cards aren't changing this time
 
     def edit_definition(
-        self, index: int = None, copy_definition: CopyDefinition = None
+        self, index: Optional[int] = None, copy_definition: Optional[CopyDefinition] = None
     ):
         """
         Opens the edit dialog for the selected copy definition

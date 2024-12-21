@@ -1244,9 +1244,9 @@ def test(
     kanji,
     onyomi,
     kunyomi,
-    expected_furigana: str = None,
-    expected_furikanji: str = None,
-    expected_kana_only: str = None,
+    expected_furigana: Optional[str] = None,
+    expected_furikanji: Optional[str] = None,
+    expected_kana_only: Optional[str] = None,
 ):
     """
     Function that tests the kana_highlight function

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
@@ -51,7 +51,7 @@ class ComboBoxPlaceholderLineEdit(QLineEdit):
     This would let the user type in the line edit, so we need to manually ignore input events.
     """
 
-    def __init__(self, parent=None, placeholder_text: str = None, **kwargs):
+    def __init__(self, parent=None, placeholder_text: Optional[str] = None, **kwargs):
         super().__init__(parent, **kwargs)
         # Set the default style to vertically center the text so that the
         # text's y's and g's are not cut off at the bottom
@@ -88,7 +88,7 @@ class RequiredCombobox(QComboBox):
     def __init__(
         self,
         parent=None,
-        placeholder_text: str = None,
+        placeholder_text: Optional[str] = None,
         is_required: bool = False,
         auto_size: bool = False,
         minimum_width: int = 250,

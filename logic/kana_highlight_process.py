@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Optional, Callable, Union
 
 from anki.notes import Note
 
@@ -17,7 +17,7 @@ def kana_highlight_process(
     kanji_field: str,
     return_type: Union[FuriReconstruct, None],
     note: Note,
-    show_error_message: Callable[[str], None] = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
 ) -> str:
     """
     Wraps the kana_highlight function to be used as an extra processing step in the copy fields

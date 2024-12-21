@@ -1,5 +1,5 @@
 from contextlib import suppress
-from typing import Union, Tuple
+from typing import Optional, Union, Tuple
 
 # noinspection PyUnresolvedReferences
 from anki.models import NotetypeDict
@@ -113,8 +113,8 @@ class BasicEditorFormLayout(QFormLayout):
     def __init__(
         self,
         parent,
-        copy_definition: CopyDefinition = None,
-        extra_top_widgets: list[Tuple[QLabel, QWidget]] = None,
+        copy_definition: Optional[CopyDefinition] = None,
+        extra_top_widgets: Optional[list[Tuple[QLabel, QWidget]]] = None,
     ):
         super().__init__(parent)
 
@@ -597,7 +597,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
     the dropdown boxes can access the text chosen in the other dropdown boxes.
     """
 
-    def __init__(self, parent, copy_definition: CopyDefinition = None):
+    def __init__(self, parent, copy_definition: Optional[CopyDefinition] = None):
         # Define Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("Save")
         self.close_button = QPushButton("Cancel")

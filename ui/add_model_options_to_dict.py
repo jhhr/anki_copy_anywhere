@@ -1,10 +1,11 @@
 from aqt import mw
 
 from ..logic.interpolate_fields import CARD_VALUES, intr_format
+from typing import Optional
 
 
 def add_model_options_to_dict(
-    model_name: str, model_id: int, target_dict: dict, prefix: str = None
+    model_name: str, model_id: int, target_dict: dict, prefix: Optional[str] = None
 ):
     """
     Add the field names and card values to the target_dict.

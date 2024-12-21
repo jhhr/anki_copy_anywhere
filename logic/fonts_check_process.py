@@ -14,8 +14,8 @@ def fonts_check_process(
     fonts_dict_file: str,
     limit_to_fonts: Optional[list[str]],
     character_limit_regex: Optional[str],
-    show_error_message: Callable[[str], None] = None,
-    file_cache: dict = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
+    file_cache: Optional[dict] = None,
 ) -> str:
     """
     Go through all the characters in the text and return the fonts that all have an entry in the fonts_dict_file.

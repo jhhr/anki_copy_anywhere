@@ -131,7 +131,7 @@ class ProgressUpdateDef:
     a mutable object that the progress_update function can access.
     """
 
-    def __init__(self, label: str = None, value: int = None, max_value: int = None):
+    def __init__(self, label: Optional[str] = None, value: Optional[int] = None, max_value: Optional[int] = None):
         self.label = label
         self.value = value
         self.max_value = max_value
@@ -152,7 +152,7 @@ class ProgressUpdateDef:
 def copy_fields(
     copy_definitions: list[CopyDefinition],
     card_ids=None,
-    card_ids_per_definition: list[list[int]] = None,
+    card_ids_per_definition: Optional[list[list[int]]] = None,
     parent=None,
     is_sync: bool = False,
 ):
@@ -447,8 +447,8 @@ def apply_process_chain(
     ],
     text: str,
     destination_note: Note,
-    show_error_message: Callable[[str], None] = None,
-    file_cache: dict = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
+    file_cache: Optional[dict] = None,
 ) -> Union[str, None]:
     """
     Apply a list of processes to a text
@@ -510,13 +510,13 @@ def apply_process_chain(
 def copy_for_single_trigger_note(
     copy_definition: CopyDefinition,
     trigger_note: Note,
-    results: CacheResults = None,
-    undo_entry: int = None,
-    field_only: str = None,
-    deck_id: int = None,
+    results: Optional[CacheResults] = None,
+    undo_entry: Optional[int] = None,
+    field_only: Optional[str] = None,
+    deck_id: Optional[int] = None,
     multiple_note_types: bool = False,
-    show_error_message: Callable[[str], None] = None,
-    file_cache: dict = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
+    file_cache: Optional[dict] = None,
 ) -> Tuple[bool, int, int]:
     """
     Copy fields into a single note
@@ -634,11 +634,11 @@ def copy_into_single_note(
     destination_note: Note,
     source_notes: list[Note],
     variable_values_dict: dict,
-    field_only: str = None,
+    field_only: Optional[str] = None,
     multiple_note_types: bool = False,
-    select_card_separator: str = None,
-    file_cache: dict = None,
-    show_error_message: Callable[[str], None] = None,
+    select_card_separator: Optional[str] = None,
+    file_cache: Optional[dict] = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
 ) -> bool:
     if not show_error_message:
 
@@ -698,8 +698,8 @@ def copy_into_single_note(
 def get_variable_values_for_note(
     field_to_variable_defs: list[CopyFieldToVariable],
     note: Note,
-    file_cache: dict = None,
-    show_error_message: Callable[[str], None] = None,
+    file_cache: Optional[dict] = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
 ) -> Union[dict, None]:
     """
     Get the values for the variables from the note
@@ -752,11 +752,11 @@ def get_across_target_notes(
     trigger_note: Note,
     select_card_by: str,
     extra_state: dict,
-    deck_id: int = None,
-    variable_values_dict: dict = None,
-    only_copy_into_decks: str = None,
+    deck_id: Optional[int] = None,
+    variable_values_dict: Optional[dict] = None,
+    only_copy_into_decks: Optional[str] = None,
     select_card_count: str = "1",
-    show_error_message: Callable[[str], None] = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
 ) -> list[Note]:
     """
     Get the target notes based on the search value and the query. These will either be
@@ -922,9 +922,9 @@ def get_field_values_from_notes(
     notes: list[Note],
     dest_note: Optional[Note],
     multiple_note_types: bool = False,
-    variable_values_dict: dict = None,
+    variable_values_dict: Optional[dict] = None,
     select_card_separator: str = ", ",
-    show_error_message: Callable[[str], None] = None,
+    show_error_message: Optional[Callable[[str], None]] = None,
 ) -> str:
     """
     Get the value from the field in the selected notes gotten with get_notes_to_copy_from.

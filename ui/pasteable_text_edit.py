@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Union
+from typing import Optional, Union
 
 # noinspection PyUnresolvedReferences
 from aqt.qt import (
@@ -49,9 +49,9 @@ class PasteableTextEdit(AutoResizingTextEdit):
     def __init__(
         self,
         parent=None,
-        options_dict: dict = None,
-        height: int = None,
-        placeholder_text: str = None,
+        options_dict: Optional[dict] = None,
+        height: Optional[int] = None,
+        placeholder_text: Optional[str] = None,
         **kwargs
     ):
         super().__init__(parent, **kwargs)
@@ -153,7 +153,7 @@ class PasteableTextEdit(AutoResizingTextEdit):
         group_name: str,
         option_name: str,
         option_text: str,
-        target_level: dict = None,
+        target_level: Optional[dict] = None,
     ):
         current_level = self.options_dict if target_level is None else target_level
         if group_name not in current_level:

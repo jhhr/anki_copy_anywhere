@@ -1,11 +1,11 @@
 import re
-from typing import Callable
+from typing import Optional, Callable
 
 DEBUG = False
 
 
 def kanjium_to_javdejong_process(
-    text: str, delimiter: str = "・", show_error_message: Callable[[str], None] = None
+    text: str, delimiter: str = "・", show_error_message: Optional[Callable[[str], None]] = None
 ):
     """
     Convert a pitch accent html string that is in Kanjium format to Javdejong format.
