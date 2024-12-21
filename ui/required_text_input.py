@@ -1,7 +1,6 @@
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QLineEdit,
-    QTextEdit,
+    QPlainTextEdit,
     QEvent,
     qtmajor,
 )
@@ -72,7 +71,7 @@ class RequiredLineEdit(QLineEdit):
         #     self.textChanged.connect(self.update_required_style)
 
 
-class RequiredTextEdit(QTextEdit):
+class RequiredTextEdit(QPlainTextEdit):
     """
     A QLineEdit that shows a required style when empty.
     """
@@ -90,9 +89,6 @@ class RequiredTextEdit(QTextEdit):
         self.was_valid = True
         self.required_style = required_style
         self.default_style = default_style
-        # Set this as a default for all text edits as editing fields
-        # with this addons requires plain text pretty much always
-        self.setAcceptRichText(False)
         if default_style:
             self.setStyleSheet(default_style)
         if is_required:

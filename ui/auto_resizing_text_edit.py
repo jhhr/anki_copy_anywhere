@@ -1,16 +1,4 @@
-# noinspection PyUnresolvedReferences
-from aqt.qt import (
-    QTextEdit,
-    QSizePolicy,
-    qtmajor,
-)
-
 from .required_text_input import RequiredTextEdit
-
-if qtmajor > 5:
-    SizePolicy = QSizePolicy.Policy
-else:
-    SizePolicy = QSizePolicy
 
 
 class AutoResizingTextEdit(RequiredTextEdit):
@@ -19,10 +7,17 @@ class AutoResizingTextEdit(RequiredTextEdit):
         self.textChanged.connect(self.autoResize)
 
     def autoResize(self):
-        self.document().setTextWidth(self.viewport().width())
+        document = self.document()
         margins = self.contentsMargins()
-        height = int(self.document().size().height() + margins.top() + margins.bottom())
-        self.setFixedHeight(height)
+        height = 0
+
+        block = document.begin()
+        while block.isValid():
+            height += self.blockBoundingRect(block).height()
+            block = block.next()
+
+        height += (margins.top() + margins.bottom()) * 2
+        self.setFixedHeight(int(height))
 
     def resizeEvent(self, event):
         self.autoResize()

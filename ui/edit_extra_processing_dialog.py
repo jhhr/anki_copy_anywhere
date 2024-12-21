@@ -190,7 +190,7 @@ class RegexProcessDialog(QDialog):
         self.form.addRow(regex_label, self.flags_field)
 
         with suppress(KeyError):
-            self.regex_field.setText(self.process["regex"])
+            self.regex_field.setPlainText(self.process["regex"])
         with suppress(KeyError):
             self.replacement_field.setText(self.process["replacement"])
         with suppress(KeyError):
@@ -297,7 +297,7 @@ class FontsCheckProcess(QDialog):
             for font in self.process["limit_to_fonts"]:
                 self.limit_to_fonts_field.add_item(font)
         with suppress(KeyError):
-            self.regex_field.setText(self.process["character_limit_regex"])
+            self.regex_field.setPlainText(self.process["character_limit_regex"])
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
