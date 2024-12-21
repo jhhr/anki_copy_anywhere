@@ -1,26 +1,14 @@
 import re
 from typing import Union, Callable, TypedDict, Literal, Optional
 
-try:
-    from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
-    from .jpn_text_processing.get_conjugatable_okurigana_stem import (
-        get_conjugatable_okurigana_stem,
-    )
-    from .jpn_text_processing.starts_with_okurigana_conjugation import (
-        starts_with_okurigana_conjugation,
-        OkuriResults,
-    )
-except ImportError:
-    # For testing
-    import sys
-    from jpn_text_processing.kana_conv import to_katakana, to_hiragana
-    from jpn_text_processing.get_conjugatable_okurigana_stem import (
-        get_conjugatable_okurigana_stem,
-    )
-    from jpn_text_processing.starts_with_okurigana_conjugation import (
-        starts_with_okurigana_conjugation,
-        OkuriResults,
-    )
+from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
+from .jpn_text_processing.get_conjugatable_okurigana_stem import (
+    get_conjugatable_okurigana_stem,
+)
+from .jpn_text_processing.starts_with_okurigana_conjugation import (
+    starts_with_okurigana_conjugation,
+    OkuriResults,
+)
 
 HIRAGANA_CONVERSION_DICT = {
     "か": ["が"],

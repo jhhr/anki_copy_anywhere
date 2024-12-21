@@ -1,10 +1,7 @@
 import sys
 from typing import Literal, NamedTuple
 
-try:
-    from .okurigana_dict import get_okuri_dict_for_okurigana
-except ImportError:
-    from okurigana_dict import get_okuri_dict_for_okurigana
+from .okurigana_dict import get_okuri_dict_for_okurigana
 
 LOG = False
 
