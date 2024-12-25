@@ -1,24 +1,19 @@
 import json
 from contextlib import contextmanager
-from typing import Optional, Dict, Any, Union, TypedDict
+from typing import Optional, Dict, Any, Union, TypedDict, Protocol, Iterable, Tuple
 
-# noinspection PyUnresolvedReferences
 from anki.cards import Card
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import QFontMetrics, QComboBox
-
-# noinspection PyUnresolvedReferences
-from aqt.utils import tooltip
 
 
 def add_dict_key_value(
     dict: dict,
-    key: str,
-    value: Optional[str] = None,
+    key: Optional[str] = None,
+    value: Optional[Union[str, int, float, bool]] = None,
     new_key: Optional[str] = None,
 ):
-    if new_key is not None and value is None:
+    if new_key is not None and value is None and key is not None:
         # rename key
         dict[new_key] = dict.pop(key, None)
     elif new_key is not None and value is not None:
@@ -28,7 +23,7 @@ def add_dict_key_value(
     elif value is not None:
         # set value for key
         dict[key] = value
-    else:
+    elif key is not None:
         # remove key
         dict.pop(key, None)
 
@@ -67,7 +62,7 @@ def write_custom_data(
             add_dict_key_value(
                 custom_data,
                 kv.get("key"),
-                kv.get("value"),
+                kv.get("value", ""),
                 kv.get("new_key"),
             )
     else:
@@ -78,7 +73,14 @@ def write_custom_data(
     card.custom_data = compressed_data
 
 
-def to_lowercase_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+# Type that'll match anki's Note class
+class DictLike(Protocol):
+    def items(self) -> Iterable[Tuple[str, Any]]: ...
+    def keys(self) -> Iterable[str]: ...
+    def values(self) -> Iterable[Any]: ...
+
+
+def to_lowercase_dict(d: Union[Dict[str, Any], DictLike, None]) -> Dict[str, Any]:
     """Converts a dictionary to lowercase keys"""
     if d is None:
         return {}
@@ -103,10 +105,12 @@ def adjust_width_to_largest_item(combo_box: QComboBox):
     max_width = 0
     for i in range(combo_box.count()):
         item_text = combo_box.itemText(i)
-        item_width = QFontMetrics(combo_box.font()).width(item_text)
+        item_width = QFontMetrics(combo_box.font()).horizontalAdvance(item_text)
         if item_width > max_width:
             max_width = item_width
-    combo_box.view().setMinimumWidth(max_width + 20)
+    view = combo_box.view()
+    if view is not None:
+        view.setMinimumWidth(max_width + 20)
 
 
 @contextmanager

@@ -1,7 +1,7 @@
-# noinspection PyUnresolvedReferences
+from typing import Optional, Callable, Union, Sequence
+from anki.cards import CardId
 from aqt import mw
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QDialog,
     QVBoxLayout,
@@ -12,7 +12,6 @@ from aqt.qt import (
     QHBoxLayout,
     Qt,
     qtmajor,
-    QTimer,
 )
 
 from .edit_copy_definition_dialog import EditCopyDefinitionDialog
@@ -24,16 +23,13 @@ from ..logic.copy_fields import (
     copy_fields,
 )
 from ..utils import make_query_string
-from typing import Optional
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
 else:
-    WindowModal = Qt.WindowModal
+    WindowModal = Qt.WindowModal  # type: ignore
 
-DEFAULT_CARDS_SELECTED_LABEL = (
-    "Select some copy definitions to show what cards would apply."
-)
+DEFAULT_CARDS_SELECTED_LABEL = "Select some copy definitions to show what cards would apply."
 
 
 class PickCopyDefinitionDialog(QDialog):
@@ -45,19 +41,19 @@ class PickCopyDefinitionDialog(QDialog):
     def __init__(
         self,
         parent,
-        copy_definitions: [CopyDefinition],
-        browser_card_ids,
-        browser_search,
+        copy_definitions: list[CopyDefinition],
+        browser_card_ids: Optional[list[int]],
+        browser_search: Optional[str],
     ):
         super().__init__(parent)
 
         self.copy_definitions = copy_definitions
-        self.selected_definitions_applicable_cards = []
-        self.selected_copy_definitions = []
-        self.remove_row_funcs = []
-        self.applicable_note_type_names = []
-        self.checkboxes = []
-        self.definition_card_ids = []
+        self.selected_definitions_applicable_cards: set[int] = set()
+        self.selected_copy_definitions: list[CopyDefinition] = []
+        self.remove_row_funcs: list[Callable[[], None]] = []
+        self.applicable_note_type_names: list[str] = []
+        self.checkboxes: list[QCheckBox] = []
+        self.definition_card_ids: list[Sequence[Union[int, CardId]]] = []
         self.browser_card_ids = browser_card_ids
         self.browser_search = browser_search
 
@@ -67,7 +63,7 @@ class PickCopyDefinitionDialog(QDialog):
         self.setLayout(self.vbox)
 
         self.use_selected_cards_button = QPushButton(
-            f"Use selected cards ({len(browser_card_ids)})"
+            f"Use selected cards ({len(browser_card_ids or [])})"
         )
         self.use_selected_cards_button.clicked.connect(
             lambda: self.toggle_card_selected_button(self.use_selected_cards_button)
@@ -211,7 +207,7 @@ class PickCopyDefinitionDialog(QDialog):
         if copy_definition is not None:
             definition = copy_definition
         elif index is None:
-            definition = {}
+            definition = None
         else:
             definition = self.copy_definitions[index]
 
@@ -219,10 +215,10 @@ class PickCopyDefinitionDialog(QDialog):
 
         if dialog.exec():
             copy_definition = dialog.get_copy_definition()
-            if index is None:
+            if index is None and copy_definition is not None:
                 config.add_definition(copy_definition)
                 self.add_definition_row(len(self.copy_definitions), copy_definition)
-            else:
+            elif index is not None and copy_definition is not None:
                 config.update_definition_by_index(index, copy_definition)
                 for func in self.remove_row_funcs:
                     func()
@@ -265,7 +261,7 @@ class PickCopyDefinitionDialog(QDialog):
             browser_query = self.browser_search
 
         self.selected_definitions_applicable_cards = set()
-        total_applicable_cards = []
+        total_applicable_cards: list[Union[int, CardId]] = []
         self.applicable_note_type_names = []
         nothing_checked = True
         for index, checkbox in enumerate(self.checkboxes):
@@ -283,18 +279,16 @@ class PickCopyDefinitionDialog(QDialog):
                 # Split by comma and remove the first wrapping " but keeping the last one
                 note_type_names = checked_definition.get("copy_into_note_types")
                 if note_type_names and note_type_names != "-":
-                    note_type_names = note_type_names.strip('""').split('", "')
-                    note_type_query = make_query_string("note", note_type_names)
-                def_card_ids = mw.col.find_cards(
-                    f"{note_type_query} {decks_query} {browser_query}"
-                )
+                    note_type_names_list = note_type_names.strip('""').split('", "')
+                    note_type_query = make_query_string("note", note_type_names_list)
+                def_card_ids = mw.col.find_cards(f"{note_type_query} {decks_query} {browser_query}")
 
                 self.selected_definitions_applicable_cards.update(def_card_ids)
                 self.definition_card_ids[index] = def_card_ids
                 total_applicable_cards.extend(def_card_ids)
                 definition_name = checked_definition.get("definition_name", "")
                 checkbox.setText(f"{definition_name} ({len(def_card_ids)})")
-                for note_type_name in note_type_names:
+                for note_type_name in note_type_names_list:
                     if note_type_name not in self.applicable_note_type_names:
                         self.applicable_note_type_names.append(note_type_name)
             else:
@@ -303,9 +297,10 @@ class PickCopyDefinitionDialog(QDialog):
             self.cards_selected_label.setText(DEFAULT_CARDS_SELECTED_LABEL)
         elif len(self.selected_definitions_applicable_cards) > 0:
             self.cards_selected_label.setText(
-                f"""{len(self.selected_definitions_applicable_cards)} cards apply over {len(self.applicable_note_type_names)} different note types.
-            Total copy operations to be done: {len(total_applicable_cards)}.
-            Click apply to run the selected copy definitions on these cards."""
+                f"{len(self.selected_definitions_applicable_cards)} cards apply over"
+                f" {len(self.applicable_note_type_names)} different note types."
+                f"<br>Total copy operations to be done: {len(total_applicable_cards)}."
+                "Click apply to run the selected copy definitions on these cards."
             )
             self.apply_button.setEnabled(True)
         else:
@@ -313,18 +308,6 @@ class PickCopyDefinitionDialog(QDialog):
                 "No cards applicable for the selected copy definitions."
             )
             self.apply_button.setEnabled(False)
-
-    def get_selected_definition_index(self):
-        """
-        Returns the selected definition index
-        """
-        return self.copy_definition_cbox.currentIndex()
-
-    def get_selected_definition_name(self):
-        """
-        Returns the selected definition name
-        """
-        return self.copy_definition_cbox.currentText()
 
 
 def show_copy_dialog(browser):

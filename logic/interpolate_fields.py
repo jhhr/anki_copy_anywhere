@@ -1,12 +1,10 @@
 import re
 import time
 from functools import partial
-from typing import Tuple, Union, List, Optional, Callable
+from typing import Tuple, Union, List, Optional, Callable, Sequence
 
-# noinspection PyUnresolvedReferences
-from anki.cards import Card
+from anki.cards import Card, CardId
 
-# noinspection PyUnresolvedReferences
 from anki.consts import (
     CARD_TYPE_NEW,
     CARD_TYPE_LRN,
@@ -14,10 +12,8 @@ from anki.consts import (
     CARD_TYPE_RELEARNING,
 )
 
-# noinspection PyUnresolvedReferences
 from anki.notes import Note
 
-# noinspection PyUnresolvedReferences
 from aqt import mw
 
 from ..utils import to_lowercase_dict
@@ -170,9 +166,7 @@ BASE_NOTE_MENU_DICT = {
 DESTINATION_NOTE_MENU_DICT = {
     # The note being used to query
     DESTINATION_NOTE_DATA_KEY: {
-        "Destination Note Type ID (mid:)": intr_format(
-            f"{DESTINATION_PREFIX}{NOTE_TYPE_ID}"
-        ),
+        "Destination Note Type ID (mid:)": intr_format(f"{DESTINATION_PREFIX}{NOTE_TYPE_ID}"),
         "Destination Note ID (nid:)": intr_format(f"{DESTINATION_PREFIX}{NOTE_ID}"),
         "Destination note all tags": intr_format(f"{DESTINATION_PREFIX}{NOTE_TAGS}"),
         "Destination note has tag": intr_format(f"{DESTINATION_PREFIX}{NOTE_HAS_TAG}"),
@@ -183,10 +177,22 @@ DESTINATION_NOTE_MENU_DICT = {
 }
 
 
+JSONSerializableValue = Union[
+    None,
+    bool,
+    int,
+    float,
+    str,
+    Sequence["JSONSerializableValue"],
+    dict[str, "JSONSerializableValue"],
+]
+ValueOrValueGetter = Union[JSONSerializableValue, Callable[[str], JSONSerializableValue]]
+
+
 def get_note_data_value(
     note: Note,
     field_name: str,
-) -> Union[str, int, None, Callable[[str], Union[str, any]]]:
+) -> ValueOrValueGetter:
     """
     Get the value for a single special field.
     """
@@ -195,7 +201,8 @@ def get_note_data_value(
         return arg if note.has_tag(arg) else "-"
 
     if field_name == NOTE_TYPE_ID:
-        return note.model()["id"]
+        note_type = note.note_type()
+        return note_type["id"] if note_type else ""
     if field_name == NOTE_ID:
         return note.id
     if field_name == NOTE_TAGS:
@@ -221,52 +228,61 @@ def format_timestamp_days(e, time_format=None):
 
 
 def get_card_last_reps(
-    card_id: str,
+    card_id: CardId,
     rep_count: str,
     get_ease: bool = False,
     get_ivl: bool = False,
     get_fct: bool = False,
 ) -> Union[
     # Return  or a flat list of values
-    List[Union[int, float]],
+    Sequence[Union[int, float]],
     # or a list of lists of values when two or more rev_log fields are requested
-    List[List[Union[int, float]]],
+    Sequence[Sequence[Union[int, float]]],
 ]:
     if not get_ease and not get_ivl and not get_fct:
         return []
     all = rep_count == "all"
     if not all:
         try:
-            rep_count = int(rep_count)
+            rep_count_int = int(rep_count)
         except ValueError:
             return []
-        if rep_count < 1:
+        if rep_count_int < 1:
             return []
+    assert mw.col.db is not None
     # Get rep eases, excluding manual schedules, identified by ease = 0
-    reps = mw.col.db.list(
-        f"""SELECT 
-                {",".join(filter(None, [
-            "ease" if get_ease else "",
-            "ivl" if get_ivl else "",
-            "factor" if get_fct else ""
-        ]))}
+    select_cols = ",".join(
+        filter(
+            None,
+            ["ease" if get_ease else "", "ivl" if get_ivl else "", "factor" if get_fct else ""],
+        )
+    )
+    reps = mw.col.db.list(f"""SELECT 
+                {select_cols}
                 FROM revlog
                 WHERE cid = {card_id}
                 AND ease != 0
                 ORDER BY id
-                {f"DESC LIMIT {rep_count}" if not all else ""}
-            """
-    )
+                {f"DESC LIMIT {rep_count_int}" if not all else ""}
+            """)
     return reps
+
+
+ValuesDict = dict[str, ValueOrValueGetter]
 
 
 def get_value_for_card(
     card: Card,
     note: Note,
-) -> dict[str, any]:
-    (first, last, cnt, total) = mw.col.db.first(
+) -> ValuesDict:
+    assert mw.col.db is not None
+    result = mw.col.db.first(
         f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card.id}"
     )
+    if result:
+        (first, last, cnt, total) = result
+    else:
+        first, last, cnt, total = None, None, None, None
     return {
         CARD_ID: card.id or 0,
         OTHER_CARD_IDS: [cid for cid in note.card_ids() if cid != card.id],
@@ -275,19 +291,13 @@ def get_value_for_card(
         CARD_IVL: card.ivl or 0,
         CARD_EASE: card.factor / 10 or 0,
         # If FSRS is not enabled, memory_state will be None
-        CARD_STABILITY: (
-            round(card.memory_state.stability, 1) if card.memory_state else 0
-        ),
-        CARD_DIFFICULTY: (
-            round(card.memory_state.difficulty, 1) if card.memory_state else 0
-        ),
+        CARD_STABILITY: round(card.memory_state.stability, 1) if card.memory_state else 0,
+        CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
         CARD_REP_COUNT: card.reps or 0,
         CARD_LAPSE_COUNT: card.lapses or 0,
         CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "-",
         CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "-",
-        CARD_AVERAGE_TIME: (
-            timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-"
-        ),
+        CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-",
         CARD_TOTAL_TIME: timespan(total),
         CARD_TYPE: (
             "Review"
@@ -310,9 +320,12 @@ def get_value_for_card(
     }
 
 
+CardValuesDict = dict[str, ValuesDict]
+
+
 def get_card_values_dict_for_note(
     note: Note,
-) -> dict[str, dict[str, Union[str, Callable[[str], Union[str, any]]]]]:
+) -> CardValuesDict:
     """
     Get a dictionary of special fields that are card-specific.
     """
@@ -321,9 +334,11 @@ def get_card_values_dict_for_note(
     # cards will be empty for a new note being added so we can't return anything
     cards = note.cards()
     if not cards:
-        for card_template in note.note_type()["tmpls"]:
-            # Make a fake card to get the default values
-            card_values[card_template["name"]] = get_value_for_card(Card(mw.col), note)
+        note_type = note.note_type()
+        if note_type:
+            for card_template in note_type["tmpls"]:
+                # Make a fake card to get the default values
+                card_values[card_template["name"]] = get_value_for_card(Card(mw.col), note)
     # Add values as a dict by card_type_name
     for card in note.cards():
         card_type_name = card.template()["name"]
@@ -377,7 +392,7 @@ def get_from_note_fields(
     field: str,
     note: Note,
     note_fields: dict,
-    card_values_dict: Optional[dict] = None,
+    card_values_dict: Optional[CardValuesDict] = None,
     multiple_note_types: bool = False,
 ) -> Tuple[Union[str, None], Union[dict, None]]:
     """
@@ -405,24 +420,24 @@ def get_from_note_fields(
         maybe_note_value_key, maybe_note_value_arg = note_match.group(1, 2)
         # Check if the note value key is valid
         if maybe_note_value_key in NOTE_VALUES:
-            value = get_note_data_value(note, maybe_note_value_key)
+            value_or_partial = get_note_data_value(note, maybe_note_value_key)
             # Check if this value is a function that needs the argument
-            if isinstance(value, partial):
-                return value(maybe_note_value_arg), card_values_dict
+            if isinstance(value_or_partial, partial):
+                value = value_or_partial(maybe_note_value_arg)
+            else:
+                value = value_or_partial
             return value, card_values_dict
     # And last, cards are harder since they need to specify the card type name too
     card_match = (
-        CARD_VALUE_RE.match(field)
-        if not multiple_note_types
-        else MULTI_CARD_VALUE_RE.match(field)
+        CARD_VALUE_RE.match(field) if not multiple_note_types else MULTI_CARD_VALUE_RE.match(field)
     )
     if card_match:
         if multiple_note_types:
             maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2)
-            maybe_card_type_name = None
+            maybe_card_type_name = ""
         else:
-            maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = (
-                card_match.group(1, 2, 3)
+            maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = card_match.group(
+                1, 2, 3
             )
         # Check if the card type name is valid
         if maybe_card_value_key in CARD_VALUES_DICT:
@@ -448,11 +463,13 @@ def get_from_note_fields(
 
             value_dict = card_values_dict.get(maybe_card_type_name)
             if value_dict and maybe_card_value_key in value_dict:
-                value = value_dict.get(maybe_card_value_key)
+                value_or_partial = value_dict.get(maybe_card_value_key)
                 # Check if this value is a function that needs the argument
-                if isinstance(value, partial):
-                    return value(maybe_card_value_arg), card_values_dict
-                return value_dict.get(maybe_card_value_key), card_values_dict
+                if isinstance(value_or_partial, partial):
+                    value = value_or_partial(maybe_card_value_arg)
+                else:
+                    value = value_or_partial
+                return value, card_values_dict
     # If we get here, the field is invalid
     return None, card_values_dict
 

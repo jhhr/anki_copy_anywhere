@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Union
+from typing import Optional, Callable
 
 from anki.notes import Note
 
@@ -15,7 +15,7 @@ def kana_highlight_process(
     onyomi_field: str,
     kunyomi_field: str,
     kanji_field: str,
-    return_type: Union[FuriReconstruct, None],
+    return_type: FuriReconstruct,
     note: Note,
     show_error_message: Optional[Callable[[str], None]] = None,
 ) -> str:
@@ -28,20 +28,23 @@ def kana_highlight_process(
         def show_error_message(message: str):
             print(message)
 
-    # show_error_message(f"kana_highlight_process: {onyomi_field}, {kunyomi_field}, {kanji_field}, {text}, {return_type}")
+    # show_error_message(
+    #     f"kana_highlight_process: {onyomi_field}, {kunyomi_field}, {kanji_field}, {text},"
+    #     f" {return_type}"
+    # )
 
-    if onyomi_field is None:
+    if not onyomi_field:
         show_error_message("Error in kana_highlight: Missing 'onyomi_field'")
         return kana_filter(text)
 
-    if kunyomi_field is None:
+    if not kunyomi_field:
         show_error_message("Error in kana_highlight: Missing 'kunyomi_field'")
         return kana_filter(text)
 
-    if kanji_field is None:
+    if not kanji_field:
         show_error_message("Error in kana_highlight: Missing 'kanji_field'")
         return kana_filter(text)
-    if return_type is None:
+    if not return_type:
         show_error_message("Error in kana_highlight: Missing 'return_type'")
         return kana_filter(text)
 
@@ -60,7 +63,8 @@ def kana_highlight_process(
             break
     if kanji_to_highlight is None or onyomi is None or kunyomi is None:
         show_error_message(
-            f"Error in kana_highlight: note doesn't contain fields: Kanji ({kanji_to_highlight}), Onyomi ({onyomi}), Kunyomi ({kunyomi})"
+            f"Error in kana_highlight: note doesn't contain fields: Kanji ({kanji_to_highlight}),"
+            f" Onyomi ({onyomi}), Kunyomi ({kunyomi})"
         )
         if return_type == "kana_only":
             return kana_filter(text)

@@ -13,7 +13,11 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
     config = Config()
     config.load()
 
-    note_type_name = note.note_type()["name"]
+    note_type = note.note_type()
+    if not note_type:
+        # Error situation, note_type should exist when adding note
+        return
+    note_type_name = note_type["name"]
 
     for copy_definition in config.copy_definitions:
         copy_on_add = copy_definition.get("copy_on_add", False)
@@ -47,7 +51,11 @@ def run_copy_fields_on_review(card: Card):
     config = Config()
     config.load()
     note = card.note()
-    note_type_name = note.note_type()["name"]
+    note_type = note.note_type()
+    if not note_type:
+        # Error situation, note_type should exist when reviewing card
+        return
+    note_type_name = note_type["name"]
 
     for copy_definition in config.copy_definitions:
         copy_on_review = copy_definition.get("copy_on_review", False)
@@ -83,8 +91,12 @@ def run_copy_fields_on_review(card: Card):
 def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str):
     config = Config()
     config.load()
-    note_type_name = note.note_type()["name"]
     changed = False
+    note_type = note.note_type()
+    if not note_type:
+        # Error situation, note_type should exist when unfocusing field
+        return changed
+    note_type_name = note_type["name"]
 
     for copy_definition in config.copy_definitions:
         copy_into_note_types = copy_definition.get("copy_into_note_types", None)

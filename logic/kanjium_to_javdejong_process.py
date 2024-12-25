@@ -5,12 +5,16 @@ DEBUG = False
 
 
 def kanjium_to_javdejong_process(
-    text: str, delimiter: str = "・", show_error_message: Optional[Callable[[str], None]] = None
+    text: str,
+    delimiter: Optional[str],
+    show_error_message: Optional[Callable[[str], None]] = None,
 ):
     """
     Convert a pitch accent html string that is in Kanjium format to Javdejong format.
-    :param text: Text with the pitch accent html string to convert. If not in Kanjium format, it will be returned as is.
-    :param delimiter: The delimiter to use when joining the converted pitch accent descriptions. Default is '・'.
+    :param text: Text with the pitch accent html string to convert. If not in Kanjium format,
+        it will be returned as is.
+    :param delimiter: The delimiter to use when joining the converted pitch accent descriptions.
+        Default is '・'.
     :param show_error_message: A function to call to show an error message. Default is None.
     :return: The converted pitch accent html string in Javdejong format.
     """
@@ -22,6 +26,9 @@ def kanjium_to_javdejong_process(
     is_kanjium_pitch = re.search(r"currentColor", text)
     if not is_kanjium_pitch:
         return text
+
+    if not delimiter:
+        delimiter = "・"
 
     # Split the input string into pitch accent descriptions
     pitch_accent_descriptions = text.split("・")
@@ -39,9 +46,7 @@ def kanjium_to_javdejong_process(
         all_kana_matches = re.findall(r"[ぁ-んァ-ンゞ゛゜ー]", pitch_accent_description)
         if all_kana_matches:
             for i, kana_match in enumerate(all_kana_matches):
-                all_kana.append(
-                    {"kana": kana_match, "index": i, "overline": False, "down": False}
-                )
+                all_kana.append({"kana": kana_match, "index": i, "overline": False, "down": False})
 
         if DEBUG:
             show_error_message(f"all_kana: {all_kana}")
@@ -50,7 +55,13 @@ def kanjium_to_javdejong_process(
 
         # Find characters that have an overline
         overline_kana_matches = re.findall(
-            r'<span style="display:inline-block;position:relative;padding-right:0.1em;margin-right:0.1em;"><span style="display:inline;">([ぁ-んァ-ンゞ゛゜ー]*?)<\/span>(?!<span style="border-color:currentColor;display:block;user-select:none;pointer-events:none;position:absolute;top:0.1em;left:0;right:0;height:0;border-top-width:0.1em;border-top-style:solid;right:-0.1em;height:0.4em;border-right-width:0.1em;border-right-style:solid;"></span>)|<span style="display:inline;">([ぁ-んァ-ンゞ゛゜ー]*?)<\/span><span style="border-color:currentColor;display:block;user-select:none;pointer-events:none;position:absolute;top:0.1em;left:0;right:0;height:0;border-top-width:0.1em;border-top-style:solid;"><\/span>',
+            r"""<span
+style="display:inline-block;position:relative;padding-right:0.1em;margin-right:0.1em;"><span'
+style="display:inline;">([ぁ-んァ-ンゞ゛゜ー]*?)<\/span>(?!<span'
+style="border-color:currentColor;display:block;user-select:none;pointer-events:none;position:absolute;top:0.1em;left:0;right:0;height:0;border-top-width:0.1em;border-top-style:solid;right:-0.1em;height:0.4em;border-right-width:0.1em;border-right-style:solid;"></span>)|<span'
+style="display:inline;">([ぁ-んァ-ンゞ゛゜ー]*?)<\/span><span'
+style="border-color:currentColor;display:block;user-select:none;pointer-events:none;position:absolute;top:0.1em;left:0;right:0;height:0;border-top-width:0.1em;border-top-style:solid;"><\/span>
+""",
             pitch_accent_description,
         )
         if overline_kana_matches:
@@ -69,7 +80,9 @@ def kanjium_to_javdejong_process(
 
         # Find characters that have an overline and downpitch notch
         downpitch_matches = re.findall(
-            r'<span style="display:inline;">([ぁ-んァ-ンゞ゛゜ー]*?)<\/span><span style="border-color:currentColor;display:block;user-select:none;pointer-events:none;position:absolute;top:0.1em;left:0;right:0;height:0;border-top-width:0.1em;border-top-style:solid;right:-0.1em;height:0.4em;border-right-width:0.1em;border-right-style:solid;"><\/span>',
+            r"""<span style="display:inline;">([ぁ-んァ-ンゞ゛゜ー]*?)<\/span><span
+style="border-color:currentColor;display:block;user-select:none;pointer-events:none;position:absolute;top:0.1em;left:0;right:0;height:0;border-top-width:0.1em;border-top-style:solid;right:-0.1em;height:0.4em;border-right-width:0.1em;border-right-style:solid;"><\/span>
+""",
             pitch_accent_description,
         )
         if downpitch_matches:

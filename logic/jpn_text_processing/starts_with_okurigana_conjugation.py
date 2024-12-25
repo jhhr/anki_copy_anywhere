@@ -11,10 +11,13 @@ def log(*args):
         print(*args)
 
 
+OkuriType = Literal["full_okuri", "partial_okuri", "empty_okuri", "no_okuri"]
+
+
 class OkuriResults(NamedTuple):
     okurigana: str
     rest_kana: str
-    result: Literal["full_okuri", "partial_okuri", "empty_okuri", "no_okuri"]
+    result: OkuriType
 
 
 def starts_with_okurigana_conjugation(
@@ -43,7 +46,8 @@ def starts_with_okurigana_conjugation(
         return OkuriResults("", kana_text, "no_okuri")
 
     log(
-        f"kana_text: {kana_text}, kanji_okurigana: {kanji_okurigana}, kanji: {kanji}, kanji_reading: {kanji_reading}, okuri_dict: {okuri_dict}"
+        f"kana_text: {kana_text}, kanji_okurigana: {kanji_okurigana}, kanji: {kanji},"
+        f" kanji_reading: {kanji_reading}, okuri_dict: {okuri_dict}"
     )
 
     if not kana_text[0] in okuri_dict and not okuri_dict[""]:
@@ -53,32 +57,34 @@ def starts_with_okurigana_conjugation(
     okurigana = ""
     rest = kana_text
     prev_dict = okuri_dict
-    return_type = None
+    okuri_result: OkuriType = "no_okuri"
     # Recurse into the dict to find the longest okurigana
     # ending in either cur_char not being in the dict or the dict being empty
     while True:
         cur_char = rest[0]
         log(
-            f"okurigana: {okurigana}, rest: {rest}, cur_char: {cur_char}, in dict: {cur_char in prev_dict}"
+            f"okurigana: {okurigana}, rest: {rest}, cur_char: {cur_char}, in dict:"
+            f" {cur_char in prev_dict}"
         )
-        if not cur_char in prev_dict:
+        if cur_char not in prev_dict:
             log(
-                f"reached dict end, empty_dict: {not prev_dict}, is_last: {prev_dict.get('is_last')}"
+                f"reached dict end, empty_dict: {not prev_dict}, is_last:"
+                f" {prev_dict.get('is_last')}"
             )
-            return_type = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
+            okuri_result = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
             break
         prev_dict = prev_dict[cur_char]
         okurigana += cur_char
         rest = rest[1:]
         if not rest:
             log("reached text end")
-            return_type = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
+            okuri_result = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
             break
     if not okurigana and okuri_dict[""]:
         # If no okurigana was found, but this conjugation can be valid with no okurigana,
         # then we indicate that this empty string is a full okurigana
-        return_type = "empty_okuri"
-    return OkuriResults(okurigana, rest, return_type)
+        okuri_result = "empty_okuri"
+    return OkuriResults(okurigana, rest, okuri_result)
 
 
 # Tests
@@ -90,9 +96,7 @@ def test(text, okurigana, kanji, kanji_reading, expected):
         global LOG
         assert okurigana == expected[0], f"okurigana: '{okurigana}' != '{expected[0]}'"
         assert rest == expected[1], f"rest: '{rest}' != '{expected[1]}'"
-        assert (
-            return_type == expected[2]
-        ), f"return_type: '{return_type}' != '{expected[2]}'"
+        assert return_type == expected[2], f"return_type: '{return_type}' != '{expected[2]}'"
     except AssertionError as e:
         # Re-run with logging enabled
         LOG = True
@@ -196,7 +200,7 @@ def main():
         kanji_reading="は",
         expected=("", "げな", "empty_okuri"),
     )
-    print("Ok")
+    print("\033[92mTests passed\033[0m")
 
 
 if __name__ == "__main__":

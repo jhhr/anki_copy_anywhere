@@ -9,23 +9,20 @@ from ..logic.copy_fields import copy_fields
 
 
 def create_comparelog(local_rids: List[int], texts: List[str]) -> None:
+    assert mw.col.db is not None
     texts.clear()
     local_rids.clear()
     local_rids.extend([id for id in mw.col.db.list("SELECT id FROM revlog")])
 
 
 def review_cid_remote(local_rids: List[int]):
+    assert mw.col.db is not None
     local_rid_string = ids2str(local_rids)
-    remote_reviewed_cids = [
-        cid
-        for cid in mw.col.db.list(
-            f"""SELECT DISTINCT cid
+    remote_reviewed_cids = [cid for cid in mw.col.db.list(f"""SELECT DISTINCT cid
             FROM revlog
             WHERE id NOT IN {local_rid_string}
             AND type < 4
-            """
-        )  # type: 0=Learning, 1=Review, 2=relearn, 3=filtered, 4=Manual
-    ]
+            """)]
     return remote_reviewed_cids
 
 
@@ -54,7 +51,7 @@ def auto_copy_definitions(texts: List[str]):
 
 
 def init_sync_hook():
-    texts = []
+    texts: List[str] = []
 
     # sync_will_start.append(lambda: create_comparelog(local_rids, texts))
     # Run copy fields for local changes that will be synced

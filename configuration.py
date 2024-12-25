@@ -1,7 +1,7 @@
 import html
-from typing import TypedDict, Optional, Union, Literal
+from typing import TypedDict, Optional, Union, Literal, Sequence
+from typing_extensions import TypeGuard
 
-# noinspection PyUnresolvedReferences
 from aqt import mw
 
 from .logic.kana_highlight import FuriReconstruct
@@ -17,8 +17,8 @@ def save_config(data):
     mw.addonManager.writeConfig(tag, data)
 
 
-def run_on_configuration_change(function):
-    mw.addonManager.setConfigUpdatadAction(__name__, lambda *_: function())
+# def run_on_configuration_change(function):
+#     mw.addonManager.setConfigUpdatedAction(__name__, lambda *_: function())
 
 
 KANJIUM_TO_JAVDEJONG_PROCESS = "Pitch accent conversion: Kanjium to Javdejong"
@@ -52,7 +52,7 @@ FONTS_CHECK_PROCESS = "Fonts check"
 class FontsCheckProcess(TypedDict):
     name: str
     fonts_dict_file: str
-    limit_to_fonts: Optional[str]
+    limit_to_fonts: Optional[list[str]]
     character_limit_regex: Optional[str]
 
 
@@ -62,9 +62,7 @@ def get_fonts_check_process_label(fonts_check_process):
         fonts_limit = f", (limit {len(fonts_limit)} fonts)"
     else:
         fonts_limit = ""
-    return (
-        f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
-    )
+    return f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
 
 
 KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
@@ -78,6 +76,27 @@ class KanaHighlightProcess(TypedDict):
     return_type: FuriReconstruct
 
 
+AnyProcess = Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]
+
+
+def is_kana_highlight_process(process: Union[dict, AnyProcess]) -> TypeGuard[KanaHighlightProcess]:
+    return process.get("name") == KANA_HIGHLIGHT_PROCESS
+
+
+def is_regex_process(process: Union[dict, AnyProcess]) -> TypeGuard[RegexProcess]:
+    return process.get("name") == REGEX_PROCESS
+
+
+def is_fonts_check_process(process: Union[dict, AnyProcess]) -> TypeGuard[FontsCheckProcess]:
+    return process.get("name") == FONTS_CHECK_PROCESS
+
+
+def is_kanjium_to_javdejong_process(
+    process: Union[dict, AnyProcess],
+) -> TypeGuard[KanjiumToJavdejongProcess]:
+    return process.get("name") == KANJIUM_TO_JAVDEJONG_PROCESS
+
+
 ALL_FIELD_TO_FIELD_PROCESS_NAMES = [
     KANJIUM_TO_JAVDEJONG_PROCESS,
     REGEX_PROCESS,
@@ -88,29 +107,30 @@ ALL_FIELD_TO_VARIABLE_PROCESS_NAMES = [
     REGEX_PROCESS,
 ]
 
-NEW_PROCESS_DEFAULTS = {
-    KANJIUM_TO_JAVDEJONG_PROCESS: {
-        "name": KANJIUM_TO_JAVDEJONG_PROCESS,
-        "delimiter": "・",
-    },
-    REGEX_PROCESS: {
-        "name": REGEX_PROCESS,
-        "regex": "",
-        "replacement": "",
-        "flags": "",
-    },
-    FONTS_CHECK_PROCESS: {
-        "name": FONTS_CHECK_PROCESS,
-        "fonts_dict_file": "",
-        "limit_to_fonts": "",
-        "character_limit_regex": "",
-    },
-    KANA_HIGHLIGHT_PROCESS: {
-        "name": KANA_HIGHLIGHT_PROCESS,
-        "onyomi_field": "",
-        "kunyomi_field": "",
-        "kanji_field": "",
-    },
+NEW_PROCESS_DEFAULTS: dict[str, AnyProcess] = {
+    KANJIUM_TO_JAVDEJONG_PROCESS: KanjiumToJavdejongProcess(
+        name=KANJIUM_TO_JAVDEJONG_PROCESS,
+        delimiter="・",
+    ),
+    REGEX_PROCESS: RegexProcess(
+        name=REGEX_PROCESS,
+        regex="",
+        replacement="",
+        flags="",
+    ),
+    FONTS_CHECK_PROCESS: FontsCheckProcess(
+        name=FONTS_CHECK_PROCESS,
+        fonts_dict_file="",
+        limit_to_fonts=[],
+        character_limit_regex="",
+    ),
+    KANA_HIGHLIGHT_PROCESS: KanaHighlightProcess(
+        name=KANA_HIGHLIGHT_PROCESS,
+        onyomi_field="",
+        kunyomi_field="",
+        kanji_field="",
+        return_type="kana_only",
+    ),
 }
 
 MULTIPLE_ALLOWED_PROCESS_NAMES = [
@@ -123,29 +143,22 @@ class CopyFieldToField(TypedDict):
     copy_from_text: str
     copy_if_empty: bool
     copy_on_unfocus: bool
-    process_chain: list[
-        Union[
-            KanjiumToJavdejongProcess,
-            RegexProcess,
-            FontsCheckProcess,
-            KanaHighlightProcess,
-        ]
-    ]
+    process_chain: Sequence[AnyProcess]
 
 
 class CopyFieldToVariable(TypedDict):
     copy_into_variable: str
     copy_from_text: str
-    process_chain: list[Union[RegexProcess]]
+    process_chain: Sequence[AnyProcess]
 
 
-COPY_MODE_WITHIN_NOTE = "Within note"
-COPY_MODE_ACROSS_NOTES = "Across notes"
 CopyModeType = Literal["Within note", "Across notes"]
+COPY_MODE_WITHIN_NOTE: CopyModeType = "Within note"
+COPY_MODE_ACROSS_NOTES: CopyModeType = "Across notes"
 
-DIRECTION_DESTINATION_TO_SOURCES = "Destination to sources"
-DIRECTION_SOURCE_TO_DESTINATIONS = "Source to destinations"
-DirectionType = Literal["Destination to source", "Source to destination"]
+DirectionType = Literal["Destination to sources", "Source to destinations"]
+DIRECTION_DESTINATION_TO_SOURCES: DirectionType = "Destination to sources"
+DIRECTION_SOURCE_TO_DESTINATIONS: DirectionType = "Source to destinations"
 
 SELECT_CARD_BY_VALUES = ("None", "Random", "Least_reps")
 SelectCardByType = Literal["None", "Random", "Least_reps"]
@@ -188,11 +201,12 @@ class Config:
     def copy_definitions(self):
         return self.data["copy_definitions"] or []
 
-    def get_definition_by_name(self, name) -> dict:
+    def get_definition_by_name(self, name) -> Union[dict, None]:
         # find the definition in the list of definitions
         for definition in self.data["copy_definitions"]:
             if definition["definition_name"] == name:
                 return definition
+        return None
 
     def add_definition(self, definition: CopyDefinition):
         self.data["copy_definitions"].append(definition)
@@ -200,6 +214,8 @@ class Config:
 
     def remove_definition_by_name(self, name: str):
         definition = self.get_definition_by_name(name)
+        if definition is None:
+            return
         if definition:
             self.data["copy_definitions"].remove(definition)
             self.save()
@@ -209,7 +225,7 @@ class Config:
         self.save()
 
     def update_definition_by_name(
-        self, name: str, new_definition: dict
+        self, name: str, new_definition: CopyDefinition
     ) -> Union[int, None]:
         for index, definition in enumerate(self.data["copy_definitions"]):
             if definition["definition_name"] == name:
@@ -217,6 +233,6 @@ class Config:
                 return index
         return None
 
-    def update_definition_by_index(self, index: int, definition: dict):
+    def update_definition_by_index(self, index: int, definition: CopyDefinition):
         self.data["copy_definitions"][index] = definition
         self.save()

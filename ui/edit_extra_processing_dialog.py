@@ -1,15 +1,12 @@
 import re
 from contextlib import suppress
-from typing import Union
+from typing import Union, Optional, Callable, cast, Sequence
 
-# noinspection PyUnresolvedReferences
 from aqt import mw
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QWidget,
     QFormLayout,
-    QComboBox,
     QLabel,
     QDialog,
     QHBoxLayout,
@@ -25,26 +22,25 @@ from aqt.qt import (
     qtmajor,
 )
 
-# noinspection PyUnresolvedReferences
 from aqt.utils import tooltip
 
 from .auto_resizing_text_edit import AutoResizingTextEdit
 from .list_input import ListInputWidget
 from .required_combobox import RequiredCombobox
 from ..configuration import CopyDefinition
+from .multi_combo_box import MultiComboBox
 
 if qtmajor > 5:
-    from .multi_combo_box import MultiComboBoxQt6 as MultiComboBox
-
+    WindowModal = Qt.WindowModality.WindowModal
     QFixedFont = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
     QAlignLeft = Qt.AlignmentFlag.AlignLeft
 else:
-    from .multi_combo_box import MultiComboBoxQt5 as MultiComboBox
-
-    QFixedFont = QFontDatabase.systemFont(QFontDatabase.FixedFont)
-    QAlignLeft = Qt.AlignLeft
+    WindowModal = Qt.WindowModal  # type: ignore
+    QFixedFont = QFontDatabase.systemFont(QFontDatabase.FixedFont)  # type: ignore
+    QAlignLeft = Qt.AlignLeft  # type: ignore
 
 from ..configuration import (
+    AnyProcess,
     CopyFieldToField,
     CopyFieldToVariable,
     KanaHighlightProcess,
@@ -60,11 +56,7 @@ from ..configuration import (
     KANA_HIGHLIGHT_PROCESS,
     MULTIPLE_ALLOWED_PROCESS_NAMES,
 )
-
-if qtmajor > 5:
-    WindowModal = Qt.WindowModality.WindowModal
-else:
-    WindowModal = Qt.WindowModal
+from ..logic.kana_highlight import FuriReconstruct
 
 
 class ClickableLabel(QLabel):
@@ -98,9 +90,7 @@ class KanjiumToJavdejongProcessDialog(QDialog):
         self.form.addRow(self.top_label)
 
         self.delimiter_field = QLineEdit()
-        self.form.addRow(
-            "Delimiter between multiple pitch accents", self.delimiter_field
-        )
+        self.form.addRow("Delimiter between multiple pitch accents", self.delimiter_field)
 
         with suppress(KeyError):
             self.delimiter_field.setText(self.process["delimiter"])
@@ -154,7 +144,8 @@ class RegexProcessDialog(QDialog):
         self.process = process
 
         self.description = """
-        Basic regex processing step that replaces the text that matches the regex with the replacement.
+        Basic regex processing step that replaces the text that matches the regex with the
+        replacement.
         """
         self.form = QFormLayout()
         self.setWindowModality(WindowModal)
@@ -177,15 +168,13 @@ class RegexProcessDialog(QDialog):
         self.form.addRow("Replacement", self.replacement_field)
 
         self.flags_field = MultiComboBox(placeholder_text="Select flags (optional)")
-        self.flags_field.addItems(
-            [
-                "ASCII",
-                "IGNORECASE",
-                "VERBOSE",
-                "MULTILINE",
-                "DOTALL",
-            ]
-        )
+        self.flags_field.addItems([
+            "ASCII",
+            "IGNORECASE",
+            "VERBOSE",
+            "MULTILINE",
+            "DOTALL",
+        ])
         regex_label = ClickableLabel("Flags", REGEX_FLAGS_DESCRIPTION, self)
         self.form.addRow(regex_label, self.flags_field)
 
@@ -194,7 +183,9 @@ class RegexProcessDialog(QDialog):
         with suppress(KeyError):
             self.replacement_field.setText(self.process["replacement"])
         with suppress(KeyError):
-            self.flags_field.setCurrentText(self.process["flags"])
+            flags = self.process["flags"]
+            if flags:
+                self.flags_field.setCurrentText(flags)
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
@@ -222,14 +213,16 @@ class RegexProcessDialog(QDialog):
         self.accept()
 
 
-class FontsCheckProcess(QDialog):
+class FontsCheckProcessDialog(QDialog):
     def __init__(self, parent, process: FontsCheckProcess):
         super().__init__(parent)
         self.process = process
 
         self.description = """
-        For the given text, go through all the characters and return the fonts for which every character has an entry in the JSON file for.
-        The JSON file is intended be something pre-generated from a script that checks which fonts support which characters.
+        For the given text, go through all the characters and return the fonts for which every
+        character has an entry in the JSON file for.
+        The JSON file is intended be something pre-generated from a script that checks which fonts
+        support which characters.
         """
         self.form = QFormLayout()
         self.setWindowModality(WindowModal)
@@ -242,27 +235,23 @@ class FontsCheckProcess(QDialog):
         self.form.addRow("Fonts dict JSON file", self.fonts_dict_file_field)
         self.form.addRow(
             "",
-            QLabel(
-                """<small>Provide the file name only, e.g. 'fonts_by_char.json'.
+            QLabel("""<small>Provide the file name only, e.g. 'fonts_by_char.json'.
         <br/>
         The file is assumed to be in your Anki collection.media folder.
         <br/>
         The content should be <code>{"char": ["font1", "font2", ...], "char2": ...}</code>
-        </small>"""
-            ),
+        </small>"""),
         )
 
         self.limit_to_fonts_field = ListInputWidget()
         self.form.addRow("Limit to fonts", self.limit_to_fonts_field)
         self.form.addRow(
             "",
-            QLabel(
-                """<small>
+            QLabel("""<small>
         (Optional) A list of font file names (without the file ending) to limit the output to.
         <br/>
         You can add multiple fonts at once inputting a single item of comma separated values
-        </small>"""
-            ),
+        </small>"""),
         )
 
         self.regex_field = AutoResizingTextEdit()
@@ -271,10 +260,10 @@ class FontsCheckProcess(QDialog):
         self.regex_field.textChanged.connect(lambda: validate_regex(self))
         self.form.addRow(
             "",
-            QLabel(
-                """<small>(Optional) Regex used to limit the characters checked.
+            QLabel("""<small>(Optional) Regex used to limit the characters checked.
         <br/>
-        When using regex your dictionary should contain an "all_fonts" key that contains all possible fonts.
+        When using regex your dictionary should contain an "all_fonts" key that contains all
+        possible fonts.
         <br/>
         When all characters are excluded, the output will either the limit_to_fonts or all_fonts.
         <br/>
@@ -282,9 +271,8 @@ class FontsCheckProcess(QDialog):
         <br/>
         You probably want this to be a character range
         <br/>
-        e.g. <code>[a-z]</code> or <code>[\u4E00-\u9FFF]</code>.
-        </small>"""
-            ),
+        e.g. <code>[a-z]</code> or <code>[\u4e00-\u9fff]</code>.
+        </small>"""),
         )
 
         self.regex_error_display = QLabel()
@@ -294,8 +282,10 @@ class FontsCheckProcess(QDialog):
         with suppress(KeyError):
             self.fonts_dict_file_field.setText(self.process["fonts_dict_file"])
         with suppress(KeyError):
-            for font in self.process["limit_to_fonts"]:
-                self.limit_to_fonts_field.add_item(font)
+            limit_to_fonts = self.process.get("limit_to_fonts")
+            if limit_to_fonts:
+                for font in limit_to_fonts:
+                    self.limit_to_fonts_field.add_item(font)
         with suppress(KeyError):
             self.regex_field.setPlainText(self.process["character_limit_regex"])
 
@@ -334,7 +324,7 @@ The kanji, onyomi and kunyomi fields are gotten from the destination note type.
 
 
 class KanaHighlightProcessDialog(QDialog):
-    def __init__(self, parent, process: KanaHighlightProcess, copy_into_note_types):
+    def __init__(self, parent, process: KanaHighlightProcess, copy_into_note_types: Optional[str]):
         super().__init__(parent)
         self.process = process
         self.copy_into_note_types = copy_into_note_types
@@ -347,24 +337,16 @@ class KanaHighlightProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.onyomi_field_cbox = RequiredCombobox(
-            placeholder_text="Select field (required)"
-        )
+        self.onyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Onyomi field", self.onyomi_field_cbox)
 
-        self.kunyomi_field_cbox = RequiredCombobox(
-            placeholder_text="Select field (required)"
-        )
+        self.kunyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Kunyomi field", self.kunyomi_field_cbox)
 
-        self.kanji_field_cbox = RequiredCombobox(
-            placeholder_text="Select field (required)"
-        )
+        self.kanji_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Kanji field", self.kanji_field_cbox)
 
-        self.return_type_cbox = RequiredCombobox(
-            placeholder_text="Select return type (required"
-        )
+        self.return_type_cbox = RequiredCombobox(placeholder_text="Select return type (required")
         self.return_type_cbox.addItems(["furigana", "furikanji", "kana_only"])
         self.return_type_cbox.setCurrentText("kana_only")
         self.form.addRow("Return type", self.return_type_cbox)
@@ -397,12 +379,13 @@ class KanaHighlightProcessDialog(QDialog):
         self.bottom_grid.addWidget(self.close_button, 0, 2)
 
     def save_process(self):
+        return_type = cast(FuriReconstruct, self.return_type_cbox.currentText())
         self.process = {
             "name": KANA_HIGHLIGHT_PROCESS,
             "onyomi_field": self.onyomi_field_cbox.currentText(),
             "kunyomi_field": self.kunyomi_field_cbox.currentText(),
             "kanji_field": self.kanji_field_cbox.currentText(),
-            "return_type": self.return_type_cbox.currentText(),
+            "return_type": return_type,
         }
         self.accept()
 
@@ -411,6 +394,8 @@ class KanaHighlightProcessDialog(QDialog):
             return
         for note_type_name in self.copy_into_note_types.strip('""').split('", "'):
             note_type = mw.col.models.by_name(note_type_name)
+            if note_type is None:
+                continue
             for field_name in mw.col.models.field_names(note_type):
                 self.onyomi_field_cbox.addItem(field_name)
                 self.kunyomi_field_cbox.addItem(field_name)
@@ -421,7 +406,7 @@ class EditExtraProcessingWidget(QWidget):
     def __init__(
         self,
         parent,
-        copy_definition: CopyDefinition,
+        copy_definition: Optional[CopyDefinition],
         field_to_x_def: Union[CopyFieldToField, CopyFieldToVariable],
         allowed_process_names: list[str],
     ):
@@ -431,10 +416,10 @@ class EditExtraProcessingWidget(QWidget):
         self.copy_definition = copy_definition
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
-        self.process_dialogs = []
-        self.remove_row_funcs = []
+        self.process_dialogs: list[QDialog] = []
+        self.remove_row_funcs: list[Callable[[], None]] = []
         try:
-            self.process_chain = field_to_x_def["process_chain"]
+            self.process_chain = cast(list[AnyProcess], field_to_x_def["process_chain"])
         except KeyError:
             self.process_chain = []
 
@@ -490,7 +475,7 @@ class EditExtraProcessingWidget(QWidget):
         # because init_options_to_process_combobox calls addItem which
         # triggers the currentTextChanged signal in the PlaceholderCombobox
         self.add_process_chain_button.currentTextChanged.disconnect(self.add_process)
-        self.field_to_x_def["process_chain"] = self.process_chain
+        self.field_to_x_def["process_chain"] = cast(Sequence[AnyProcess], self.process_chain)
         self.init_options_to_process_combobox()
 
         for index, process in enumerate(self.process_chain):
@@ -513,9 +498,7 @@ class EditExtraProcessingWidget(QWidget):
         hbox = QHBoxLayout()
         self.middle_grid.addLayout(hbox, index, 1)
 
-        process_label = ClickableLabel(
-            get_process_name(process), process_dialog.description, self
-        )
+        process_label = ClickableLabel(get_process_name(process), process_dialog.description, self)
         hbox.addStretch(1)
         hbox.addWidget(process_label)
 
@@ -561,7 +544,7 @@ class EditExtraProcessingWidget(QWidget):
         self.add_process_chain_button.hidePopup()
         if not process_name:
             return
-        new_process = NEW_PROCESS_DEFAULTS[process_name]
+        new_process: AnyProcess = NEW_PROCESS_DEFAULTS[process_name]
         if new_process is None:
             return
         self.add_process_row(len(self.process_chain), new_process)
@@ -578,7 +561,8 @@ class EditExtraProcessingWidget(QWidget):
         if process_name == KANA_HIGHLIGHT_PROCESS:
             note_types = None
             with suppress(KeyError):
-                note_types = self.copy_definition["copy_into_note_types"]
+                if self.copy_definition:
+                    note_types = self.copy_definition["copy_into_note_types"]
             return (
                 KanaHighlightProcessDialog(self, process, note_types),
                 lambda _: KANA_HIGHLIGHT_PROCESS,
@@ -586,7 +570,7 @@ class EditExtraProcessingWidget(QWidget):
         if process_name == REGEX_PROCESS:
             return RegexProcessDialog(self, process), get_regex_process_label
         if process_name == FONTS_CHECK_PROCESS:
-            return FontsCheckProcess(self, process), get_fonts_check_process_label
+            return FontsCheckProcessDialog(self, process), get_fonts_check_process_label
         if process_name == KANJIUM_TO_JAVDEJONG_PROCESS:
             return (
                 KanjiumToJavdejongProcessDialog(self, process),

@@ -1,3 +1,4 @@
+from typing import Optional
 from aqt.qt import (
     QLineEdit,
     QPlainTextEdit,
@@ -8,7 +9,7 @@ from aqt.qt import (
 if qtmajor > 5:
     QEventTypes = QEvent.Type
 else:
-    QEventTypes = QEvent.Type
+    QEventTypes = QEvent.Type  # type: ignore
 
 
 class RequiredLineEdit(QLineEdit):
@@ -35,7 +36,7 @@ class RequiredLineEdit(QLineEdit):
             self.update_required_style()
             # self.textChanged.connect(self.update_required_style)
 
-    def update_required_style(self) -> str:
+    def update_required_style(self):
         if self.is_required and not self.text() and self.was_valid:
             self.setStyleSheet(self.default_style + self.required_style)
             self.was_valid = False
@@ -43,10 +44,11 @@ class RequiredLineEdit(QLineEdit):
             self.setStyleSheet(self.default_style)
             self.was_valid = True
 
-    def event(self, event: QEvent):
+    def event(self, event: Optional[QEvent]):
         if (
             hasattr(self, "is_required")
             and self.is_required
+            and event is not None
             and event.type()
             in (
                 QEventTypes.FocusIn,
@@ -103,10 +105,11 @@ class RequiredTextEdit(QPlainTextEdit):
             self.setStyleSheet(self.default_style)
             self.was_valid = True
 
-    def event(self, event: QEvent):
+    def event(self, event: Optional[QEvent]):
         if (
             hasattr(self, "is_required")
             and self.is_required
+            and event is not None
             and event.type()
             in (
                 QEventTypes.FocusIn,

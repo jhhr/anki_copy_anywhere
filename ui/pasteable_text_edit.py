@@ -1,9 +1,7 @@
 from functools import partial
 from typing import Optional, Union
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
-    QTextEdit,
     QMenu,
     QContextMenuEvent,
     QAction,
@@ -64,8 +62,8 @@ class PasteableTextEdit(AutoResizingTextEdit):
         if placeholder_text:
             self.setPlaceholderText(placeholder_text)
 
-    def contextMenuEvent(self, event: QContextMenuEvent):
-        if not self.options_dict:
+    def contextMenuEvent(self, event: Optional[QContextMenuEvent]):
+        if not self.options_dict or not event:
             return
 
         context_menu = QMenu(parent=self)
@@ -156,6 +154,6 @@ class PasteableTextEdit(AutoResizingTextEdit):
         target_level: Optional[dict] = None,
     ):
         current_level = self.options_dict if target_level is None else target_level
-        if group_name not in current_level:
+        if current_level is not None and group_name not in current_level:
             current_level[group_name] = {}
-        current_level[group_name][option_name] = option_text
+            current_level[group_name][option_name] = option_text

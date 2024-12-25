@@ -1,6 +1,6 @@
 from typing import Union
 
-CONJUGATABLE_LAST_OKURI = {
+CONJUGATABLE_LAST_OKURI: set[str] = {
     # Godan verbs
     "う",
     "く",

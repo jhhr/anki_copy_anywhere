@@ -3,7 +3,6 @@ import re
 from pathlib import Path
 from typing import Callable, Optional
 
-# noinspection PyUnresolvedReferences
 from aqt import mw
 
 from .FatalProcessError import FatalProcessError
@@ -18,16 +17,19 @@ def fonts_check_process(
     file_cache: Optional[dict] = None,
 ) -> str:
     """
-    Go through all the characters in the text and return the fonts that all have an entry in the fonts_dict_file.
-    The fonts_dict_file should be a json file of the form {char: [font1, font2, ...], ...}. Additionally it should
-    contain a list of all the fonts that are used in the collection in the key "all_fonts".
+    Go through all the characters in the text and return the fonts that all have an entry in the
+    fonts_dict_file.
+    The fonts_dict_file should be a json file of the form {char: [font1, font2, ...], ...}.
+    Additionally it should contain a list of all the fonts that are used in the collection in the
+    key "all_fonts".
 
     :param text: The text to check
     :param fonts_dict_file: The path to the json file with the fonts dictionary
     :param limit_to_fonts: A list of font file names to limit the output to
     :param character_limit_regex: A regex to limit the characters to check
     :param show_error_message: A function that takes a string and shows an error message
-    :param file_cache: A dictionary to cache the open JSON file contents, to avoid opening the file multiple times
+    :param file_cache: A dictionary to cache the open JSON file contents, to avoid opening the file
+        multiple times
 
     :return A string that can be parsed as an array of strings, e.g. '["font1", "font2", ...]'
 
@@ -39,12 +41,12 @@ def fonts_check_process(
         def show_error_message(message: str):
             print(message)
 
-    if fonts_dict_file is None or fonts_dict_file == "":
+    if not fonts_dict_file:
         show_error_message("Error in fonts_check_process: Missing 'fonts_dict_file'")
         return ""
 
     char_regex = None
-    if character_limit_regex is not None and character_limit_regex != "":
+    if character_limit_regex:
         char_regex = re.compile(character_limit_regex)
 
     # try to get the fonts_dict from the cache
@@ -72,9 +74,7 @@ def fonts_check_process(
                 if file_cache is not None:
                     file_cache[fonts_dict_file] = fonts_dict
             except json.JSONDecodeError as e:
-                raise FatalProcessError(
-                    f"Error parsing JSON in file '{fonts_dict_file_full}': {e}"
-                )
+                raise FatalProcessError(f"Error parsing JSON in file '{fonts_dict_file_full}': {e}")
 
     if text is None or text == "":
         show_error_message("Text was empty")
@@ -116,7 +116,8 @@ def fonts_check_process(
             )
             return ""
 
-        # All characters were excluded by the regex, so we assume they are all ok to be displayed by all the fonts
+        # All characters were excluded by the regex, so we assume they are all ok to be
+        # displayed by all the fonts
         if limit_to_fonts is not None:
             return f'["{join_str.join(limit_to_fonts)}"]'
 
@@ -125,20 +126,19 @@ def fonts_check_process(
         if all_fonts is not None:
             return f'["{join_str.join(all_fonts)}"]'
 
-        show_error_message(
-            f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key"
-        )
+        show_error_message(f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key")
         return ""
 
     if valid_fonts is None:
-        valid_fonts = []
+        valid_fonts = set()
 
     if len(valid_fonts) == 0:
         if (len(text)) == 1:
             show_error_message(f"{text} - No fonts were valid for this character")
         else:
             show_error_message(
-                f"{text} - Some characters had valid fonts but no fonts were valid for every character"
+                f"{text} - Some characters had valid fonts but no fonts were valid for every"
+                " character"
             )
         return ""
 

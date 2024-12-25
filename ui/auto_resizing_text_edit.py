@@ -7,16 +7,21 @@ class AutoResizingTextEdit(RequiredTextEdit):
         self.textChanged.connect(self.autoResize)
 
     def autoResize(self):
-        document = self.document()
         margins = self.contentsMargins()
         height = 0
+        document = self.document()
+        margin = (margins.top() + margins.bottom()) * 2
+        if not document:
+            # Set a reasonable one-line height
+            self.setFixedHeight(self.fontMetrics().height() + margin)
+            return
 
         block = document.begin()
         while block.isValid():
-            height += self.blockBoundingRect(block).height()
+            height += int(self.blockBoundingRect(block).height())
             block = block.next()
 
-        height += (margins.top() + margins.bottom()) * 2
+        height += margin
         self.setFixedHeight(int(height))
 
     def resizeEvent(self, event):

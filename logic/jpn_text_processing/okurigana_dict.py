@@ -1,8 +1,8 @@
-from typing import Union
+from typing import Union, Tuple
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.
-PART_OF_SPEECH_NUM = {
+PART_OF_SPEECH_NUM: dict[int, list[str]] = {
     1: ["adj-i", "adjective (keiyoushi)"],
     2: ["adj-na", "adjectival nouns or quasi-adjectives (keiyodoshi)"],
     7: ["adj-ix", "adjective (keiyoushi) - yoi/ii class"],
@@ -34,7 +34,7 @@ PART_OF_SPEECH_NUM = {
     48: ["vs-i", "suru verb - included"],
 }
 
-E_I_ENDING_KANA = {
+E_I_ENDING_KANA: set[str] = {
     "い",
     "え",
     "き",
@@ -53,7 +53,7 @@ E_I_ENDING_KANA = {
     "れ",
 }
 
-GODAN_ENDINGS = {
+GODAN_ENDINGS: dict[str, str] = {
     "う": "u",
     "く": "k",
     "ぐ": "g",
@@ -115,11 +115,7 @@ def get_part_of_speech(
 
     # Regular verb patterns
     # Check ichidan vs godan
-    if (
-        len(okurigana) >= 2
-        and okurigana.endswith("る")
-        and okurigana[-2] in E_I_ENDING_KANA
-    ):
+    if len(okurigana) >= 2 and okurigana.endswith("る") and okurigana[-2] in E_I_ENDING_KANA:
         # Most verbs ending in eru/iru are ichidan
         return "v1"
 
@@ -160,7 +156,7 @@ def get_okuri_dict_for_okurigana(
 # in でしょう, ならば or です among others.
 # euphonic changes were also removed except for the last vs-s (47) vs vs-i (48)
 # suru verb classes
-ALL_OKURI_BY_PART_OF_SPEECH = [
+ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] = [
     (1, "い"),
     (1, "くない"),
     (1, "くないです"),
@@ -1199,7 +1195,7 @@ ALL_OKURI_BY_PART_OF_SPEECH = [
 #   began with the 1st and 2nd characters (the keys of the previous levels)
 # - and so on
 # Ending in an empty dict which indicates the end of the okurigana.
-POSSIBLE_OKURIGANA_PROGRESSION_DICT = {}
+POSSIBLE_OKURIGANA_PROGRESSION_DICT: dict[str, dict] = {}
 
 
 # Populating POSSIBLE_OKURIGANA_PROGRESSION_DICT
@@ -1219,7 +1215,11 @@ def add_chars_to_dict(kana_chars, char_dict):
 
 
 for item in ALL_OKURI_BY_PART_OF_SPEECH:
-    pos_num, okuri, euph = item if len(item) == 3 else (*item, None)
+    if len(item) == 3:
+        pos_num, okuri, euph = item
+    else:
+        pos_num, okuri = item
+        euph = ""
     # Get part of speech string id
     # Get part of speech string id
     pos_id, pos_desc = PART_OF_SPEECH_NUM[pos_num]

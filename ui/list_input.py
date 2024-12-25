@@ -1,4 +1,3 @@
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QWidget,
     QVBoxLayout,
@@ -20,17 +19,17 @@ class ListInputWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
 
         self.list_widget = QListWidget()
-        self.layout.addWidget(self.list_widget)
+        self.main_layout.addWidget(self.list_widget)
 
         self.input_field = QLineEdit()
-        self.layout.addWidget(self.input_field)
+        self.main_layout.addWidget(self.input_field)
 
         self.button_layout = QHBoxLayout()
-        self.layout.addLayout(self.button_layout)
+        self.main_layout.addLayout(self.button_layout)
 
         self.add_button = QPushButton("Add Item(s)")
         self.add_button.clicked.connect(self.add_item)
@@ -56,7 +55,7 @@ class ListInputWidget(QWidget):
                 for item in item_text.split(","):
                     item = item.strip()
                     if not item:
-                        # Skip empty items, such as if the input has a trailing comma or multiple commas
+                        # Skip empty items, if the input has a trailing comma or multiple commas
                         continue
                     # stripping whitespace is important
                     self.list_widget.addItem(item)
@@ -78,5 +77,7 @@ class ListInputWidget(QWidget):
     def get_items(self):
         items = []
         for index in range(self.list_widget.count()):
-            items.append(self.list_widget.item(index).text())
+            item = self.list_widget.item(index)
+            if item:
+                items.append(item.text())
         return items

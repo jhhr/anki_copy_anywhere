@@ -4,8 +4,8 @@ from typing import Callable, Optional
 
 def regex_process(
     text: str,
-    regex: str,
-    replacement: str,
+    regex: Optional[str],
+    replacement: Optional[str],
     flags: Optional[str],
     show_error_message: Optional[Callable[[str], None]] = None,
 ) -> str:
@@ -18,15 +18,16 @@ def regex_process(
         def show_error_message(message: str):
             print(message)
 
-    if regex is None or regex == "":
+    if not regex:
         show_error_message("Error in basic_regex_process: Missing 'regex'")
         return text
 
     if replacement is None:
+        # Replace can be "" but not None
         show_error_message("Error in basic_regex_process: Missing 'replacement'")
         return text
 
-    if flags is None or flags == "":
+    if not flags:
         piped_flags = 0
     else:
         int_flags = [getattr(re, f) for f in flags.split(", ")]
@@ -35,9 +36,9 @@ def regex_process(
         for f in int_flags[1:]:
             piped_flags |= f
 
-    regex = re.compile(regex, piped_flags)
+    compiled_regex = re.compile(regex, piped_flags)
 
-    return regex.sub(replacement, text)
+    return compiled_regex.sub(replacement, text)
 
 
 def test(
@@ -52,12 +53,10 @@ def test(
     try:
         assert result == expected
     except AssertionError:
-        print(
-            f"""{test_name}
+        print(f"""{test_name}
 Expected: {expected}
 Got: {result}
-"""
-        )
+""")
         raise
 
 

@@ -1,14 +1,11 @@
-# noinspection PyUnresolvedReferences
 from aqt.browser import Browser
 
-# noinspection PyUnresolvedReferences
 from aqt.gui_hooks import (
     browser_menus_did_init,
     browser_will_show_context_menu,
     deck_browser_will_show_options_menu,
 )
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import QAction, qconnect, QMenu
 
 from ..configuration import Config
@@ -51,7 +48,7 @@ def add_separator_to_gear():
     text -- what's written in the gear."""
 
     def aux(m, did):
-        a = m.addSeparator()
+        m.addSeparator()
 
     deck_browser_will_show_options_menu.append(aux)
 
@@ -76,12 +73,14 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
         ),
     )
     custom_data_menu = menu.addMenu("CustomData")
+    assert custom_data_menu is not None
     # Add the actions to the browser's card context menu
     custom_data_menu.addAction(reset_fc_action)
     custom_data_menu.addAction(reset_all_action)
 
     config.load()
     copy_fields_menu = menu.addMenu("Copy anywhere")
+    assert copy_fields_menu is not None
 
     # Avoid late binding that would cause all copy_fields to use the last copy_definition
     # defined in the loop

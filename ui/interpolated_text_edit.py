@@ -1,23 +1,8 @@
 from typing import Optional, Union
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
-    QWidget,
     QVBoxLayout,
-    QFrame,
     QLabel,
-    QDialog,
-    QComboBox,
-    QTabWidget,
-    QSizePolicy,
-    QFormLayout,
-    QLineEdit,
-    QPushButton,
-    QGridLayout,
-    QCheckBox,
-    QIntValidator,
-    Qt,
-    qtmajor,
 )
 
 from .pasteable_text_edit import PasteableTextEdit
@@ -54,7 +39,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
             options_dict = {}
         self.options_dict = options_dict
         # validation dict is 1-level dict with all possible fields as keys
-        self.validate_dict = {}
+        self.validate_dict: dict[str, bool] = {}
 
         self.text_edit = PasteableTextEdit(
             parent,
@@ -141,9 +126,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
             try:
                 self.validate_dict[intr_format(field.lower())]
             except KeyError:
-                invalid_fields.append(
-                    f'<b style="color:red">{field}</b>: Not a valid field'
-                )
+                invalid_fields.append(f'<b style="color:red">{field}</b>: Not a valid field')
                 continue
 
             if arg is not None:
@@ -157,12 +140,10 @@ class InterpolatedTextEditLayout(QVBoxLayout):
                 if validator is not None:
                     error_msg = basic_arg_validator(arg) or validator(arg)
                     if error_msg:
-                        invalid_fields.append(
-                            f"""{field}
+                        invalid_fields.append(f"""{field}
                             <span style="color: orange;"><b style="color:red">
                               {arg or "[blank]"}</b>: {error_msg}
-                            </span>"""
-                        )
+                            </span>""")
 
         if len(invalid_fields) > 0:
             self.error_label.setText("<br/>".join(invalid_fields))

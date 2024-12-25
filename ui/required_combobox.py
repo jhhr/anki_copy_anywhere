@@ -1,15 +1,11 @@
-from typing import Optional, Union
+from typing import Optional, Union, cast, Iterable
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QComboBox,
     QStandardItemModel,
     QStandardItem,
     QListView,
     QLineEdit,
-    QStyledItemDelegate,
-    QPalette,
-    QFontMetrics,
     Qt,
     QEvent,
     qtmajor,
@@ -19,8 +15,8 @@ if qtmajor > 5:
     QtKeys = Qt.Key
     QEventTypes = QEvent.Type
 else:
-    QtKeys = Qt
-    QEventTypes = QEvent.Type
+    QtKeys = Qt  # type: ignore
+    QEventTypes = QEvent.Type  # type: ignore
 
 
 # Make a dict of QEvent type values to their names for debugging
@@ -78,10 +74,16 @@ class ComboBoxPlaceholderLineEdit(QLineEdit):
     def mouseReleaseEvent(self, _):
         # Toggle the QComboBox popup when clicking on the line edit
         # view() is the QListView, the popup, within the QComboBox
-        if self.parent().view().isVisible():
-            self.parent().hidePopup()
+        parent = cast(QComboBox, self.parent())
+        if not parent:
+            return
+        view = parent.view()
+        if not view:
+            return
+        if view.isVisible():
+            parent.hidePopup()
         else:
-            self.parent().showPopup()
+            parent.showPopup()
 
 
 class RequiredCombobox(QComboBox):
@@ -95,7 +97,7 @@ class RequiredCombobox(QComboBox):
         **kwargs
     ):
         super().__init__(parent, **kwargs)
-        #### Placeholder management
+        # --- Placeholder management
         self.setLineEdit(
             ComboBoxPlaceholderLineEdit(
                 placeholder_text=placeholder_text,
@@ -109,7 +111,7 @@ class RequiredCombobox(QComboBox):
         self.setCurrentIndex(-1)
         self.setModel(QStandardItemModel(self))
 
-        #### Size management
+        # --- Size management
         self.auto_size = auto_size
         self.max_width = 0
         self.setMinimumWidth(minimum_width)
@@ -139,10 +141,11 @@ class RequiredCombobox(QComboBox):
         # elif is_required and not self.currentTextChanged.isConnected():
         #     self.currentTextChanged.connect(self.update_required_style)
 
-    def event(self, event: QEvent):
+    def event(self, event: Optional[QEvent]):
         if (
             hasattr(self, "is_required")
             and self.is_required
+            and event is not None
             and event.type()
             in (
                 QEventTypes.FocusIn,
@@ -155,7 +158,10 @@ class RequiredCombobox(QComboBox):
         return super().event(event)
 
     def check_text_width(self, text: str):
-        item_width = self.view().fontMetrics().boundingRect(text).width()
+        view = self.view()
+        if not view:
+            return
+        item_width = view.fontMetrics().boundingRect(text).width()
         self.update_max_width(item_width)
 
     def update_max_width(self, width: int):
@@ -170,20 +176,31 @@ class RequiredCombobox(QComboBox):
         self.max_width = 0
         super().clear()
 
-    def setPlaceholderText(self, text: str):
-        self.lineEdit().setPlaceholderText(text)
+    def setPlaceholderText(self, text: Optional[str]):
+        lineEdit = self.lineEdit()
+        if not lineEdit:
+            return
+        lineEdit.setPlaceholderText(text)
 
     def placeholderText(self):
-        return self.lineEdit().placeholderText()
+        line_edit = self.lineEdit()
+        if not line_edit:
+            return ""
+        return line_edit.placeholderText()
 
     def unset_current_index(self):
         self.setCurrentIndex(-1)
 
-    def addItem(self, item: Union[str, QStandardItem]):
+    # Signature doesn't match superclass addItem(self, text: Union[str, None]) -> None
+    # But that's fine, we don't want the normal addItem behavior here
+    def addItem(self, item: Union[str, QStandardItem, None]):  # type: ignore[override]
+        model = cast(QStandardItemModel, self.model())
+        if not model or item is None:
+            return
         if isinstance(item, str):
             item = QStandardItem(item)
         nothing_was_selected = self.currentText() == ""
-        self.model().appendRow(item)
+        model.appendRow(item)
         # If there was nothing selected, adding data sets the line edit text to non-empty which
         # hides the placeholder text. Undo this by setting the current index to -1.
         if nothing_was_selected:
@@ -192,12 +209,17 @@ class RequiredCombobox(QComboBox):
         if self.auto_size:
             self.check_text_width(item.text())
 
-    def addItems(self, items: list[QStandardItem]):
+    def addItems(self, items: Iterable[Union[str, QStandardItem, None]]):
+        model = cast(QStandardItemModel, self.model())
+        if not model:
+            return
         nothing_was_selected = self.currentText() == ""
         for item in items:
+            if item is None:
+                continue
             if isinstance(item, str):
                 item = QStandardItem(item)
-            self.model().appendRow(item)
+            model.appendRow(item)
             if self.auto_size:
                 self.check_text_width(item.text())
         if nothing_was_selected:
@@ -206,7 +228,10 @@ class RequiredCombobox(QComboBox):
     def showPopup(self):
         # When the popup is opened by clicking on the line edit, we need to set a flag to prevent
         # it from closing when clicking anywhere else. We check this flag in hidePopup().
-        self.lineEdit().popup_open = True
+        line_edit = cast(ComboBoxPlaceholderLineEdit, self.lineEdit())
+        if not line_edit:
+            return
+        line_edit.popup_open = True
         if self.auto_size:
             self.set_popup_and_box_width()
         super().showPopup()
@@ -215,8 +240,9 @@ class RequiredCombobox(QComboBox):
         # When the popup was opened by clicking on the line edit, it's inevitable that the next
         # click anywhere will close it. We can prevent by having a flag that we set when the
         # popup is opened by clicking on the line edit and then checking it here.
-        if self.lineEdit().popup_open:
-            self.lineEdit().popup_open = False
+        line_edit = cast(ComboBoxPlaceholderLineEdit, self.lineEdit())
+        if line_edit.popup_open:
+            line_edit.popup_open = False
             return
-        self.lineEdit().popup_open = False
+        line_edit.popup_open = False
         super().hidePopup()

@@ -1,8 +1,6 @@
-# noinspection PyUnresolvedReferences
+from typing import cast
 from aqt.qt import (
-    QComboBox,
     QStyledItemDelegate,
-    QListView,
     QStandardItemModel,
     QStandardItem,
     QFont,
@@ -19,11 +17,11 @@ if qtmajor > 5:
     QtKeys = Qt.Key
     QBold = QFont.Weight.Bold
 else:
-    QAlignCenter = Qt.AlignCenter
-    # QTextAlignmentRole = Qt.TextAlignmentRole
-    # QUserRole = Qt.UserRole
-    QtKeys = Qt
-    QBold = QFont.Bold
+    QAlignCenter = Qt.AlignCenter  # type: ignore
+    # QTextAlignmentRole = Qt.TextAlignmentRole # type: ignore
+    # QUserRole = Qt.UserRole # type: ignore
+    QtKeys = Qt  # type: ignore
+    QBold = QFont.Bold  # type: ignore
 
 
 class CenteredItemDelegate(QStyledItemDelegate):
@@ -64,8 +62,10 @@ class GroupedComboBox(RequiredCombobox):
         if not text:
             return
         # Override to handle setting text with consideration for item formatting
+        model = cast(QStandardItemModel, self.model())
         for i in range(self.count()):
-            if self.model().item(i).text().strip() == text.strip():
+            item = model.item(i)
+            if item and item.text().strip() == text.strip():
                 self.setCurrentIndex(i)
                 super().setCurrentText(text.strip())
                 break

@@ -1,11 +1,16 @@
 from aqt import mw
 
 from ..logic.interpolate_fields import CARD_VALUES, intr_format
-from typing import Optional
+from typing import Optional, Union
+
+from anki.models import NotetypeId
 
 
 def add_model_options_to_dict(
-    model_name: str, model_id: int, target_dict: dict, prefix: Optional[str] = None
+    model_name: str,
+    model_id: Union[NotetypeId, int],
+    target_dict: dict,
+    prefix: Optional[str] = None,
 ):
     """
     Add the field names and card values to the target_dict.
@@ -18,6 +23,12 @@ def add_model_options_to_dict(
 
     :return: void, modifies target_dict in place
     """
+    model = mw.col.models.get(NotetypeId(model_id))
+    if model is None:
+        # Can't add fields if model doesn't exist, this shouldn't happen but let's not throw
+        # an error if it does
+        print(f"Error: add_model_options_to_dict - Note type {model_name} not found")
+        return
     fields_key = "Note fields"
     cards_key = "Card types"
     # Field replacement values will be 2-level menu
@@ -25,7 +36,7 @@ def add_model_options_to_dict(
     target_dict[model_key] = {fields_key: {}, cards_key: {}}
     cards_target = target_dict[model_key][cards_key]
     fields_target = target_dict[model_key][fields_key]
-    card_templates = mw.col.models.get(model_id)["tmpls"]
+    card_templates = model["tmpls"]
 
     # If there is only 1 card template, don't add a sub-menu
     # Card replacement values will be 3-level menu, model: card_type: card_value
@@ -37,6 +48,6 @@ def add_model_options_to_dict(
                 value = f"{prefix}{value}"
             cards_target[card_template["name"]][card_value] = intr_format(value)
 
-    for field_name in mw.col.models.field_names(mw.col.models.get(model_id)):
+    for field_name in mw.col.models.field_names(model):
         field_value = field_name if prefix is None else f"{prefix}{field_name}"
         fields_target[field_name] = intr_format(field_value)

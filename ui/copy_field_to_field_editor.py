@@ -1,21 +1,16 @@
 from contextlib import suppress
-
-# noinspection PyUnresolvedReferences
+from typing import Optional, TypedDict, cast
 from aqt import mw
 
-# noinspection PyUnresolvedReferences
 from aqt.qt import (
     QWidget,
     QVBoxLayout,
     QFrame,
     QLabel,
-    QDialog,
-    QComboBox,
     QFormLayout,
     QPushButton,
     QGridLayout,
     QCheckBox,
-    Qt,
     qtmajor,
 )
 
@@ -23,8 +18,8 @@ if qtmajor > 5:
     QFrameStyledPanel = QFrame.Shape.StyledPanel
     QFrameShadowRaised = QFrame.Shadow.Raised
 else:
-    QFrameStyledPanel = QFrame.StyledPanel
-    QFrameShadowRaised = QFrame.Raised
+    QFrameStyledPanel = QFrame.StyledPanel  # type: ignore
+    QFrameShadowRaised = QFrame.Raised  # type: ignore
 
 from ..configuration import (
     COPY_MODE_WITHIN_NOTE,
@@ -57,8 +52,12 @@ from ..logic.interpolate_fields import (
 )
 
 
-def get_variable_names_from_copy_definition(copy_definition: CopyDefinition) -> dict:
-    variable_menu_dict = {}
+def get_variable_names_from_copy_definition(
+    copy_definition: Optional[CopyDefinition],
+) -> dict[str, str]:
+    variable_menu_dict: dict[str, str] = {}
+    if copy_definition is None:
+        return variable_menu_dict
     for variable_def in copy_definition.get("field_to_variable_defs", []):
         variable_name = variable_def["copy_into_variable"]
         if variable_name is not None:
@@ -72,28 +71,45 @@ def get_new_base_dict(copy_mode: CopyModeType) -> dict:
     return DESTINATION_NOTE_MENU_DICT | BASE_NOTE_MENU_DICT
 
 
+class FieldInputsDict(TypedDict):
+    copy_into_note_field: GroupedComboBox
+    target_note_field_label: QLabel
+    copy_from_text_label: QLabel
+    copy_from_text: InterpolatedTextEditLayout
+    copy_if_empty: QCheckBox
+    copy_on_unfocus: QCheckBox
+    process_chain: EditExtraProcessingWidget
+
+
 class CopyFieldToFieldEditor(QWidget):
     """
     Class for editing the list of fields to copy from and fields to copy into.
-    Shows the list of current field-to-field definitions. Add button for adding new definitions is at the bottom.
+    Shows the list of current field-to-field definitions. Add button for adding new definitions is
+    at the bottom.
     Remove button for removing definitions is at the top-right of each definition.
     """
 
     def __init__(
         self,
         parent,
-        copy_definition: CopyDefinition,
+        copy_definition: Optional[CopyDefinition],
         copy_mode: CopyModeType,
     ):
         super().__init__(parent)
-        self.field_to_field_defs = copy_definition.get("field_to_field_defs", [])
+        self.field_to_field_defs = (
+            copy_definition.get("field_to_field_defs", []) if copy_definition else []
+        )
         self.copy_definition = copy_definition
         self.copy_mode = copy_mode
-        self.across_mode_direction = copy_definition.get(
-            "across_mode_direction", DIRECTION_DESTINATION_TO_SOURCES
+        self.across_mode_direction = (
+            copy_definition.get("across_mode_direction", DIRECTION_DESTINATION_TO_SOURCES)
+            if copy_definition
+            else DIRECTION_DESTINATION_TO_SOURCES
         )
         clean_model_names = (
-            copy_definition.get("copy_into_note_types", "").strip('""').split('", "')
+            (copy_definition.get("copy_into_note_types", "").strip('""').split('", "'))
+            if copy_definition
+            else []
         )
         self.selected_copy_into_models = list(
             filter(
@@ -101,12 +117,9 @@ class CopyFieldToFieldEditor(QWidget):
                 [mw.col.models.by_name(model_name) for model_name in clean_model_names],
             )
         )
-        self.intersecting_fields = get_intersecting_model_fields(
-            self.selected_copy_into_models
-        )
+        self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
 
         self.copy_from_menu_options_dict = get_new_base_dict(copy_mode)
-        self.intersecting_fields = []
         self.update_copy_from_options_dict()
 
         self.copy_definition = copy_definition
@@ -126,15 +139,13 @@ class CopyFieldToFieldEditor(QWidget):
         self.bottom_form.addRow("", self.add_new_button)
         self.add_new_button.clicked.connect(self.add_new_definition)
 
-        self.copy_field_inputs = []
+        self.copy_field_inputs: list[FieldInputsDict] = []
 
         # There has to be at least one definition so initialize with one
         if len(self.field_to_field_defs) == 0:
             self.add_new_definition()
         else:
-            for index, copy_field_to_field_definition in enumerate(
-                self.field_to_field_defs
-            ):
+            for index, copy_field_to_field_definition in enumerate(self.field_to_field_defs):
                 self.add_copy_field_row(index, copy_field_to_field_definition)
 
     def add_new_definition(self):
@@ -148,9 +159,7 @@ class CopyFieldToFieldEditor(QWidget):
         self.field_to_field_defs.append(new_definition)
         self.add_copy_field_row(len(self.field_to_field_defs) - 1, new_definition)
 
-    def add_copy_field_row(
-        self, index, copy_field_to_field_definition: CopyFieldToField
-    ):
+    def add_copy_field_row(self, index, copy_field_to_field_definition: CopyFieldToField):
         # Create a QFrame
         frame = QFrame(self)
         frame.setFrameShape(QFrameStyledPanel)
@@ -164,24 +173,16 @@ class CopyFieldToFieldEditor(QWidget):
         row_form = QFormLayout()
         frame_layout.addLayout(row_form)
 
-        copy_field_inputs_dict = {}
-
         # Copy into field
         field_target_cbox = GroupedComboBox(
             placeholder_text="First select a trigger note type",
             is_required=True,
         )
-        copy_field_inputs_dict["copy_into_note_field"] = field_target_cbox
-        target_note_field_label = QLabel(
-            "<h3>Destination field (in the trigger note)</h3>"
-        )
-        copy_field_inputs_dict["target_note_field_label"] = target_note_field_label
+        target_note_field_label = QLabel("<h3>Destination field (in the trigger note)</h3>")
         row_form.addRow(target_note_field_label, field_target_cbox)
         self.update_one_field_target_cbox(field_target_cbox)
         with suppress(KeyError):
-            field_target_cbox.setCurrentText(
-                copy_field_to_field_definition["copy_into_note_field"]
-            )
+            field_target_cbox.setCurrentText(copy_field_to_field_definition["copy_into_note_field"])
             field_target_cbox.update_required_style()
 
         across = self.copy_mode == COPY_MODE_ACROSS_NOTES
@@ -190,7 +191,6 @@ class CopyFieldToFieldEditor(QWidget):
         copy_from_text_label = QLabel(
             "<h3>Source fields' (from the search) content that will replace the field</h3>"
         )
-        copy_field_inputs_dict["copy_from_text_label"] = copy_from_text_label
         copy_from_text_layout = InterpolatedTextEditLayout(
             is_required=True,
             label=copy_from_text_label,
@@ -207,29 +207,22 @@ class CopyFieldToFieldEditor(QWidget):
             {intr_format(NOTE_ID)}, {intr_format(CARD_IVL)}, {intr_format(CARD_TYPE)} etc.</li>
         </ul>""",
         )
-        copy_field_inputs_dict["copy_from_text"] = copy_from_text_layout
 
         row_form.addRow(copy_from_text_layout)
 
         copy_from_text_layout.update_options(self.copy_from_menu_options_dict)
         with suppress(KeyError):
-            copy_from_text_layout.set_text(
-                copy_field_to_field_definition["copy_from_text"]
-            )
+            copy_from_text_layout.set_text(copy_field_to_field_definition["copy_from_text"])
 
         copy_if_empty = QCheckBox("Only copy into field, if it's empty")
-        copy_field_inputs_dict["copy_if_empty"] = copy_if_empty
         row_form.addRow("", copy_if_empty)
         with suppress(KeyError):
             copy_if_empty.setChecked(copy_field_to_field_definition["copy_if_empty"])
 
         copy_on_unfocus = QCheckBox("Copy on unfocusing the field in the note editor")
-        copy_field_inputs_dict["copy_on_unfocus"] = copy_on_unfocus
         row_form.addRow("", copy_on_unfocus)
         with suppress(KeyError):
-            copy_on_unfocus.setChecked(
-                copy_field_to_field_definition.get("copy_on_unfocus", False)
-            )
+            copy_on_unfocus.setChecked(copy_field_to_field_definition.get("copy_on_unfocus", False))
 
         process_chain_widget = EditExtraProcessingWidget(
             self,
@@ -237,7 +230,15 @@ class CopyFieldToFieldEditor(QWidget):
             copy_field_to_field_definition,
             ALL_FIELD_TO_FIELD_PROCESS_NAMES,
         )
-        copy_field_inputs_dict["process_chain"] = process_chain_widget
+        copy_field_inputs_dict: FieldInputsDict = {
+            "copy_into_note_field": field_target_cbox,
+            "target_note_field_label": target_note_field_label,
+            "copy_from_text_label": copy_from_text_label,
+            "copy_from_text": copy_from_text_layout,
+            "copy_if_empty": copy_if_empty,
+            "copy_on_unfocus": copy_on_unfocus,
+            "process_chain": process_chain_widget,
+        }
         row_form.addRow(process_chain_widget)
 
         # Remove
@@ -255,15 +256,14 @@ class CopyFieldToFieldEditor(QWidget):
             ]:
                 widget.deleteLater()
                 row_form.removeWidget(widget)
-                widget = None
             for layout in [copy_from_text_layout]:
                 for i in range(0, layout.count()):
-                    layout.itemAt(i).widget().deleteLater()
+                    item = layout.itemAt(i)
+                    if item and (item_widget := item.widget()):
+                        item_widget.deleteLater()
                 layout.deleteLater()
             self.middle_grid.removeWidget(frame)
-            self.remove_definition(
-                copy_field_to_field_definition, copy_field_inputs_dict
-            )
+            self.remove_definition(copy_field_to_field_definition, copy_field_inputs_dict)
 
         remove_button.clicked.connect(remove_row)
         row_form.addRow("", remove_button)
@@ -282,9 +282,7 @@ class CopyFieldToFieldEditor(QWidget):
         field_to_field_defs = []
         for copy_field_inputs in self.copy_field_inputs:
             copy_field_definition = {
-                "copy_into_note_field": copy_field_inputs[
-                    "copy_into_note_field"
-                ].currentText(),
+                "copy_into_note_field": copy_field_inputs["copy_into_note_field"].currentText(),
                 "copy_from_text": copy_field_inputs["copy_from_text"].get_text(),
                 "copy_if_empty": copy_field_inputs["copy_if_empty"].isChecked(),
                 "copy_on_unfocus": copy_field_inputs["copy_on_unfocus"].isChecked(),
@@ -301,9 +299,7 @@ class CopyFieldToFieldEditor(QWidget):
     def update_all_field_target_cboxes(self):
         for copy_field_inputs in self.copy_field_inputs:
             self.update_one_field_target_cbox(copy_field_inputs["copy_into_note_field"])
-            copy_field_inputs["copy_from_text"].update_options(
-                self.copy_from_menu_options_dict
-            )
+            copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
 
     def update_direction_labels(self, direction: DirectionType):
         self.across_mode_direction = direction
@@ -315,15 +311,16 @@ class CopyFieldToFieldEditor(QWidget):
             copy_into_label_clarification = "a searched note"
             copy_from_text_clarification = "from the trigger note"
 
-        new_copy_into_label = (
-            f"<h3>Destination field ({copy_into_label_clarification})</h3>"
+        new_copy_into_label = f"<h3>Destination field ({copy_into_label_clarification})</h3>"
+        new_copy_from_text_label = (
+            f"<h4>Source fields' ({copy_from_text_clarification}) content that will replace the"
+            " field</h4>"
         )
-        new_copy_from_text_label = f"<h4>Source fields' ({copy_from_text_clarification}) content that will replace the field</h4>"
 
         for copy_field_inputs in self.copy_field_inputs:
-            target_note_field_label = copy_field_inputs["target_note_field_label"]
+            target_note_field_label = cast(QLabel, copy_field_inputs["target_note_field_label"])
             target_note_field_label.setText(new_copy_into_label)
-            copy_from_text_label = copy_field_inputs["copy_from_text_label"]
+            copy_from_text_label = cast(QLabel, copy_field_inputs["copy_from_text_label"])
             copy_from_text_label.setText(new_copy_from_text_label)
 
     def update_one_field_target_cbox(self, field_target_cbox: GroupedComboBox):
@@ -348,7 +345,10 @@ class CopyFieldToFieldEditor(QWidget):
                     self.intersecting_fields = get_intersecting_model_fields(
                         self.selected_copy_into_models
                     )
-                group_name = f"Intersecting fields of {', '.join([model['name'] for model in self.selected_copy_into_models])}"
+                group_name = (
+                    "Intersecting fields of"
+                    f" {', '.join([model['name'] for model in self.selected_copy_into_models])}"
+                )
                 field_target_cbox.addGroup(group_name)
                 for field_name in self.intersecting_fields:
                     field_target_cbox.addItemToGroup(group_name, field_name)
@@ -385,17 +385,15 @@ class CopyFieldToFieldEditor(QWidget):
 
     def update_copy_from_options_dict(self):
         """
-        Updates the raw options dict used for the "Define what to copy from" TextEdit right-click menu.
-        The raw dict is used for validating the text in the TextEdit.
+        Updates the raw options dict used for the "Define what to copy from" TextEdit right-click
+        menu. The raw dict is used for validating the text in the TextEdit.
         """
         options_dict = get_new_base_dict(self.copy_mode)
         variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
         if variables_dict:
             options_dict[VARIABLES_KEY] = variables_dict
 
-        trigger_model_names = [
-            model["name"] for model in self.selected_copy_into_models
-        ]
+        trigger_model_names = [model["name"] for model in self.selected_copy_into_models]
 
         if self.copy_mode == COPY_MODE_WITHIN_NOTE:
             # If there are multiple models, add the intersecting fields only
@@ -419,7 +417,7 @@ class CopyFieldToFieldEditor(QWidget):
                 # One destination model, many source models
                 for model in models:
                     # Only the trigger note models are potential destinations
-                    # The destination note will get added twice, once as a source and once as a destination
+                    # The destination note will get added twice, as a source and as a destination
                     if model.name in trigger_model_names:
                         add_model_options_to_dict(
                             f"(Destination) {model.name}",
@@ -440,7 +438,7 @@ class CopyFieldToFieldEditor(QWidget):
                         DESTINATION_PREFIX,
                     )
                     # Only the trigger note models are potential sources
-                    # The source note will get added twice, once as a source and once as a destination
+                    # The source note will get added twice, as a source and once as a destination
                     if model.name in trigger_model_names:
                         add_model_options_to_dict(model.name, model.id, options_dict)
 
