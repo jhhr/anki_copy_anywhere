@@ -722,7 +722,17 @@ def check_onyomi_readings(
         onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
         # Convert the onyomi to hiragana since the furigana is in hiragana
         onyomi_reading = to_hiragana(onyomi_reading)
-        if onyomi_reading in target_furigana_section:
+        onyomi_is_in_section = False
+        if edge == "whole":
+            # onyomi should match the whole furigana or repeat twice within in it
+            onyomi_is_in_section = (
+                onyomi_reading == target_furigana_section
+                or onyomi_reading * 2 == target_furigana_section
+            )
+
+        else:
+            onyomi_is_in_section = onyomi_reading in target_furigana_section
+        if onyomi_is_in_section:
             log(f"\n1 onyomi_reading: {onyomi_reading}")
             if return_on_or_kun_match_only:
                 return {"text": "", "type": "onyomi"}
@@ -898,8 +908,17 @@ def check_kunyomi_readings(
                 )
                 return {"text": furigana, "type": "kunyomi"}
 
-        # For kunyomi we just check for a match with the stem
-        if kunyomi_stem in target_furigana_section:
+        # For kunyomi check for a match with the stem
+        kunyomi_is_in_section = False
+        if edge == "whole":
+            # kunyomi should match the whole furigana or repeat twice within in it
+            kunyomi_is_in_section = (
+                kunyomi_stem == target_furigana_section
+                or kunyomi_stem * 2 == target_furigana_section
+            )
+        else:
+            kunyomi_is_in_section = kunyomi_stem in target_furigana_section
+        if kunyomi_is_in_section:
             log(f"\n1 kunyomi_stem: {kunyomi_stem}")
             if return_on_or_kun_match_only:
                 return {"text": "", "type": "kunyomi"}
@@ -1303,6 +1322,28 @@ def main():
         expected_kana_only="ぎょう<b>ギ</b>",
         expected_furigana=" 行[ぎょう]<b> 儀[ギ]</b>",
         expected_furikanji=" ぎょう[行]<b> ギ[儀]</b>",
+    )
+    test(
+        test_name="Should not match onyomi in whole edge match 1/",
+        kanji="嗜",
+        onyomi="シ(漢)、ジ(呉)",
+        kunyomi="たしな.む、たしな.み、この.む、この.み",
+        # the onyomi し occurs in the middle of the furigana but should not be matched
+        sentence="嗜[たしな]まれたことは？",
+        expected_kana_only="<b>たしなまれた</b>ことは？",
+        expected_furigana="<b> 嗜[たしな]まれた</b>ことは？",
+        expected_furikanji="<b> たしな[嗜]まれた</b>ことは？",
+    )
+    test(
+        test_name="Should match onyomi twice in whole edge match 2/",
+        kanji="悠",
+        onyomi="ユウ(呉)",
+        kunyomi="なが.い",
+        # the onyomi ユウ occurs twice in the furigana and should be matched both times
+        sentence="悠々[ゆうゆう]とした時間[じかん]。",
+        expected_kana_only="<b>ユウユウ</b>としたじかん。",
+        expected_furigana="<b> 悠々[ユウユウ]</b>とした 時間[じかん]。",
+        expected_furikanji="<b> ユウユウ[悠々]</b>とした じかん[時間]。",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 1/",
