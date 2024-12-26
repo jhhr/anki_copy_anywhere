@@ -126,7 +126,7 @@ def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_name: str)
             continue
 
         # Don't need to merge undo entries for unfocusing a field
-        changed, _, _ = copy_for_single_trigger_note(
+        changed = copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
             field_only=field_name,

@@ -154,6 +154,65 @@ class ProgressUpdateDef:
         self.max_value = None
 
 
+class ProgressUpdater:
+    """
+    Helper class to update the progress bar and its label. This class is used to store
+    the start time, definition name, total cards count, progress update definition and
+    whether the copy is across notes. It also stores the current card count and the
+    total processed sources and destinations. The update_counts method is used to
+    increment the counts and the render_update method is used to update the progress
+    bar and its label.
+    """
+
+    def __init__(
+        self,
+        start_time: float,
+        definition_name: str,
+        total_cards_count: int,
+        progrss_update_def: ProgressUpdateDef,
+        is_across: bool,
+    ):
+        self.start_time = start_time
+        self.definition_name = definition_name
+        self.total_cards_count = total_cards_count
+        self.progress_update_def = progrss_update_def
+        self.is_across = is_across
+        self.card_cnt = 0
+        self.total_processed_sources = 0
+        self.total_processed_destinations = 0
+
+    def update_counts(
+        self,
+        card_cnt_inc: Optional[int] = None,
+        processed_sources_inc: Optional[int] = None,
+        processed_destinations_inc: Optional[int] = None,
+    ):
+        if card_cnt_inc is not None:
+            self.card_cnt += card_cnt_inc
+        if processed_sources_inc is not None:
+            self.total_processed_sources += processed_sources_inc
+        if processed_destinations_inc is not None:
+            self.total_processed_destinations += processed_destinations_inc
+
+    def get_counts(self) -> Tuple[int, int, int]:
+        return self.card_cnt, self.total_processed_sources, self.total_processed_destinations
+
+    def render_update(self):
+        elapsed_s = time.time() - self.start_time
+        elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
+        self.progress_update_def.label = f"""<strong>{self.definition_name}</strong>:
+        <br>Copied {self.card_cnt}/{self.total_cards_count} cards
+        <br><small>Notes processed - destinations: {self.total_processed_destinations}
+            {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
+        <br>Time: {elapsed_time}"""
+        if self.card_cnt / self.total_cards_count > 0.10 or elapsed_s > 5:
+            eta_s = (elapsed_s / self.card_cnt) * (self.total_cards_count - self.card_cnt)
+            eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
+            self.progress_update_def.label += f" - ETA: {eta}"
+        self.progress_update_def.value = self.card_cnt
+        self.progress_update_def.max_value = self.total_cards_count
+
+
 def copy_fields(
     copy_definitions: list[CopyDefinition],
     card_ids=None,
@@ -362,6 +421,15 @@ def copy_fields_in_background(
 
     cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
     total_cards_count = len(cards)
+    is_across = copy_definition["copy_mode"] == COPY_MODE_ACROSS_NOTES
+
+    progress_updater = ProgressUpdater(
+        start_time=start_time,
+        definition_name=definition_name,
+        total_cards_count=total_cards_count,
+        progrss_update_def=progress_update_def,
+        is_across=is_across,
+    )
 
     # Cache any opened files, so process chains can use them instead of needing to open them again
     # contents will be cached by file name
@@ -370,32 +438,15 @@ def copy_fields_in_background(
 
     total_processed_sources = 0
     total_processed_destinations = 0
-    is_across = copy_definition["copy_mode"] == COPY_MODE_ACROSS_NOTES
     for card in cards:
         if card_cnt % 10 == 0 and card_cnt > 0:
-            elapsed_s = time.time() - start_time
-            elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
-            progress_update_def.label = f"""<strong>{definition_name}</strong>:
-            <br>Copied {card_cnt}/{total_cards_count} cards
-            <br><small>Notes processed - destinations: {total_processed_destinations}
-                {f', sources: {total_processed_sources}' if is_across else ''}</small>
-            <br>Time: {elapsed_time}"""
-            if card_cnt / total_cards_count > 0.10 or elapsed_s > 5:
-                eta_s = (elapsed_s / card_cnt) * (total_cards_count - card_cnt)
-                eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
-                progress_update_def.label += f" - ETA: {eta}"
-            progress_update_def.value = card_cnt
-            progress_update_def.max_value = total_cards_count
+            progress_updater.render_update()
 
         card_cnt += 1
 
         copy_into_note = card.note()
 
-        (
-            success,
-            processed_destination_notes,
-            processed_source_notes,
-        ) = copy_for_single_trigger_note(
+        success = copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=copy_into_note,
             results=results,
@@ -404,9 +455,10 @@ def copy_fields_in_background(
             multiple_note_types=multiple_note_types,
             show_error_message=show_error_message,
             file_cache=file_cache,
+            progress_updater=progress_updater,
         )
-        total_processed_sources += processed_source_notes
-        total_processed_destinations += processed_destination_notes
+
+        progress_updater.update_counts(card_cnt_inc=1)
 
         copied_into_cards.append(card)
 
@@ -420,6 +472,8 @@ def copy_fields_in_background(
     # Otherwise, when copy fields is run manually, you want to know the result in any case
     should_report_result = len(cards) > 0 if is_sync else True
     if should_report_result:
+        #  Get counts from ProgressUpdater and render the final update
+        _, total_processed_sources, total_processed_destinations = progress_updater.get_counts()
         results.add_result_text(f"""<br><span>
             {time.time() - start_time:.2f}s - 
             <i>{copy_definition['definition_name']}:</i> 
@@ -513,7 +567,8 @@ def copy_for_single_trigger_note(
     multiple_note_types: bool = False,
     show_error_message: Optional[Callable[[str], None]] = None,
     file_cache: Optional[dict] = None,
-) -> Tuple[bool, int, int]:
+    progress_updater: Optional[ProgressUpdater] = None,
+) -> bool:
     """
     Copy fields into a single note
     :param copy_definition: The definition of what to copy, includes process chains
@@ -528,6 +583,7 @@ def copy_for_single_trigger_note(
     :param multiple_note_types: Whether the copy is into multiple note types
     :param show_error_message: Optional function to show error messages
     :param file_cache: A dictionary to cache opened files' content
+    :param progress_updater: Optional object to update the progress bar
     :return: Tuple of the op success + number of destination and source notes processed
     """
     if not show_error_message:
@@ -569,7 +625,7 @@ def copy_for_single_trigger_note(
             DIRECTION_SOURCE_TO_DESTINATIONS,
         ]:
             show_error_message("Error in copy fields: missing across mode direction value")
-            return False, len(destination_notes), len(source_notes)
+            return False
         target_notes = get_across_target_notes(
             copy_from_cards_query=copy_from_cards_query or "",
             trigger_note=trigger_note,
@@ -589,7 +645,7 @@ def copy_for_single_trigger_note(
             source_notes = [trigger_note]
     else:
         show_error_message("Error in copy fields: missing copy mode value")
-        return False, len(destination_notes), len(source_notes)
+        return False
 
     if len(source_notes) == 0:
         show_error_message(
@@ -608,7 +664,13 @@ def copy_for_single_trigger_note(
             select_card_separator=select_card_separator,
             file_cache=file_cache,
             show_error_message=show_error_message,
+            progress_updater=progress_updater,
         )
+        if progress_updater is not None:
+            progress_updater.update_counts(
+                processed_destinations_inc=1,
+            )
+            progress_updater.render_update()
         mw.col.update_note(destination_note)
         # undo_entry has to be updated after every undoable op or the last_step will
         # increment causing an "target undo op not found" error!
@@ -618,9 +680,9 @@ def copy_for_single_trigger_note(
         if results is not None and changes is not None:
             results.changes = changes
         if not success:
-            return False, len(destination_notes), len(source_notes)
+            return False
 
-    return True, len(destination_notes), len(source_notes)
+    return True
 
 
 def copy_into_single_note(
@@ -633,6 +695,7 @@ def copy_into_single_note(
     select_card_separator: Optional[str] = None,
     file_cache: Optional[dict] = None,
     show_error_message: Optional[Callable[[str], None]] = None,
+    progress_updater: Optional[ProgressUpdater] = None,
 ) -> bool:
     if not show_error_message:
 
@@ -667,6 +730,7 @@ def copy_into_single_note(
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
             variable_values_dict=variable_values_dict,
+            progress_updater=progress_updater,
         )
         # Step 2.2: If we have further processing steps, run them
         if process_chain is not None:
@@ -919,6 +983,7 @@ def get_field_values_from_notes(
     variable_values_dict: Optional[dict] = None,
     select_card_separator: Optional[str] = ", ",
     show_error_message: Optional[Callable[[str], None]] = None,
+    progress_updater: Optional[ProgressUpdater] = None,
 ) -> str:
     """
     Get the value from the field in the selected notes gotten with get_notes_to_copy_from.
@@ -934,6 +999,7 @@ def get_field_values_from_notes(
         Irrelevant if there is only one note
     :param show_error_message: A function to show error messages, used for storing all messages
         until the end of the whole operation to show them in a GUI element at the end
+    :param progress_updater: An object to update the progress bar with
     :return: String with the values from the field in the notes
     """
     if not show_error_message:
@@ -972,6 +1038,9 @@ def get_field_values_from_notes(
                 f" {', '.join(invalid_fields)}"
             )
 
+        if progress_updater is not None:
+            progress_updater.update_counts(processed_sources_inc=1)
+            progress_updater.render_update()
         result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
 
     return result_val
