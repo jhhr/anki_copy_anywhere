@@ -116,11 +116,12 @@ def get_part_of_speech(
     # Regular verb patterns
     # Check ichidan vs godan
     if len(okurigana) >= 2 and okurigana.endswith("る") and okurigana[-2] in E_I_ENDING_KANA:
-        # Most verbs ending in eru/iru are ichidan
+        # Verbs ending in eru/iru are ichidan
         return "v1"
 
     # Godan verb endings
     godan_type = GODAN_ENDINGS.get(okurigana[-1])
+    print(f"last char: {okurigana[-1]}")
     if godan_type:
         return f"v5{godan_type}"
 
@@ -145,6 +146,7 @@ def get_okuri_dict_for_okurigana(
         kanji=kanji,
         kanji_reading=kanji_reading,
     )
+    print(f"part_of_speech: {part_of_speech}")
     if part_of_speech is None:
         return None
     return POSSIBLE_OKURIGANA_PROGRESSION_DICT[part_of_speech]
@@ -194,7 +196,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (28, "ませんで"),
     (28, "れば"),
     (28, "なければ"),
-    (28, "られる"),
+    (28, "られて"),
     (28, "れる"),
     (28, "られます"),
     (28, "れます"),

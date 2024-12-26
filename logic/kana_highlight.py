@@ -598,8 +598,7 @@ def process_readings(
     if kunyomi_results["type"] == "kunyomi" and word_data["edge"] in ["right", "whole"]:
         kunyomi = highlight_args.get("kunyomi", "")
         okurigana_to_highlight = ""
-        partial_okuri = ""
-        partial_okuri_rest = ""
+        partial_okuri_results: list[OkuriResults] = []
         rest_kana = okurigana
         kunyomi_readings = iter(kunyomi.split("、"))
         while not okurigana_to_highlight and (next_kunyomi := next(kunyomi_readings, None)):
@@ -615,14 +614,13 @@ def process_readings(
             res = check_okurigana_for_kunyomi_inflection(
                 kunyomi_okurigana, kunyomi_reading, word_data, highlight_args
             )
-            if res.result == "partial_okuri" or res.result == "empty_okuri":
+            if res.result in ["partial_okuri", "empty_okuri"]:
                 # If we only got a partial or empty okurigana match, continue looking
                 # in case we get a full match instead
-                partial_okuri = res.okurigana
-                partial_okuri_rest = res.rest_kana
+                partial_okuri_results.append(res)
                 log(
-                    "\ncheck_kunyomi_readings while got a partial_okuri:"
-                    f" {partial_okuri}, rest_kana: {partial_okuri_rest}"
+                    "\ncheck_kunyomi_readings while got a partial result:"
+                    f" {res.okurigana}, rest_kana: {res.okurigana}, type: {res.result}"
                 )
                 continue
             if res.result == "full_okuri":
@@ -632,13 +630,16 @@ def process_readings(
                 )
                 okurigana_to_highlight = res.okurigana
                 rest_kana = res.rest_kana
-        if partial_okuri and not okurigana_to_highlight:
+        # If multiple partial okuri results were found, use the one that matches the most
+        if partial_okuri_results and not okurigana_to_highlight:
+            log(f"\ncheck_kunyomi_readings while got {len(partial_okuri_results)} partial results")
+            best_res = max(partial_okuri_results, key=lambda x: len(x.okurigana))
             log(
-                f"\ncheck_kunyomi_readings while final partial_okuri: {partial_okuri},"
-                f" rest_kana: {partial_okuri_rest}"
+                f"\ncheck_kunyomi_readings while final partial_okuri: {best_res.okurigana},"
+                f" rest_kana: {best_res.rest_kana}, type: {best_res.result}"
             )
-            okurigana_to_highlight = partial_okuri
-            rest_kana = partial_okuri_rest
+            okurigana_to_highlight = best_res.okurigana
+            rest_kana = best_res.rest_kana
         log(
             "\ncheck_kunyomi_readings while result - okurigana:"
             f" {okurigana_to_highlight}, rest_kana: {rest_kana}"
@@ -841,7 +842,7 @@ def check_okurigana_for_kunyomi_inflection(
     conjugatable_stem = get_conjugatable_okurigana_stem(kunyomi_okurigana)
     log(f"\ncheck okurigana 1 - conjugatable_stem: {conjugatable_stem}")
     if conjugatable_stem is None or not maybe_okuri_text.startswith(conjugatable_stem):
-        log("\ncheck okurigana 2 - no conjugatable_stem")
+        log("\ncheck okurigana 2 - no conjugatable_stem or no match")
         # Not a verb or i-adjective, so just check for an exact match within the okurigana
         if maybe_okuri_text.startswith(kunyomi_okurigana):
             log(f"\ncheck okurigana 3 - maybe_okuri_text: {maybe_okuri_text}")
@@ -1728,6 +1729,20 @@ def main():
         expected_kana_only="おとを <b>きこえた</b>か？なにも <b>きいて</b>いないよ",
         expected_furigana=" 音[おと]を<b> 聞[き]こえた</b>か？ 何[なに]も<b> 聞[き]いて</b>いないよ",
         expected_furikanji=" おと[音]を<b> き[聞]こえた</b>か？ なに[何]も<b> き[聞]いて</b>いないよ",
+    )
+    test(
+        test_name="Verb okurigana test 11/",
+        kanji="抑",
+        onyomi="ヨク(漢)、オク(呉)",
+        kunyomi="おさ.える、そもそも、そも、ふさ.ぐ",
+        sentence="俳句[はいく]は 言葉[ことば]が 最小限[さいしょうげん]に 抑[おさ]えられている。",
+        expected_kana_only="はいくは ことばが さいしょうげんに <b>おさえられて</b>いる。",
+        expected_furigana=(
+            " 俳句[はいく]は 言葉[ことば]が 最小限[さいしょうげん]に<b> 抑[おさ]えられて</b>いる。"
+        ),
+        expected_furikanji=(
+            " はいく[俳句]は ことば[言葉]が さいしょうげん[最小限]に<b> おさ[抑]えられて</b>いる。"
+        ),
     )
     test(
         test_name="Adjective okurigana test 1/",
