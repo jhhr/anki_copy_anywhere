@@ -491,7 +491,7 @@ def reconstruct_furigana(
         if reconstruct_type == "kana_only":
             return f"{furigana}{okurigana}{rest_kana}"
         if reconstruct_type == "furikanji":
-            return f" {furigana}[{right_word}{middle_word}{left_word}]{okurigana}{rest_kana}"
+            return f" {furigana}[{left_word}{middle_word}{right_word}]{okurigana}{rest_kana}"
         return f" {left_word}{middle_word}{right_word}[{furigana}]{okurigana}{rest_kana}"
 
     if edge == "whole":
