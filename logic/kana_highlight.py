@@ -585,7 +585,7 @@ def process_readings(
         return onyomi_match, "", okurigana
 
     kunyomi_results = check_kunyomi_readings(
-        highlight_args.get("kunyomi", ""),
+        highlight_args,
         furigana,
         target_furigana_section,
         edge,
@@ -881,7 +881,7 @@ def check_okurigana_for_kunyomi_inflection(
 
 
 def check_kunyomi_readings(
-    kunyomi: str,
+    highlight_args: HighlightArgs,
     furigana: str,
     target_furigana_section: str,
     edge: Edge,
@@ -901,6 +901,7 @@ def check_kunyomi_readings(
 
     :return: Result dict with the modified furigana
     """
+    kunyomi = highlight_args.get("kunyomi", "")
     kunyomi_readings = kunyomi.split("、")
     for kunyomi_reading in kunyomi_readings:
         # Split the reading into the stem and the okurigana
@@ -963,6 +964,17 @@ def check_kunyomi_readings(
                         converted_kunyomi,
                         edge,
                     )
+
+    # Exception for 尻尾[しっぽ] where 尾[ぽ] should be considered a kunyomi, not jukujikun
+    # 尻 already gets matched with small tsu conversion so handle 尾[ぽ] here
+    if highlight_args["kanji_to_match"] == "尾" and furigana == "ぽ":
+        return process_kunyomi_match(
+            furigana,
+            "ぽ",
+            edge,
+            process_type,
+            wrap_readings_with_tags,
+        )
     log("\ncheck_kunyomi_readings - no match")
     return {"text": "", "type": "none"}
 
