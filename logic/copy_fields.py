@@ -206,9 +206,10 @@ class ProgressUpdater:
             {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
         <br>Time: {elapsed_time}"""
         if self.card_cnt / self.total_cards_count > 0.10 or elapsed_s > 5:
-            eta_s = (elapsed_s / self.card_cnt) * (self.total_cards_count - self.card_cnt)
-            eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
-            self.progress_update_def.label += f" - ETA: {eta}"
+            if self.card_cnt > 0:
+                eta_s = (elapsed_s / self.card_cnt) * (self.total_cards_count - self.card_cnt)
+                eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
+                self.progress_update_def.label += f" - ETA: {eta}"
         self.progress_update_def.value = self.card_cnt
         self.progress_update_def.max_value = self.total_cards_count
 
