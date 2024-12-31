@@ -1,0 +1,14 @@
+// filepath: /.vscode/launch.json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Run file with setup",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test/run_with_setup.py",
+            "args": ["${file}"],
+            "console": "integratedTerminal"
+        }
+    ]
+}

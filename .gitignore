@@ -1,4 +1,6 @@
 .idea
 __pycache__
 meta.json
-.vscode
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
