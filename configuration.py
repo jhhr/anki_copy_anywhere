@@ -142,7 +142,8 @@ class CopyFieldToField(TypedDict):
     copy_into_note_field: str
     copy_from_text: str
     copy_if_empty: bool
-    copy_on_unfocus: bool
+    copy_on_unfocus_when_edit: bool
+    copy_on_unfocus_when_add: bool
     process_chain: Sequence[AnyProcess]
 
 

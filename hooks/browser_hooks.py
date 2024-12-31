@@ -84,16 +84,22 @@ def on_browser_will_show_context_menu(browser: Browser, menu: QMenu):
 
     # Avoid late binding that would cause all copy_fields to use the last copy_definition
     # defined in the loop
-    def make_copy_fields_lambda(copy_def):
-        return lambda: copy_fields(
-            parent=browser,
-            copy_definitions=[copy_def],
-            card_ids=browser.selectedNotesAsCards(),
-        )
+    def make_copy_fields_runner(copy_def):
+        print(f"make_copy_fields_lambda, copy_def: {copy_def['definition_name']}")
+
+        def run_copy_def():
+            print(f"run_copy_def, copy_def: {copy_def['definition_name']}")
+            copy_fields(
+                copy_definitions=[copy_def],
+                note_ids=browser.selected_notes(),
+                parent=browser,
+            )
+
+        return run_copy_def
 
     for copy_definition in config.copy_definitions:
         copy_fields_action = QAction(copy_definition["definition_name"], browser)
-        qconnect(copy_fields_action.triggered, make_copy_fields_lambda(copy_definition))
+        qconnect(copy_fields_action.triggered, make_copy_fields_runner(copy_definition))
         copy_fields_menu.addAction(copy_fields_action)
 
 
