@@ -70,8 +70,6 @@ KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
 
 class KanaHighlightProcess(TypedDict):
     name: str
-    onyomi_field: str
-    kunyomi_field: str
     kanji_field: str
     return_type: FuriReconstruct
 
@@ -126,8 +124,6 @@ NEW_PROCESS_DEFAULTS: dict[str, AnyProcess] = {
     ),
     KANA_HIGHLIGHT_PROCESS: KanaHighlightProcess(
         name=KANA_HIGHLIGHT_PROCESS,
-        onyomi_field="",
-        kunyomi_field="",
         kanji_field="",
         return_type="kana_only",
     ),

@@ -65,6 +65,13 @@ GODAN_ENDINGS: dict[str, str] = {
     "る": "r",
 }
 
+LOG = False
+
+
+def log(msg: str) -> None:
+    if LOG:
+        print(msg)
+
 
 # For getting the conjugation dict in POSSIBLE_OKURIGANA_PROGRESSION_DICT
 # we need to determine the word's part of speech.
@@ -121,7 +128,7 @@ def get_part_of_speech(
 
     # Godan verb endings
     godan_type = GODAN_ENDINGS.get(okurigana[-1])
-    print(f"last char: {okurigana[-1]}")
+    log(f"last char: {okurigana[-1]}")
     if godan_type:
         return f"v5{godan_type}"
 
@@ -146,7 +153,7 @@ def get_okuri_dict_for_okurigana(
         kanji=kanji,
         kanji_reading=kanji_reading,
     )
-    print(f"part_of_speech: {part_of_speech}")
+    log(f"part_of_speech: {part_of_speech}")
     if part_of_speech is None:
         return None
     return POSSIBLE_OKURIGANA_PROGRESSION_DICT[part_of_speech]

@@ -517,8 +517,6 @@ def apply_process_chain(
             if is_kana_highlight_process(process):
                 text = kana_highlight_process(
                     text=text,
-                    onyomi_field=process.get("onyomi_field", ""),
-                    kunyomi_field=process.get("kunyomi_field", ""),
                     kanji_field=process.get("kanji_field", ""),
                     return_type=process.get("return_type", "kana_only"),
                     note=destination_note,

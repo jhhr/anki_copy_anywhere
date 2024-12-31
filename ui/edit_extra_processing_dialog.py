@@ -337,12 +337,6 @@ class KanaHighlightProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.onyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
-        self.form.addRow("Onyomi field", self.onyomi_field_cbox)
-
-        self.kunyomi_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
-        self.form.addRow("Kunyomi field", self.kunyomi_field_cbox)
-
         self.kanji_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
         self.form.addRow("Kanji field", self.kanji_field_cbox)
 
@@ -353,10 +347,6 @@ class KanaHighlightProcessDialog(QDialog):
 
         self.update_combobox_options()
 
-        with suppress(KeyError):
-            self.onyomi_field_cbox.setCurrentText(self.process["onyomi_field"])
-        with suppress(KeyError):
-            self.kunyomi_field_cbox.setCurrentText(self.process["kunyomi_field"])
         with suppress(KeyError):
             self.kanji_field_cbox.setCurrentText(self.process["kanji_field"])
         with suppress(KeyError):
@@ -382,8 +372,6 @@ class KanaHighlightProcessDialog(QDialog):
         return_type = cast(FuriReconstruct, self.return_type_cbox.currentText())
         self.process = {
             "name": KANA_HIGHLIGHT_PROCESS,
-            "onyomi_field": self.onyomi_field_cbox.currentText(),
-            "kunyomi_field": self.kunyomi_field_cbox.currentText(),
             "kanji_field": self.kanji_field_cbox.currentText(),
             "return_type": return_type,
         }
@@ -397,8 +385,6 @@ class KanaHighlightProcessDialog(QDialog):
             if note_type is None:
                 continue
             for field_name in mw.col.models.field_names(note_type):
-                self.onyomi_field_cbox.addItem(field_name)
-                self.kunyomi_field_cbox.addItem(field_name)
                 self.kanji_field_cbox.addItem(field_name)
 
 
