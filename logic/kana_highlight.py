@@ -857,6 +857,8 @@ def check_onyomi_readings(
     :return: string, the modified furigana
       or [True, False] when return_on_or_kun_match_only
     """
+    if not onyomi:
+        return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
     onyomi_readings = onyomi.split("、")
     # order readings by length so that we try to match the longest reading first
     onyomi_readings.sort(key=len, reverse=True)
@@ -864,6 +866,8 @@ def check_onyomi_readings(
     for onyomi_reading in onyomi_readings:
         # remove text in () in the reading
         onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
+        if not onyomi_reading:
+            continue
         # Convert the onyomi to hiragana since the furigana is in hiragana
         onyomi_reading = to_hiragana(onyomi_reading)
         onyomi_is_in_section = False
@@ -1068,8 +1072,12 @@ def check_kunyomi_readings(
     :return: Result dict with the modified furigana
     """
     kunyomi = highlight_args.get("kunyomi", "")
+    if not kunyomi:
+        return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
     kunyomi_readings = kunyomi.split("、")
     for kunyomi_reading in kunyomi_readings:
+        if not kunyomi_reading:
+            continue
         # Split the reading into the stem and the okurigana
         kunyomi_stem = kunyomi_reading
         if "." in kunyomi_reading:
@@ -1731,6 +1739,33 @@ Return type: {return_type}
 
 
 def main():
+    test(
+        test_name="Should not crash with kanji that has empty onyomi or kunyomi",
+        kanji="匂",
+        # 匂 has no onyomi, 区 has no kunyomi
+        sentence="この 区域[くいき]は 匂[にお]いがする。",
+        expected_kana_only="この クイキは <b>におい</b>がする。",
+        expected_furigana="この 区域[クイキ]は<b> 匂[にお]い</b>がする。",
+        expected_furikanji="この クイキ[区域]は<b> にお[匂]い</b>がする。",
+        expected_kana_only_with_tags_split=(
+            "この <on>ク</on><on>イキ</on>は <b><kun>にお</kun><oku>い</oku></b>がする。"
+        ),
+        expected_furigana_with_tags_split=(
+            "この <on> 区[ク]</on><on> 域[イキ]</on>は <b><kun> 匂[にお]</kun><oku>い</oku></b>がする。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "この <on> ク[区]</on><on> イキ[域]</on>は <b><kun> にお[匂]</kun><oku>い</oku></b>がする。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "この <on>クイキ</on>は <b><kun>にお</kun><oku>い</oku></b>がする。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "この <on> 区域[クイキ]</on>は <b><kun> 匂[にお]</kun><oku>い</oku></b>がする。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "この <on> クイキ[区域]</on>は <b><kun> にお[匂]</kun><oku>い</oku></b>がする。"
+        ),
+    )
     test(
         test_name="Should not incorrectly match onyomi twice 1/",
         kanji="視",
