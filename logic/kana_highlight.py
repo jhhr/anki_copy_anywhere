@@ -2491,6 +2491,30 @@ def main():
         ),
     )
     test(
+        test_name="Should be able to get okurigana of jukujikun reading 1/",
+        kanji="逆",
+        # No kunyomi to match, the okurigana would need to be analyzed to get the dictionary form
+        # and then determine where the okurigana ends
+        sentence="逆上[のぼ]せたので",
+        expected_kana_only="<b>の</b>せたので",
+        expected_furigana="<b> 逆[の]</b> 上[ぼ]せたので",
+        expected_furikanji="<b> の[逆]</b> ぼ[上]せたので",
+        expected_kana_only_with_tags_split="<b><juk>の</juk></b><juk>ぼ</juk><oku>せた</oku>ので",
+        expected_furigana_with_tags_split=(
+            "<b><juk> 逆[の]</juk></b><juk> 上[ぼ]</juk><oku>せた</oku>ので"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><juk> の[逆]</juk></b><juk> ぼ[上]</juk><oku>せた</oku>ので"
+        ),
+        expected_kana_only_with_tags_merged="<b><juk>の</juk></b><juk>ぼせた</juk>ので",
+        expected_furigana_with_tags_merged=(
+            "<b><juk> 逆[の]</juk></b><juk> 上[ぼ]</juk><oku>せた</oku>ので"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><juk> の[逆]</juk></b><juk> ぼ[上]</juk><oku>せた</oku>ので"
+        ),
+    )
+    test(
         test_name="Verb okurigana test 1/",
         kanji="来",
         sentence="今[いま]に 来[きた]るべし",
