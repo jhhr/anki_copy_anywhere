@@ -28,8 +28,10 @@ from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
 from ..configuration import (
     CopyDefinition,
+    definition_modifies_other_notes,
     CopyFieldToVariable,
     CopyFieldToField,
+    get_field_to_field_unfocus_trigger_fields,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
     DIRECTION_SOURCE_TO_DESTINATIONS,
@@ -492,8 +494,6 @@ def copy_fields_in_background(
     total_processed_sources = 0
     total_processed_destinations = 0
     for note in notes:
-        progress_updater.render_update()
-
         note_cnt += 1
 
         success = copy_for_single_trigger_note(
@@ -709,6 +709,7 @@ def copy_for_single_trigger_note(
             source_notes=source_notes,
             variable_values_dict=variable_values_dict,
             field_only=field_only,
+            modifies_other_notes=definition_modifies_other_notes(copy_definition),
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             file_cache=file_cache,
@@ -734,6 +735,7 @@ def copy_into_single_note(
     source_notes: list[Note],
     variable_values_dict: Optional[dict] = None,
     field_only: Optional[str] = None,
+    modifies_other_notes: bool = False,
     multiple_note_types: bool = False,
     select_card_separator: Optional[str] = None,
     file_cache: Optional[dict] = None,
@@ -747,7 +749,12 @@ def copy_into_single_note(
 
     for field_to_field_def in field_to_field_defs:
         copy_into_note_field = field_to_field_def.get("copy_into_note_field", "")
-        if field_only is not None and copy_into_note_field != field_only:
+        trigger_fields = get_field_to_field_unfocus_trigger_fields(
+            field_to_field_def, modifies_other_notes
+        )
+        if field_only is not None and field_only not in trigger_fields:
+            # If we're only meant to copy a specific def, defined by the field_only parameter
+            # Note, depending on the mode, may be that field_only == copy_into_note_field
             continue
         copy_from_text = field_to_field_def.get("copy_from_text", "")
         copy_if_empty = field_to_field_def.get("copy_if_empty", False)

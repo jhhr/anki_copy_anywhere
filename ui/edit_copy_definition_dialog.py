@@ -43,7 +43,7 @@ from .interpolated_text_edit import InterpolatedTextEditLayout
 from .required_combobox import RequiredCombobox
 from .required_text_input import RequiredLineEdit
 from .scrollable_dialog import ScrollableQDialog
-from .multi_combo_box import MultiComboBox as MultiComboBox
+from .multi_combo_box import MultiComboBox
 from ..configuration import (
     Config,
     CopyDefinition,

@@ -140,7 +140,34 @@ class CopyFieldToField(TypedDict):
     copy_if_empty: bool
     copy_on_unfocus_when_edit: bool
     copy_on_unfocus_when_add: bool
+    copy_on_unfocus_trigger_field: str
     process_chain: Sequence[AnyProcess]
+
+
+def get_field_to_field_unfocus_trigger_fields(
+    field_to_field: CopyFieldToField, modifies_other_notes: bool
+) -> list[str]:
+    if modifies_other_notes:
+        # source to destination mode is triggered by a field change in the trigger note
+        # while the destination field is a different field in another note
+        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip('""').split('", "')
+    else:
+        # destination to sources mode or within note mode the destination and trigger fields
+        # are the same
+        return [field_to_field.get("copy_into_note_field", "")]
+
+
+def get_triggered_field_to_field_def_for_field(
+    field_to_field_defs: list[CopyFieldToField], field_name: str, modifies_other_notes: bool
+) -> Union[CopyFieldToField, None]:
+    """
+    Get the field-to-field definition that matches the field_name and the mode.
+    """
+    for field_def in field_to_field_defs:
+        trigger_fields = get_field_to_field_unfocus_trigger_fields(field_def, modifies_other_notes)
+        if field_name in trigger_fields:
+            return field_def
+    return None
 
 
 class CopyFieldToVariable(TypedDict):
@@ -176,6 +203,44 @@ class CopyDefinition(TypedDict):
     select_card_by: SelectCardByType
     select_card_count: Optional[str]
     select_card_separator: Optional[str]
+
+
+def mode_modifies_trigger_note(
+    copy_mode: Optional[str],
+    across_mode_direction: Optional[str],
+) -> bool:
+    return (
+        copy_mode == COPY_MODE_WITHIN_NOTE
+        or across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES
+    )
+
+
+def definition_modifies_trigger_note(
+    copy_definition: CopyDefinition,
+) -> bool:
+    return mode_modifies_trigger_note(
+        copy_definition.get("copy_mode", None),
+        copy_definition.get("across_mode_direction", None),
+    )
+
+
+def mode_modifies_other_notes(
+    copy_mode: Optional[str],
+    across_mode_direction: Optional[str],
+) -> bool:
+    return (
+        copy_mode == COPY_MODE_ACROSS_NOTES
+        and across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS
+    )
+
+
+def definition_modifies_other_notes(
+    copy_definition: CopyDefinition,
+) -> bool:
+    return mode_modifies_other_notes(
+        copy_definition.get("copy_mode", None),
+        copy_definition.get("across_mode_direction", None),
+    )
 
 
 class Config:

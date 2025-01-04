@@ -56,11 +56,11 @@ class InterpolatedTextEditLayout(QVBoxLayout):
 
         self.addWidget(main_label)
 
-        if description:
-            optional_description = QLabel(description)
-            # Set description font size smaller
-            optional_description.setStyleSheet("font-size: 10px;")
-            self.addWidget(optional_description)
+        self.optional_description = QLabel("")
+        # Set description font size smaller
+        self.optional_description.setStyleSheet("font-size: 10px;")
+        self.addWidget(self.optional_description)
+        self.set_description(description)
 
         self.addWidget(self.text_edit)
         self.addWidget(self.error_label)
@@ -75,6 +75,14 @@ class InterpolatedTextEditLayout(QVBoxLayout):
         """Set the text in the text field."""
         self.text_edit.setPlainText(text)
         self.text_edit.update_required_style()
+
+    def set_description(self, description):
+        """Set the description text."""
+        if description:
+            self.optional_description.setText(description)
+            self.optional_description.show()
+        else:
+            self.optional_description.hide()
 
     def update_options(self, new_options_dict):
         """

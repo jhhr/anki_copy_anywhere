@@ -32,6 +32,7 @@ from ..configuration import (
     DIRECTION_SOURCE_TO_DESTINATIONS,
     DIRECTION_DESTINATION_TO_SOURCES,
 )
+from .multi_combo_box import MultiComboBox
 from .grouped_combo_box import GroupedComboBox
 from .add_model_options_to_dict import add_model_options_to_dict
 from .add_intersecting_model_field_options_to_dict import (
@@ -79,6 +80,8 @@ class FieldInputsDict(TypedDict):
     copy_if_empty: QCheckBox
     copy_on_unfocus_when_edit: QCheckBox
     copy_on_unfocus_when_add: QCheckBox
+    copy_on_unfocus_trigger_label: QLabel
+    copy_on_unfocus_trigger_field: MultiComboBox
     process_chain: EditExtraProcessingWidget
 
 
@@ -156,6 +159,7 @@ class CopyFieldToFieldEditor(QWidget):
             "copy_if_empty": False,
             "copy_on_unfocus_when_edit": False,
             "copy_on_unfocus_when_add": False,
+            "copy_on_unfocus_trigger_field": "",
             "process_chain": [],
         }
         self.field_to_field_defs.append(new_definition)
@@ -182,18 +186,18 @@ class CopyFieldToFieldEditor(QWidget):
         )
         target_note_field_label = QLabel("<h3>Destination field (in the trigger note)</h3>")
         row_form.addRow(target_note_field_label, field_target_cbox)
-        self.update_one_field_target_cbox(field_target_cbox)
+        self.update_a_destination_field_target_cbox(field_target_cbox)
         with suppress(KeyError):
             field_target_cbox.setCurrentText(copy_field_to_field_definition["copy_into_note_field"])
             field_target_cbox.update_required_style()
 
-        across = self.copy_mode == COPY_MODE_ACROSS_NOTES
-        destination = self.across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES
         # Copy from field
         copy_from_text_label = QLabel(
-            "<h3>Source fields' (from the search) content that will replace the field</h3>"
+            # Default to within mode texts, these only need to be modifed in across mode
+            "<h3>Trigger note fields' content that will replace the field</h3>"
         )
-        notes_word = "source notes'" if destination else "destination note's" if across else "note"
+        across = self.copy_mode == COPY_MODE_ACROSS_NOTES
+        notes_word = "source notes'" if across else "note"
         copy_from_text_description = f"""<ul>
         <li>Reference any {notes_word} field with {intr_format('Field Name')}.</li>
         {f'''<li>Reference any destination fields with
@@ -225,8 +229,6 @@ class CopyFieldToFieldEditor(QWidget):
         copy_on_unfocus_when_edit = QCheckBox(
             "Copy on unfocusing the field when editing an existing note"
         )
-        copy_on_unfocus = QCheckBox("Copy on unfocusing the field in the note editor")
-        row_form.addRow("", copy_on_unfocus)
         row_form.addRow("", copy_on_unfocus_when_edit)
         with suppress(KeyError):
             copy_on_unfocus_when_edit.setChecked(
@@ -238,6 +240,22 @@ class CopyFieldToFieldEditor(QWidget):
         with suppress(KeyError):
             copy_on_unfocus_when_add.setChecked(
                 copy_field_to_field_definition.get("copy_on_unfocus_when_add", False)
+            )
+
+        # When copying from source to destination, the trigger field should be one of the
+        # trigger note's fields, so we'll need to show an extra checkbox to set that
+        copy_on_unfocus_trigger_field = MultiComboBox(
+            placeholder_text="First select a trigger note type",
+        )
+        copy_on_unfocus_trigger_label = QLabel("Copy on unfocus trigger field")
+        row_form.addRow(copy_on_unfocus_trigger_label, copy_on_unfocus_trigger_field)
+        # Options need to exist before we can set the initial text
+        if self.copy_mode == COPY_MODE_ACROSS_NOTES:
+            self.update_an_unfocus_trigger_field_cbox(copy_on_unfocus_trigger_field)
+            self.update_direction_labels(self.across_mode_direction)
+        with suppress(KeyError):
+            copy_on_unfocus_trigger_field.setCurrentText(
+                copy_field_to_field_definition["copy_on_unfocus_trigger_field"]
             )
 
         process_chain_widget = EditExtraProcessingWidget(
@@ -252,10 +270,13 @@ class CopyFieldToFieldEditor(QWidget):
             "copy_from_text_label": copy_from_text_label,
             "copy_from_text": copy_from_text_layout,
             "copy_if_empty": copy_if_empty,
+            "copy_on_unfocus_trigger_label": copy_on_unfocus_trigger_label,
+            "copy_on_unfocus_trigger_field": copy_on_unfocus_trigger_field,
             "copy_on_unfocus_when_edit": copy_on_unfocus_when_edit,
             "copy_on_unfocus_when_add": copy_on_unfocus_when_add,
             "process_chain": process_chain_widget,
         }
+
         row_form.addRow(process_chain_widget)
 
         # Remove
@@ -311,8 +332,15 @@ class CopyFieldToFieldEditor(QWidget):
                 "copy_on_unfocus_when_add": copy_on_unfocus_when_add.isChecked() and (
                     copy_on_unfocus_when_add.isEnabled()
                 ),
+                "copy_on_unfocus_trigger_field": copy_field_inputs[
+                    "copy_on_unfocus_trigger_field"
+                ].currentText(),
                 "process_chain": copy_field_inputs["process_chain"].get_process_chain(),
             }
+            print(
+                "copy_on_unfocus_trigger_field:"
+                f" {copy_field_definition['copy_on_unfocus_trigger_field']}"
+            )
             field_to_field_defs.append(copy_field_definition)
         return field_to_field_defs
 
@@ -323,18 +351,21 @@ class CopyFieldToFieldEditor(QWidget):
 
     def update_all_field_target_cboxes(self):
         for copy_field_inputs in self.copy_field_inputs:
-            self.update_one_field_target_cbox(copy_field_inputs["copy_into_note_field"])
+            self.update_a_destination_field_target_cbox(copy_field_inputs["copy_into_note_field"])
+            self.update_an_unfocus_trigger_field_cbox(
+                copy_field_inputs["copy_on_unfocus_trigger_field"]
+            )
             copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
 
-    def update_direction_labels(self, direction: DirectionType):
+    def update_direction_labels(self, direction: Optional[DirectionType]):
         self.across_mode_direction = direction
 
-        if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
-            copy_into_label_clarification = "a searched note"
-            copy_from_text_clarification = "from the trigger note"
-        else:
+        if self.across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES:
             copy_into_label_clarification = "in the trigger note"
             copy_from_text_clarification = "from the search"
+        else:
+            copy_into_label_clarification = "a searched note"
+            copy_from_text_clarification = "from the trigger note"
 
         new_copy_into_label = f"<h3>Destination field ({copy_into_label_clarification})</h3>"
         new_copy_from_text_label = (
@@ -351,14 +382,59 @@ class CopyFieldToFieldEditor(QWidget):
             copy_on_unfocus_when_add = cast(
                 QCheckBox, copy_field_inputs["copy_on_unfocus_when_add"]
             )
+            copy_on_unfocus_trigger_field = cast(
+                MultiComboBox, copy_field_inputs["copy_on_unfocus_trigger_field"]
+            )
             if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
                 copy_on_unfocus_when_add.setDisabled(True)
+                copy_on_unfocus_trigger_field.setDisabled(False)
             else:
                 copy_on_unfocus_when_add.setDisabled(False)
+                copy_on_unfocus_trigger_field.setDisabled(True)
+            self.update_unfocus_trigger_field_placeholder(copy_on_unfocus_trigger_field)
 
-    def update_one_field_target_cbox(self, field_target_cbox: GroupedComboBox):
+    def update_unfocus_trigger_field_placeholder(
+        self, unfocus_field_trigger_multibox: MultiComboBox
+    ):
         """
-        Updates the options in the "Note field to copy into" dropdown box.
+        Updates the placeholder text of the "Copy on unfocus trigger field" dropdown box.
+        """
+        if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+            if len(self.selected_copy_into_models) > 0:
+                unfocus_field_trigger_multibox.setPlaceholderText(
+                    "Select note fields of the trigger note that will trigger the copy"
+                )
+            else:
+                unfocus_field_trigger_multibox.setPlaceholderText(
+                    "First select a trigger note type"
+                )
+        else:
+            unfocus_field_trigger_multibox.setPlaceholderText("Not required in this mode")
+
+    def update_an_unfocus_trigger_field_cbox(self, unfocus_field_trigger_multibox: MultiComboBox):
+        """
+        Updates the options in the "Copy on unfocus trigger field" dropdown box with the
+        selected trigger note type's fields.
+        """
+        previous_text = unfocus_field_trigger_multibox.currentText()
+        unfocus_field_trigger_multibox.clear()
+        self.update_unfocus_trigger_field_placeholder(unfocus_field_trigger_multibox)
+        if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+            if len(self.selected_copy_into_models) == 1:
+                model = self.selected_copy_into_models[0]
+                unfocus_field_trigger_multibox.addItems(
+                    [f'"{field_name}"' for field_name in mw.col.models.field_names(model)]
+                )
+            elif len(self.selected_copy_into_models) > 1:
+                unfocus_field_trigger_multibox.addItems(
+                    [f'"{field_name}"' for field_name in self.intersecting_fields]
+                )
+        unfocus_field_trigger_multibox.setCurrentText(previous_text)
+        unfocus_field_trigger_multibox.set_popup_and_box_width()
+
+    def update_a_destination_field_target_cbox(self, field_target_cbox: GroupedComboBox):
+        """
+        Updates the options in the "Destination field" dropdown box.
         """
         previous_text = field_target_cbox.currentText()
         previous_text_in_new_options = False
