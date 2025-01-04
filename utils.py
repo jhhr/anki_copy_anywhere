@@ -6,6 +6,14 @@ from anki.cards import Card
 
 from aqt.qt import QFontMetrics, QComboBox
 
+from .configuration import (
+    CopyDefinition,
+    COPY_MODE_WITHIN_NOTE,
+    DIRECTION_DESTINATION_TO_SOURCES,
+    COPY_MODE_ACROSS_NOTES,
+    DIRECTION_SOURCE_TO_DESTINATIONS,
+)
+
 
 def add_dict_key_value(
     dict: dict,
@@ -122,3 +130,21 @@ def block_signals(*widgets):
     finally:
         for widget in widgets:
             widget.blockSignals(False)
+
+
+def definition_modifies_trigger_note(
+    copy_definition: CopyDefinition,
+) -> bool:
+    return (
+        copy_definition.get("copy_mode", None) == COPY_MODE_WITHIN_NOTE
+        or copy_definition.get("across_mode_direction", None) == DIRECTION_DESTINATION_TO_SOURCES
+    )
+
+
+def definition_modifies_other_notes(
+    copy_definition: CopyDefinition,
+) -> bool:
+    return (
+        copy_definition.get("copy_mode", None) == COPY_MODE_ACROSS_NOTES
+        and copy_definition.get("across_mode_direction", None) == DIRECTION_SOURCE_TO_DESTINATIONS
+    )

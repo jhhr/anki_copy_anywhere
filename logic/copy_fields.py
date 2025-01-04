@@ -1,12 +1,11 @@
 import base64
 import random
 import time
-from operator import itemgetter
 from typing import Callable, Union, Optional, Tuple, Sequence, Any
 
-from anki.cards import Card, CardId
 from anki.collection import Progress, OpChanges
-from anki.notes import Note
+from anki.cards import Card
+from anki.notes import Note, NoteId
 from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
@@ -168,59 +167,102 @@ class ProgressUpdater:
         self,
         start_time: float,
         definition_name: str,
-        total_cards_count: int,
+        total_notes_count: int,
         progrss_update_def: ProgressUpdateDef,
         is_across: bool,
     ):
         self.start_time = start_time
         self.definition_name = definition_name
-        self.total_cards_count = total_cards_count
+        self.total_notes_count = total_notes_count
         self.progress_update_def = progrss_update_def
         self.is_across = is_across
-        self.card_cnt = 0
+        self.note_cnt = 0
         self.total_processed_sources = 0
         self.total_processed_destinations = 0
 
     def update_counts(
         self,
-        card_cnt_inc: Optional[int] = None,
+        note_cnt_inc: Optional[int] = None,
         processed_sources_inc: Optional[int] = None,
         processed_destinations_inc: Optional[int] = None,
     ):
-        if card_cnt_inc is not None:
-            self.card_cnt += card_cnt_inc
+        if note_cnt_inc is not None:
+            self.note_cnt += note_cnt_inc
         if processed_sources_inc is not None:
             self.total_processed_sources += processed_sources_inc
         if processed_destinations_inc is not None:
             self.total_processed_destinations += processed_destinations_inc
 
     def get_counts(self) -> Tuple[int, int, int]:
-        return self.card_cnt, self.total_processed_sources, self.total_processed_destinations
+        return self.note_cnt, self.total_processed_sources, self.total_processed_destinations
 
     def render_update(self):
         elapsed_s = time.time() - self.start_time
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
         self.progress_update_def.label = f"""<strong>{self.definition_name}</strong>:
-        <br>Copied {self.card_cnt}/{self.total_cards_count} cards
+        <br>Copied {self.note_cnt}/{self.total_notes_count} notes
         <br><small>Notes processed - destinations: {self.total_processed_destinations}
             {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
         <br>Time: {elapsed_time}"""
-        if self.card_cnt / self.total_cards_count > 0.10 or elapsed_s > 5:
-            if self.card_cnt > 0:
-                eta_s = (elapsed_s / self.card_cnt) * (self.total_cards_count - self.card_cnt)
+        if self.note_cnt / self.total_notes_count > 0.10 or elapsed_s > 5:
+            if self.note_cnt > 0:
+                eta_s = (elapsed_s / self.note_cnt) * (self.total_notes_count - self.note_cnt)
                 eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
                 self.progress_update_def.label += f" - ETA: {eta}"
-        self.progress_update_def.value = self.card_cnt
-        self.progress_update_def.max_value = self.total_cards_count
+        self.progress_update_def.value = self.note_cnt
+        self.progress_update_def.max_value = self.total_notes_count
+
+
+def make_copy_fields_undo_text(
+    copy_definitions: list[CopyDefinition],
+    note_count: Optional[int] = None,
+    suffix: Optional[str] = "",
+) -> str:
+    """
+    Create an undo text for a copy fields operation
+    :param copy_definitions: The definitions of what to copy, includes process chains
+    :param note_count: The number of notes that will be copied into
+    :param suffix: A suffix to add to the undo text
+    :return: The undo text
+    """
+    if len(copy_definitions) == 1:
+        undo_text = f"Copy fields ({copy_definitions[0]['definition_name']})"
+    else:
+        undo_text = f"Copy fields with {len(copy_definitions)} definitions"
+
+    if note_count:
+        undo_text += f" for {note_count} notes"
+    if suffix:
+        undo_text += f" {suffix}"
+    return undo_text
 
 
 def copy_fields(
     copy_definitions: list[CopyDefinition],
-    card_ids=None,
-    card_ids_per_definition: Optional[list[Sequence[Union[int, CardId]]]] = None,
+    note_ids: Optional[Sequence[Union[int, NoteId]]] = None,
+    note_ids_per_definition: Optional[list[Sequence[Union[int, NoteId]]]] = None,
     parent=None,
+    field_only: Optional[str] = None,
+    undo_entry: Optional[int] = None,
+    undo_text_suffix: Optional[str] = "",
     is_sync: bool = False,
 ):
+    """
+    Run many copy definitions at once using CollectionOp. Includes fancy progress updates
+    :param copy_definitions: The definitions of what to copy
+    :param note_ids: The note ids to copy into, if None, all notes of the note type are copied into
+    :param note_ids_per_definition: An alternate of note_ids, a list of note ids to copy into for
+        each definition used by PickCopyDefinitionsDialog
+    :param parent: The parent widget
+    :param undo_entry: The undo entry to merge the changes into, if None, a custom entry
+        is created
+    :param field_only: Optional field to limit copying to. Used when copying is applied
+      in the note editor
+    :param undo_text_suffix: Optional suffix to add to the undo text.
+        Useless, if undo_entry is passed
+    :param is_sync: Whether this is a sync operation or not. Affects what notes are queried
+        and results reporting
+    """
     start_time = time.time()
     debug_texts = []
 
@@ -273,26 +315,25 @@ def copy_fields(
             progress_update_def.clear()
 
     def op(_) -> CacheResults:
-        copied_into_cards: list[Card] = []
-        if len(copy_definitions) == 1:
-            undo_text = f"Copy fields ({copy_definitions[0]['definition_name']})"
-            if card_ids:
-                undo_text += f" for {len(card_ids)} cards"
-        elif len(copy_definitions) > 1:
-            undo_text = f"Copying with {len(copy_definitions)} definitions"
-            total_card_count = None
-            if card_ids:
-                total_card_count = len(card_ids) * len(copy_definitions)
-            elif card_ids_per_definition:
-                total_card_count = sum(len(ids) for ids in card_ids_per_definition)
-            if total_card_count:
-                undo_text += f" for a {total_card_count} cards"
-            else:
-                undo_text += " for all possible target cards"
-        else:
+        if not copy_definitions:
             show_error_message("Error in copy fields: No definitions given")
             return CacheResults(result_text="", changes=None)
-        undo_entry = mw.col.add_custom_undo_entry(undo_text)
+
+        copied_into_cards: list[Card] = []
+        copied_into_notes: list[Note] = []
+        # If an undo_entry isn't passed, create one
+        nonlocal undo_entry
+        if undo_entry is None:
+            if note_ids is not None:
+                note_count = len(note_ids)
+            elif note_ids_per_definition is not None:
+                note_count = sum(len(ids) for ids in note_ids_per_definition)
+            undo_text = make_copy_fields_undo_text(
+                copy_definitions=copy_definitions,
+                note_count=note_count,
+                suffix=undo_text_suffix,
+            )
+            undo_entry = mw.col.add_custom_undo_entry(undo_text)
         results = CacheResults(
             result_text="",
             changes=mw.col.merge_undo_entries(undo_entry),
@@ -301,24 +342,28 @@ def copy_fields(
         for i, copy_definition in enumerate(copy_definitions):
             results = copy_fields_in_background(
                 copy_definition=copy_definition,
-                card_ids=(
-                    card_ids_per_definition[i] if card_ids_per_definition is not None else card_ids
+                note_ids=(
+                    note_ids_per_definition[i] if note_ids_per_definition is not None else note_ids
                 ),
                 show_message=show_error_message,
                 is_sync=is_sync,
                 copied_into_cards=copied_into_cards,
-                undo_entry=undo_entry,
+                copied_into_notes=copied_into_notes,
                 results=results,
                 progress_update_def=progress_update_def,
+                field_only=field_only,
             )
             if mw.progress.want_cancel():
                 break
-        for card in copied_into_cards:
-            write_custom_data(card, key="fc", value="1")
-            mw.col.update_card(card)
-            # undo_entry has to be updated after every undoable op or the last_step will
-            # increment causing an "target undo op not found" error!
+        if is_sync:
+            for card in copied_into_cards:
+                write_custom_data(card, key="fc", value="1")
+            mw.col.update_cards(copied_into_cards)
             results.changes = mw.col.merge_undo_entries(undo_entry)
+        # undo_entry has to be updated after every undoable op or the last_step will
+        # increment causing an "target undo op not found" error!
+        mw.col.update_notes(copied_into_notes)
+        results.changes = mw.col.merge_undo_entries(undo_entry)
         return results
 
     return (
@@ -336,48 +381,50 @@ def copy_fields(
 def copy_fields_in_background(
     copy_definition: CopyDefinition,
     copied_into_cards: list[Card],
-    undo_entry: int,
+    copied_into_notes: list[Note],
     results: CacheResults,
     progress_update_def: ProgressUpdateDef,
     is_sync: Optional[bool] = False,
-    card_ids: Optional[Sequence[int]] = None,
+    note_ids: Optional[Sequence[int]] = None,
+    field_only: Optional[str] = None,
     show_message: Optional[Callable[[str], None]] = None,
 ) -> CacheResults:
     """
     Function run to copy stuff into many notes at once.
     :param copy_definition: The definition of what to copy, includes process chains
     :param copied_into_cards: An initially empty list of cards that will be appended to with the
-        cards that were copied into
+        cards of the notes that were copied into
+    :param copied_into_notes: An initially empty list of notes that will be appended to with the
+        notes that were copied into
     :param undo_entry: The undo entry to merge the changes into
     :param results: The results object to update with the final result text
     :param progress_update_def: The progress update object to update the progress bar with
-    :param card_ids: The card ids to copy into. this would replace the copy_into_field from
-       the copy_definition
+    :param note_ids: The note ids to copy into, if None, all notes of the note type are copied into
+    :param field_only: Optional field to limit copying to. Used when copying is applied
+      in the note editor
     :param show_message: Function to show error messages
     :param is_sync: Whether this is a sync operation or not
     :return: the CacheResults object passed as results
     """
-    (copy_into_note_types, definition_name) = itemgetter("copy_into_note_types", "definition_name")(
-        copy_definition
-    )
+    copy_into_note_types = copy_definition.get("copy_into_note_types", None)
+    definition_name = copy_definition.get("definition_name", "")
 
     start_time = time.time()
 
-    card_cnt = 0
+    note_cnt = 0
     debug_text = ""
     if not show_message:
 
         def show_error_message(message: str):
             nonlocal debug_text
-            debug_text += f"<br/>{card_cnt}--{message}"
+            debug_text += f"<br/>{note_cnt}--{message}"
             print(message)
 
     else:
 
         def show_error_message(message: str):
-            show_message(f"\n{card_cnt}--{message}")
+            show_message(f"\n{note_cnt}--{message}")
 
-    # Get from_note_type_id either directly or through copy_into_note_types
     if copy_into_note_types is None:
         show_error_message(
             f"""Error in copy fields: Note type for copy_into_note_types '{copy_into_note_types}'
@@ -387,47 +434,52 @@ def copy_fields_in_background(
 
     # Split by comma and remove the first wrapping " but keeping the last one
     note_type_names = copy_into_note_types.strip('""').split('", "')
-    note_type_ids = filter(None, [mw.col.models.id_for_name(name) for name in note_type_names])
-
-    multiple_note_types = len(note_type_names) > 1
-    fc_query = "AND json_extract(json_extract(c.data, '$.cd'), '$.fc') = 0" if is_sync else ""
-
-    if card_ids is not None and len(card_ids) > 0:
-        # Filter card_ids further into only the cards of the note type
-        cids_query = f"AND c.id IN {ids2str(card_ids)}"
-    elif card_ids is None:
-        # Get all cards of the note type
-        cids_query = ""
-    else:
-        # This is an error. If card_ids is an empty list, we won't do anything
-        # To copy into all cards card_ids should explicitly be None
-        return results
+    note_type_ids = list(
+        filter(None, [mw.col.models.id_for_name(name) for name in note_type_names])
+    )
 
     assert mw.col.db is not None
 
-    filtered_card_ids = mw.col.db.list(f"""
-            SELECT c.id
-            FROM cards c, notes n
-            WHERE n.mid IN {ids2str(note_type_ids)}
-            AND c.nid = n.id
-            {cids_query}
-            {fc_query}
-            """)
+    nids_query = f"AND n.id IN {ids2str(note_ids)}" if note_ids is not None else ""
+    notes = [
+        mw.col.get_note(nid)
+        for nid in mw.col.db.list(
+            # When syncing, only copy into notes that have been been flagged for a field change
+            # in the custom scheduler by setting the field changed flag to 1
+            # and filter by any given note_ids
+            f"""
+        SELECT n.id
+        FROM notes n, cards c
+        WHERE n.mid IN {ids2str(note_type_ids)}
+        AND c.nid = n.id
+        AND json_extract(json_extract(c.data, '$.cd'), '$.fc') = 0
+        {nids_query}
+        """
+            if is_sync
+            # Otherwise, copy into all notes and filter by any given note_ids
+            else f"""
+        SELECT n.id
+        FROM notes n
+        WHERE n.mid IN {ids2str(note_type_ids)}
+        {nids_query}
+        """
+        )
+    ]
 
-    if not is_sync and len(filtered_card_ids) == 0:
+    if not is_sync and len(notes) == 0:
+        # When syncing, it's normal to get zero results if no cards have been reviewed
         show_error_message(
-            f"Error in copy fields: Did not find any cards of note type(s) {copy_into_note_types}"
+            f"Error in copy fields: Did not find any notes of note type(s) {copy_into_note_types}"
         )
         return results
 
-    cards = [mw.col.get_card(card_id) for card_id in filtered_card_ids]
-    total_cards_count = len(cards)
+    total_notes_count = len(notes)
     is_across = copy_definition["copy_mode"] == COPY_MODE_ACROSS_NOTES
 
     progress_updater = ProgressUpdater(
         start_time=start_time,
         definition_name=definition_name,
-        total_cards_count=total_cards_count,
+        total_notes_count=total_notes_count,
         progrss_update_def=progress_update_def,
         is_across=is_across,
     )
@@ -439,29 +491,24 @@ def copy_fields_in_background(
 
     total_processed_sources = 0
     total_processed_destinations = 0
-    for card in cards:
-        if card_cnt % 10 == 0 and card_cnt > 0:
-            progress_updater.render_update()
+    for note in notes:
+        progress_updater.render_update()
 
-        card_cnt += 1
-
-        copy_into_note = card.note()
+        note_cnt += 1
 
         success = copy_for_single_trigger_note(
             copy_definition=copy_definition,
-            trigger_note=copy_into_note,
-            results=results,
-            undo_entry=undo_entry,
-            deck_id=card.odid or card.did,
-            multiple_note_types=multiple_note_types,
+            trigger_note=note,
+            copied_into_notes=copied_into_notes,
+            field_only=field_only,
             show_error_message=show_error_message,
             file_cache=file_cache,
             progress_updater=progress_updater,
         )
 
-        progress_updater.update_counts(card_cnt_inc=1)
+        progress_updater.update_counts(note_cnt_inc=1)
 
-        copied_into_cards.append(card)
+        copied_into_cards.extend(note.cards())
 
         if mw.progress.want_cancel():
             break
@@ -471,13 +518,13 @@ def copy_fields_in_background(
 
     # When syncing, don't show a pointless message that nothing was done
     # Otherwise, when copy fields is run manually, you want to know the result in any case
-    should_report_result = len(cards) > 0 if is_sync else True
+    should_report_result = len(notes) > 0 if is_sync else True
     if should_report_result:
         #  Get counts from ProgressUpdater and render the final update
         _, total_processed_sources, total_processed_destinations = progress_updater.get_counts()
         results.add_result_text(f"""<br><span>
-            {time.time() - start_time:.2f}s - 
-            <i>{copy_definition['definition_name']}:</i> 
+            {time.time() - start_time:.2f}s -
+            <i>{copy_definition['definition_name']}:</i>
             {total_processed_destinations} destinations
             {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
         </span>""")
@@ -559,11 +606,9 @@ def apply_process_chain(
 def copy_for_single_trigger_note(
     copy_definition: CopyDefinition,
     trigger_note: Note,
-    results: Optional[CacheResults] = None,
-    undo_entry: Optional[int] = None,
+    copied_into_notes: Optional[list[Note]] = None,
     field_only: Optional[str] = None,
     deck_id: Optional[int] = None,
-    multiple_note_types: bool = False,
     show_error_message: Optional[Callable[[str], None]] = None,
     file_cache: Optional[dict] = None,
     progress_updater: Optional[ProgressUpdater] = None,
@@ -572,14 +617,15 @@ def copy_for_single_trigger_note(
     Copy fields into a single note
     :param copy_definition: The definition of what to copy, includes process chains
     :param trigger_note: Note that triggered this copy or was targeted otherwise
-    :param results: The results object to update the changes with
-    :param undo_entry: The undo entry to merge the changes into
+    :param copied_into_notes: A list of notes that were copied into, to be appended to
+        with the destination notes. Can be omitted, if it's not necessary to run
+        mw.col.update_notes(copied_into_notes) after the operation
     :param field_only: Optional field to limit copying to. Used when copying is applied
       in the note editor
     :param deck_id: Deck ID where the cards are going into, only needed when adding
       a note since cards don't exist yet. Otherwise, the deck_ids are checked from the cards
       of the note
-    :param multiple_note_types: Whether the copy is into multiple note types
+    :param is_note_editor: Whether copy fields is being triggered in the note editor
     :param show_error_message: Optional function to show error messages
     :param file_cache: A dictionary to cache opened files' content
     :param progress_updater: Optional object to update the progress bar
@@ -599,6 +645,10 @@ def copy_for_single_trigger_note(
     select_card_separator = copy_definition.get("select_card_separator", None)
     copy_mode = copy_definition.get("copy_mode", None)
     across_mode_direction = copy_definition.get("across_mode_direction", None)
+
+    copy_into_note_types = copy_definition.get("copy_into_note_types", "")
+    note_type_names = copy_into_note_types.strip('""').split('", "')
+    multiple_note_types = len(note_type_names) > 1
 
     extra_state: dict[str, Any] = {}
 
@@ -670,14 +720,8 @@ def copy_for_single_trigger_note(
                 processed_destinations_inc=1,
             )
             progress_updater.render_update()
-        mw.col.update_note(destination_note)
-        # undo_entry has to be updated after every undoable op or the last_step will
-        # increment causing an "target undo op not found" error!
-        changes = None
-        if undo_entry is not None:
-            changes = mw.col.merge_undo_entries(undo_entry)
-        if results is not None and changes is not None:
-            results.changes = changes
+        if copied_into_notes is not None:
+            copied_into_notes.append(destination_note)
         if not success:
             return False
 

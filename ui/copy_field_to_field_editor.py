@@ -77,7 +77,8 @@ class FieldInputsDict(TypedDict):
     copy_from_text_label: QLabel
     copy_from_text: InterpolatedTextEditLayout
     copy_if_empty: QCheckBox
-    copy_on_unfocus: QCheckBox
+    copy_on_unfocus_when_edit: QCheckBox
+    copy_on_unfocus_when_add: QCheckBox
     process_chain: EditExtraProcessingWidget
 
 
@@ -153,7 +154,8 @@ class CopyFieldToFieldEditor(QWidget):
             "copy_into_note_field": "",
             "copy_from_text": "",
             "copy_if_empty": False,
-            "copy_on_unfocus": False,
+            "copy_on_unfocus_when_edit": False,
+            "copy_on_unfocus_when_add": False,
             "process_chain": [],
         }
         self.field_to_field_defs.append(new_definition)
@@ -191,13 +193,9 @@ class CopyFieldToFieldEditor(QWidget):
         copy_from_text_label = QLabel(
             "<h3>Source fields' (from the search) content that will replace the field</h3>"
         )
-        copy_from_text_layout = InterpolatedTextEditLayout(
-            is_required=True,
-            label=copy_from_text_label,
-            options_dict=get_new_base_dict(self.copy_mode),
-            description=f"""<ul>
-        <li>Reference any {"source notes'" if destination else "destination note's" if across else "note"} field with
-            {intr_format('Field Name')}.</li>
+        notes_word = "source notes'" if destination else "destination note's" if across else "note"
+        copy_from_text_description = f"""<ul>
+        <li>Reference any {notes_word} field with {intr_format('Field Name')}.</li>
         {f'''<li>Reference any destination fields with
             {intr_format(f'{DESTINATION_PREFIX}Field Name')}, including the current target</li>
         <li>Referencing the destination field by name will use the value from the source
@@ -205,7 +203,12 @@ class CopyFieldToFieldEditor(QWidget):
         <li>Right-click to select a {intr_format('Field Name')} to paste</li>
         <li>There are many other data values you can use, such as the
             {intr_format(NOTE_ID)}, {intr_format(CARD_IVL)}, {intr_format(CARD_TYPE)} etc.</li>
-        </ul>""",
+        </ul>"""
+        copy_from_text_layout = InterpolatedTextEditLayout(
+            is_required=True,
+            label=copy_from_text_label,
+            options_dict=get_new_base_dict(self.copy_mode),
+            description=copy_from_text_description,
         )
 
         row_form.addRow(copy_from_text_layout)
@@ -219,10 +222,23 @@ class CopyFieldToFieldEditor(QWidget):
         with suppress(KeyError):
             copy_if_empty.setChecked(copy_field_to_field_definition["copy_if_empty"])
 
+        copy_on_unfocus_when_edit = QCheckBox(
+            "Copy on unfocusing the field when editing an existing note"
+        )
         copy_on_unfocus = QCheckBox("Copy on unfocusing the field in the note editor")
         row_form.addRow("", copy_on_unfocus)
+        row_form.addRow("", copy_on_unfocus_when_edit)
         with suppress(KeyError):
-            copy_on_unfocus.setChecked(copy_field_to_field_definition.get("copy_on_unfocus", False))
+            copy_on_unfocus_when_edit.setChecked(
+                copy_field_to_field_definition.get("copy_on_unfocus_when_edit", False)
+            )
+
+        copy_on_unfocus_when_add = QCheckBox("Copy on unfocusing the field when adding a new note")
+        row_form.addRow("", copy_on_unfocus_when_add)
+        with suppress(KeyError):
+            copy_on_unfocus_when_add.setChecked(
+                copy_field_to_field_definition.get("copy_on_unfocus_when_add", False)
+            )
 
         process_chain_widget = EditExtraProcessingWidget(
             self,
@@ -236,7 +252,8 @@ class CopyFieldToFieldEditor(QWidget):
             "copy_from_text_label": copy_from_text_label,
             "copy_from_text": copy_from_text_layout,
             "copy_if_empty": copy_if_empty,
-            "copy_on_unfocus": copy_on_unfocus,
+            "copy_on_unfocus_when_edit": copy_on_unfocus_when_edit,
+            "copy_on_unfocus_when_add": copy_on_unfocus_when_add,
             "process_chain": process_chain_widget,
         }
         row_form.addRow(process_chain_widget)
@@ -250,7 +267,7 @@ class CopyFieldToFieldEditor(QWidget):
             for widget in [
                 field_target_cbox,
                 copy_if_empty,
-                copy_on_unfocus,
+                copy_on_unfocus_when_edit,
                 remove_button,
                 process_chain_widget,
             ]:
@@ -281,11 +298,19 @@ class CopyFieldToFieldEditor(QWidget):
         """
         field_to_field_defs = []
         for copy_field_inputs in self.copy_field_inputs:
+            copy_on_unfocus_when_add = cast(
+                QCheckBox, copy_field_inputs["copy_on_unfocus_when_add"]
+            )
             copy_field_definition = {
                 "copy_into_note_field": copy_field_inputs["copy_into_note_field"].currentText(),
                 "copy_from_text": copy_field_inputs["copy_from_text"].get_text(),
                 "copy_if_empty": copy_field_inputs["copy_if_empty"].isChecked(),
-                "copy_on_unfocus": copy_field_inputs["copy_on_unfocus"].isChecked(),
+                "copy_on_unfocus_when_edit": copy_field_inputs[
+                    "copy_on_unfocus_when_edit"
+                ].isChecked(),
+                "copy_on_unfocus_when_add": copy_on_unfocus_when_add.isChecked() and (
+                    copy_on_unfocus_when_add.isEnabled()
+                ),
                 "process_chain": copy_field_inputs["process_chain"].get_process_chain(),
             }
             field_to_field_defs.append(copy_field_definition)
@@ -305,11 +330,11 @@ class CopyFieldToFieldEditor(QWidget):
         self.across_mode_direction = direction
 
         if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
-            copy_into_label_clarification = "in the trigger note"
-            copy_from_text_clarification = "from the search"
-        else:
             copy_into_label_clarification = "a searched note"
             copy_from_text_clarification = "from the trigger note"
+        else:
+            copy_into_label_clarification = "in the trigger note"
+            copy_from_text_clarification = "from the search"
 
         new_copy_into_label = f"<h3>Destination field ({copy_into_label_clarification})</h3>"
         new_copy_from_text_label = (
@@ -322,6 +347,14 @@ class CopyFieldToFieldEditor(QWidget):
             target_note_field_label.setText(new_copy_into_label)
             copy_from_text_label = cast(QLabel, copy_field_inputs["copy_from_text_label"])
             copy_from_text_label.setText(new_copy_from_text_label)
+            # Copy on unfocus when adding is not allowed when source to destination, disable it
+            copy_on_unfocus_when_add = cast(
+                QCheckBox, copy_field_inputs["copy_on_unfocus_when_add"]
+            )
+            if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+                copy_on_unfocus_when_add.setDisabled(True)
+            else:
+                copy_on_unfocus_when_add.setDisabled(False)
 
     def update_one_field_target_cbox(self, field_target_cbox: GroupedComboBox):
         """

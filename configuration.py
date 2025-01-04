@@ -138,7 +138,8 @@ class CopyFieldToField(TypedDict):
     copy_into_note_field: str
     copy_from_text: str
     copy_if_empty: bool
-    copy_on_unfocus: bool
+    copy_on_unfocus_when_edit: bool
+    copy_on_unfocus_when_add: bool
     process_chain: Sequence[AnyProcess]
 
 
@@ -197,7 +198,7 @@ class Config:
     def copy_definitions(self):
         return self.data["copy_definitions"] or []
 
-    def get_definition_by_name(self, name) -> Union[dict, None]:
+    def get_definition_by_name(self, name) -> Union[CopyDefinition, None]:
         # find the definition in the list of definitions
         for definition in self.data["copy_definitions"]:
             if definition["definition_name"] == name:
