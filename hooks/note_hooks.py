@@ -1,7 +1,6 @@
 from typing import Union, Tuple
 from anki.hooks import (
     note_will_be_added,
-    # note_will_flush,
 )
 from anki.cards import Card
 from anki.notes import Note, NoteId
@@ -13,7 +12,11 @@ from aqt.gui_hooks import (
     editor_did_load_note,
 )
 
-from ..utils import write_custom_data, definition_modifies_other_notes
+from ..utils import (
+    write_custom_data,
+    definition_modifies_other_notes,
+    definition_modifies_trigger_note,
+)
 from ..configuration import (
     Config,
     CopyDefinition,
@@ -25,7 +28,7 @@ from ..logic.copy_fields import (
 )
 
 
-def get_copy_definitions_for_add_note(note: Note, deck_id) -> list[CopyDefinition]:
+def get_copy_definitions_for_add_note(note: Note) -> list[CopyDefinition]:
     config = Config()
     config.load()
     note_type = note.note_type()
@@ -53,72 +56,36 @@ def get_copy_definitions_for_add_note(note: Note, deck_id) -> list[CopyDefinitio
     return copy_definitions
 
 
-# def make_deferred_copy_defs_tag(deck_id: int, definitions: list[CopyDefinition]) -> str:
-#     definition_names = [d["definition_name"] for d in definitions]
-#     return f"__deferred_copy_defs::{deck_id}::{':|:'.join(definition_names)}"
-
-
-# def get_deferred_copy_defs_tag(note: Note) -> Union[Tuple[int, list[str], str], None]:
-#     for tag in note.tags:
-#         if tag.startswith("__deferred_copy_defs"):
-#             _, deck_id, definition_names_str = tag.split("::")
-#             definition_names = definition_names_str.split(":")
-#             return int(deck_id), definition_names, tag
-#     return None
-
-
-def run_copy_fields_on_add(note: Note, deck_id: int):
+def run_copy_fields_on_will_add_note(note: Note, deck_id: int):
     """
     Copy fields when a note is about to be added. This applies to notes being added
     by AnkiConnect or the Add cards dialog. Because the note is not yet added to the
     database, we can't get the note ID, so we can't copy fields that affect other notes.
     """
-    config = Config()
-    config.load()
+    definitions_editing_new_note = list(
+        filter(definition_modifies_trigger_note, get_copy_definitions_for_add_note(note))
+    )
 
-    note_type = note.note_type()
-    if not note_type:
-        # Error situation, note_type should exist when adding note
-        return
-    note_type_name = note_type["name"]
-
-    # Copy definitions that affect other notes need an undo entry as we want to be able to undo
-    editing_other_notes_definitions: list[CopyDefinition] = []
-
-    for copy_definition in config.copy_definitions:
-        copy_on_add = copy_definition.get("copy_on_add", False)
-        if not copy_on_add:
-            continue
-        copy_into_note_types = copy_definition.get("copy_into_note_types", None)
-        if not copy_into_note_types:
-            continue
-        # Split note_types by comma
-        note_type_names = copy_into_note_types.strip('""').split('", "')
-        if note_type_name not in note_type_names:
-            continue
-
-        # If this definition modifies other notes, we need to defer it until the note is added
-        if definition_modifies_other_notes(copy_definition):
-            editing_other_notes_definitions.append(copy_definition)
-            continue
+    # Run the definitions that only modify the new note, no undo entry needed
+    copied_into_notes: list[Note] = []
+    for copy_definition in definitions_editing_new_note:
         copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
+            copied_into_notes=copied_into_notes,
             deck_id=deck_id,
         )
 
-    if not editing_other_notes_definitions:
-        return
 
-    # Add a tag to the note to indicate that we have deferred copy definitions
-    # This tag will be removed in on_note_will_flush
-    # note.add_tag(make_deferred_copy_defs_tag(deck_id, editing_other_notes_definitions))
-
+def run_copy_fields_on_added_note(note: Note):
+    definitions_editing_new_note = list(
+        filter(definition_modifies_other_notes, get_copy_definitions_for_add_note(note))
+    )
     # Run the definitions that affect other notes with an undo entry created
     # Thus the changes on other notes can be undone while the changes on the new note
     # will remain, as that seems more user-friendly.
     copied_into_notes: list[Note] = []
-    for copy_definition in editing_other_notes_definitions:
+    for copy_definition in definitions_editing_new_note:
         # Can't use copy_fields here as it'd lead to a
         # "bug: run_in_background not called from main thread" exception
         # TODO: non CollectionOp version of copy_fields
@@ -126,93 +93,15 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
             copy_definition=copy_definition,
             trigger_note=note,
             copied_into_notes=copied_into_notes,
-            deck_id=deck_id,
         )
     undo_text = make_copy_fields_undo_text(
-        copy_definitions=editing_other_notes_definitions,
+        copy_definitions=definitions_editing_new_note,
         note_count=1,
         suffix="triggered by adding note",
     )
-    # Unfortunately, note_will_be_added is called *before* the note is actually added so after
-    # this undo entry will come the "Add Note" undo entry. This is not ideal, but it's the most
-    # reliable thing do while a note_was_added hook doesn't exist.
-    #
-    # Other altenatives would be to add a flag to new notes and run the deferred copy definitions
-    # on syncing but that seems less user-friendly.
     undo_entry = mw.col.add_custom_undo_entry(undo_text)
     mw.col.update_notes(copied_into_notes)
     mw.col.merge_undo_entries(undo_entry)
-
-
-# This approach doesn't work when col.add_note is called by AnkiConnect. When AnkiConnect adds a
-# note, a call tonote_will_flush after the "Add Note" undo entry is created does not happen like it
-# does when adding a note from the Add Note dialog. So, it seems the note_will_flush hook is not a
-# reliable way to get a point in the process where the "Add Note" undo entry has been created.
-# def on_note_will_flush(note: Note):
-#     """
-#     Run deferred copy definitions when a note is about to be flushed
-#     This is a hack to avoid the problem where creating a custom undo entry results in that the
-#     undo entry being *before* the Add note undo entyr.
-
-#     Likely a user would expect that after undoing the Add note, whatever stuff is done on adding
-#     a note would be undone by undoing the Add note or there'd be a separate undo entry for it.
-
-#     The way this works is that mw.col.add_note() calls note._to_backend_note() which calls the
-#     note_will_flush hook. At that point the "Add Note" undo entry will have been created so we can
-#     either merge into it or create a new undo entry that will be *after* the "Add Note" undo
-#     entry.
-#     """
-#     undo_status = mw.col.undo_status()
-#     print(
-#       f"note_will_flush note.id: {note.id}, note.tags: {note.tags}, undo_status: {undo_status}"
-#     )
-#     if not (note.id == 0 and undo_status.undo == "Add Note"):
-#         # We need to determine, if this is a new note being added or not.
-#         #
-#         # Note.id == 0 means it's a new note being added, however this hooks gets called for edits
-#         # done in the Add Note editor as well, so that doesn't suffice.
-#         #
-#         # By checking, if the "Add Note" undo entry is the last one, we can know that this is now
-#         # the call of _to_backend_note() after col.add_note()
-#         return
-
-#     # Then check, if the note has the deferred copy definitions tag
-#     deferred = get_deferred_copy_defs_tag(note)
-#     if not deferred:
-#         return
-#     deck_id, definition_names, tag = deferred
-#     print(f"note_will_flush deferred copy definitions: {definition_names}")
-#     # Get the definitions
-#     config = Config()
-#     config.load()
-#     editing_other_notes_definitions = list(
-#         filter(None, [config.get_definition_by_name(name) for name in definition_names])
-#     )
-#     # Run the deferred copy definitions
-#     copied_into_notes: list[Note] = []
-#     for copy_definition in editing_other_notes_definitions:
-#         # Can't use copy_fields here as it'd lead to a
-#         # "bug: run_in_background not called from main thread" exception
-#         # TODO: non CollectionOp version of copy_fields
-#         copy_for_single_trigger_note(
-#             copy_definition=copy_definition,
-#             trigger_note=note,
-#             copied_into_notes=copied_into_notes,
-#             deck_id=deck_id,
-#         )
-#     # # Make custom undo entry
-#     # undo_text = make_copy_fields_undo_text(
-#     #     copy_definitions=editing_other_notes_definitions,
-#     #     note_count=1,
-#     #     suffix="triggered by adding note",
-#     # )
-#     # undo_entry = mw.col.add_custom_undo_entry(undo_text)
-#     # Merge into the "Add Note" undo entry
-#     undo_entry = undo_status.last_step
-#     mw.col.update_notes(copied_into_notes)
-#     mw.col.merge_undo_entries(undo_entry)
-#     # Remove the tag, otherwise it would remain in the Add note editor
-#     note.remove_tag(tag)
 
 
 def run_copy_fields_on_review(card: Card):
@@ -274,7 +163,7 @@ def on_editor_did_load_note(editor: Editor):
     unfocus_field hook.
     """
     global editor_for_note_id
-    editor_for_note_id[editor.editorMode] = editor, editor.note.id if editor.note else NoteId(0)
+    editor_for_note_id[editor.editorMode] = editor, (editor.note.id if editor.note else NoteId(0))
 
 
 def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_idx: int) -> bool:
@@ -378,7 +267,9 @@ def run_copy_fields_on_unfocus_field(changed: bool, note: Note, field_idx: int) 
 
 def init_note_hooks():
     editor_did_load_note.append(on_editor_did_load_note)
-    note_will_be_added.append(lambda _col, note, deck_id: run_copy_fields_on_add(note, deck_id))
+    note_will_be_added.append(
+        lambda _col, note, deck_id: run_copy_fields_on_will_add_note(note, deck_id)
+    )
+    note_added.append(lambda _col, note: run_copy_fields_on_added_note(note))
     reviewer_did_answer_card.append(lambda reviewer, card, ease: run_copy_fields_on_review(card))
     editor_did_unfocus_field.append(run_copy_fields_on_unfocus_field)
-    # note_will_flush.append(on_note_will_flush)
