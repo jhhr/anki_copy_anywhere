@@ -49,6 +49,7 @@ from ..logic.interpolate_fields import (
     NOTE_ID,
     CARD_IVL,
     CARD_TYPE,
+    TARGET_NOTES_COUNT,
     intr_format,
 )
 
@@ -59,6 +60,10 @@ def get_variable_names_from_copy_definition(
     variable_menu_dict: dict[str, str] = {}
     if copy_definition is None:
         return variable_menu_dict
+    # Always include the target notes count variable as it will be generated
+    # in any across notes mode copy operation
+    if copy_definition.get("copy_mode") == COPY_MODE_ACROSS_NOTES:
+        variable_menu_dict[TARGET_NOTES_COUNT] = intr_format(TARGET_NOTES_COUNT)
     for variable_def in copy_definition.get("field_to_variable_defs", []):
         variable_name = variable_def["copy_into_variable"]
         if variable_name is not None:

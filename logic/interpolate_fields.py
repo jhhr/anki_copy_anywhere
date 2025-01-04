@@ -1,7 +1,7 @@
 import re
 import time
 from functools import partial
-from typing import Tuple, Union, List, Optional, Callable, Sequence
+from typing import Tuple, Union, List, Optional, Callable, Sequence, cast
 
 from anki.cards import Card, CardId
 
@@ -43,6 +43,7 @@ NOTE_VALUES = [
 NOTE_VALUE_DICT = {key: None for key in NOTE_VALUES}
 
 VARIABLES_KEY = "__Variables"
+TARGET_NOTES_COUNT = "__Target_Notes_Count"
 
 DESTINATION_CARDS_DATA_KEY = "__Destination_Card_Data"
 CARD_ID = "__Card_ID"
@@ -257,7 +258,7 @@ def get_card_last_reps(
             ["ease" if get_ease else "", "ivl" if get_ivl else "", "factor" if get_fct else ""],
         )
     )
-    reps = mw.col.db.list(f"""SELECT 
+    reps = mw.col.db.list(f"""SELECT
                 {select_cols}
                 FROM revlog
                 WHERE cid = {card_id}
@@ -394,7 +395,7 @@ def get_from_note_fields(
     note_fields: dict,
     card_values_dict: Optional[CardValuesDict] = None,
     multiple_note_types: bool = False,
-) -> Tuple[Union[str, None], Union[dict, None]]:
+) -> Tuple[Union[JSONSerializableValue, None], Union[CardValuesDict, None]]:
     """
     Get a value from a note, source or destination. The note's fields or its cards' fields.
     :param field: interpolation field key
@@ -425,7 +426,7 @@ def get_from_note_fields(
             if isinstance(value_or_partial, partial):
                 value = value_or_partial(maybe_note_value_arg)
             else:
-                value = value_or_partial
+                value = cast(JSONSerializableValue, value_or_partial)
             return value, card_values_dict
     # And last, cards are harder since they need to specify the card type name too
     card_match = (
@@ -468,7 +469,7 @@ def get_from_note_fields(
                 if isinstance(value_or_partial, partial):
                     value = value_or_partial(maybe_card_value_arg)
                 else:
-                    value = value_or_partial
+                    value = cast(JSONSerializableValue, value_or_partial)
                 return value, card_values_dict
     # If we get here, the field is invalid
     return None, card_values_dict

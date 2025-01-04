@@ -22,7 +22,7 @@ from aqt.utils import tooltip
 
 from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
-from .interpolate_fields import interpolate_from_text
+from .interpolate_fields import interpolate_from_text, TARGET_NOTES_COUNT
 from .kana_highlight_process import kana_highlight_process
 from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
@@ -688,6 +688,7 @@ def copy_for_single_trigger_note(
             show_error_message=show_error_message,
             variable_values_dict=variable_values_dict,
         )
+        variable_values_dict[TARGET_NOTES_COUNT] = len(target_notes)
         if across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES:
             destination_notes = [trigger_note]
             source_notes = target_notes
@@ -811,7 +812,7 @@ def get_variable_values_for_note(
     note: Note,
     file_cache: Optional[dict] = None,
     show_error_message: Optional[Callable[[str], None]] = None,
-) -> Union[dict, None]:
+) -> dict:
     """
     Get the values for the variables from the note
     :param field_to_variable_defs: The definitions of the variables to get
@@ -852,7 +853,7 @@ def get_variable_values_for_note(
                 file_cache=file_cache,
             )
             if interpolated_value is None:
-                return None
+                return {}
 
         variable_values_dict[copy_into_variable] = interpolated_value
 
