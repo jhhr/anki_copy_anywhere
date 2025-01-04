@@ -640,6 +640,7 @@ def copy_for_single_trigger_note(
     field_to_variable_defs = copy_definition.get("field_to_variable_defs", [])
     only_copy_into_decks = copy_definition.get("only_copy_into_decks", None)
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
+    sort_by_field = copy_definition.get("sort_by_field", None)
     select_card_by = copy_definition.get("select_card_by", None)
     select_card_count = copy_definition.get("select_card_count", None)
     select_card_separator = copy_definition.get("select_card_separator", None)
@@ -680,6 +681,7 @@ def copy_for_single_trigger_note(
             trigger_note=trigger_note,
             deck_id=deck_id,
             extra_state=extra_state,
+            sort_by_field=sort_by_field,
             only_copy_into_decks=only_copy_into_decks,
             select_card_by=select_card_by,
             select_card_count=select_card_count,
@@ -857,11 +859,26 @@ def get_variable_values_for_note(
     return variable_values_dict
 
 
+def int_sort_by_field_value(note: Note, sort_by_field) -> int:
+    try:
+        return int(note[sort_by_field])
+    except ValueError:
+        return 0
+
+
+def sort_by_field_value(note: Note, sort_by_field) -> Any:
+    try:
+        return note[sort_by_field]
+    except KeyError:
+        return ""
+
+
 def get_across_target_notes(
     copy_from_cards_query: str,
     trigger_note: Note,
     extra_state: dict,
     select_card_by: Optional[SelectCardByType] = "Random",
+    sort_by_field: Optional[str] = None,
     deck_id: Optional[int] = None,
     variable_values_dict: Optional[dict] = None,
     only_copy_into_decks: Optional[str] = None,
@@ -964,6 +981,13 @@ def get_across_target_notes(
         )
         return []
 
+    has_sort_by_field = sort_by_field and sort_by_field != "-"
+
+    def sort_notes(notes: list[Note]):
+        if has_sort_by_field:
+            notes.sort(key=lambda n: int_sort_by_field_value(n, sort_by_field), reverse=True)
+        return notes
+
     assert mw.col.db is not None
     db = mw.col.db
     # zero is a special value that means all cards
@@ -971,7 +995,7 @@ def get_across_target_notes(
         distinct_note_ids = db.list(
             f"SELECT DISTINCT nid FROM cards c WHERE c.id IN {ids2str(card_ids)}"
         )
-        return [mw.col.get_note(note_id) for note_id in distinct_note_ids]
+        return sort_notes([mw.col.get_note(note_id) for note_id in distinct_note_ids])
 
     # select a card or cards based on the select_card_by value
     selected_notes = []
@@ -1022,7 +1046,7 @@ def get_across_target_notes(
         if len(card_ids) == 0:
             break
 
-    return selected_notes
+    return sort_notes(selected_notes)
 
 
 def get_field_values_from_notes(

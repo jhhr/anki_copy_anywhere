@@ -39,6 +39,7 @@ from .copy_field_to_field_editor import (
     get_variable_names_from_copy_definition,
 )
 from .field_to_variable_editor import CopyFieldToVariableEditor
+from .grouped_combo_box import GroupedComboBox
 from .interpolated_text_edit import InterpolatedTextEditLayout
 from .required_combobox import RequiredCombobox
 from .required_text_input import RequiredLineEdit
@@ -236,7 +237,7 @@ class BasicEditorFormLayout(QFormLayout):
     def set_current_decks(self):
         assert mw.col.db is not None
         mids: list[int] = [model["id"] for model in self.selected_models]
-        dids: list[DeckId] = mw.col.db.list(f""" 
+        dids: list[DeckId] = mw.col.db.list(f"""
                 SELECT DISTINCT CASE WHEN odid==0 THEN did ELSE odid END
                 FROM cards c, notes n
                 WHERE n.mid IN {ids2str(mids)}
@@ -340,14 +341,14 @@ class AcrossNotesCopyEditor(QWidget):
         self.form = QFormLayout()
         self.main_layout.addLayout(self.form)
 
-        self.card_query_text_label = QLabel("<h3>Search query to get source cards</h3>")
+        self.card_query_text_label = QLabel("<h3>Search query to get source notes</h3>")
         self.card_query_text_layout = InterpolatedTextEditLayout(
             label=self.card_query_text_label,
             is_required=True,
             # No special fields for search, just the destination note fields will be used
             options_dict={},
             description=f"""<ul>
-            <li>Use the same query syntax as in the card browser</li>
+            <li>Use the same query syntax as in the card/note browser</li>
             <li>Reference the destination notes' fields with {intr_format('Field Name')}.</li>
             <li>Right-click to select a {intr_format('Field Name')} or special values to paste</li>
             </ul>""",
@@ -358,6 +359,16 @@ class AcrossNotesCopyEditor(QWidget):
         )
 
         self.form.addRow(self.card_query_text_layout)
+
+        self.sort_by_field_cbox = GroupedComboBox(is_required=False)
+        self.form.addRow("<h4>Sort queried notes by field</h4>", self.sort_by_field_cbox)
+        # Add all fields from all note types
+        self.sort_by_field_cbox.addItem("-")
+        self.sort_by_field_cbox.setCurrentText("-")
+        for model in mw.col.models.all():
+            self.sort_by_field_cbox.addGroup(model["name"])
+            for field in model["flds"]:
+                self.sort_by_field_cbox.addItemToGroup(model["name"], field["name"])
 
         self.card_select_hbox = QHBoxLayout()
         self.card_select_cbox = RequiredCombobox()
@@ -400,6 +411,8 @@ class AcrossNotesCopyEditor(QWidget):
         if copy_definition:
             with suppress(KeyError):
                 self.card_query_text_layout.set_text(copy_definition["copy_from_cards_query"])
+            with suppress(KeyError):
+                self.sort_by_field_cbox.setCurrentText(copy_definition["sort_by_field"])
             with suppress(KeyError):
                 self.card_select_cbox.setCurrentText(copy_definition["select_card_by"])
             with suppress(KeyError):
@@ -753,6 +766,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_from_cards_query": (
                     self.across_notes_editor_tab.card_query_text_layout.get_text()
                 ),
+                "sort_by_field": self.across_notes_editor_tab.sort_by_field_cbox.currentText(),
                 "select_card_by": select_card_by,
                 "select_card_count": self.across_notes_editor_tab.card_select_count.text(),
                 "select_card_separator": self.across_notes_editor_tab.card_select_separator.text(),
@@ -775,6 +789,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_mode": COPY_MODE_WITHIN_NOTE,
                 "across_mode_direction": None,
                 "copy_from_cards_query": None,
+                "sort_by_field": None,
                 "select_card_by": "None",
                 "select_card_count": None,
                 "select_card_separator": None,
