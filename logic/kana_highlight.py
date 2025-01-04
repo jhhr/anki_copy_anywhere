@@ -397,6 +397,7 @@ def furigana_reverser(text):
 class WithTagsDef(NamedTuple):
     with_tags: bool
     merge_consecutive: bool
+    assume_dictionary_form: bool
 
 
 Edge = Literal["left", "right", "middle", "whole", "none"]
@@ -699,7 +700,7 @@ def process_readings(
         or (True, False) / (False, True) if return_on_or_kun_match_only
     """
     furigana = word_data.get("furigana", "")
-    okurigana = word_data.get("okurigana", "")
+    maybe_okuri = word_data.get("okurigana", "")
     edge = word_data.get("edge")
     assert edge is not None, "process_readings[]: edge missing in word_data"
     target_furigana_section = get_target_furigana_section(
@@ -717,7 +718,7 @@ def process_readings(
         wrap_readings_with_tags=with_tags_def.with_tags,
     )
     if onyomi_match["type"] == "onyomi":
-        return ReadingProcessResult(onyomi_match, "", okurigana)
+        return ReadingProcessResult(onyomi_match, "", maybe_okuri)
 
     kunyomi_results = check_kunyomi_readings(
         highlight_args,
@@ -732,11 +733,15 @@ def process_readings(
         f"\nkunyomi_results: {kunyomi_results}, word_data: {word_data}, kana_highlight:"
         f" {highlight_args}"
     )
-    if kunyomi_results["type"] == "kunyomi" and word_data["edge"] in ["right", "whole"]:
+    if (
+        not with_tags_def.assume_dictionary_form
+        and kunyomi_results["type"] == "kunyomi"
+        and word_data["edge"] in ["right", "whole"]
+    ):
         kunyomi = highlight_args.get("kunyomi", "")
         okurigana_to_highlight = ""
         partial_okuri_results: list[OkuriResults] = []
-        rest_kana = okurigana
+        rest_kana = maybe_okuri
         kunyomi_readings = iter(kunyomi.split("、"))
         while not okurigana_to_highlight and (next_kunyomi := next(kunyomi_readings, None)):
             log(
@@ -784,7 +789,12 @@ def process_readings(
         return ReadingProcessResult(kunyomi_results, okurigana_to_highlight, rest_kana)
 
     if kunyomi_results["type"] == "kunyomi":
-        return ReadingProcessResult(kunyomi_results, "", word_data.get("okurigana", ""))
+        if with_tags_def.assume_dictionary_form:
+            # If we assume that this is a dictionary form word, we don't need to process
+            # just return the okurigana as-is
+            return ReadingProcessResult(kunyomi_results, maybe_okuri, "")
+        # Ohterwise, we can only assume its rest_kana
+        return ReadingProcessResult(kunyomi_results, "", maybe_okuri)
 
     kanji_count = word_data.get("kanji_count")
     kanji_pos = word_data.get("kanji_pos")
@@ -802,13 +812,13 @@ def process_readings(
                 "matched_reading": "",
             },
             "",
-            word_data.get("okurigana", ""),
+            maybe_okuri,
         )
 
     return ReadingProcessResult(
         handle_jukujikun_case(word_data, highlight_args, with_tags_def.with_tags),
-        "",
-        word_data.get("okurigana", ""),
+        maybe_okuri if with_tags_def.assume_dictionary_form else "",
+        maybe_okuri if not with_tags_def.assume_dictionary_form else "",
     )
 
 
@@ -1450,7 +1460,9 @@ def kana_highlight(
     show_error_message: Callable = print,
 ) -> str:
     if with_tags_def is None:
-        with_tags_def = WithTagsDef(True, True)  # with_tags, merge_consecutive
+        with_tags_def = WithTagsDef(
+            True, True, False  # with_tags  # merge_consecutive  # assume dictionary form
+        )
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
     onyomi or kunyomi reading. The furigana is then highlighted with <b> tags.
@@ -1631,8 +1643,12 @@ def kana_highlight(
                 # of the furigana, return what we got so far as normally a jukujikun word is not
                 # a part of a compound word where it's preceded or followed by a normal word
                 # read using onyomi or kunyomi
-                final_okurigana += partial_result["okurigana"]
-                final_rest_kana += partial_result["rest_kana"]
+                if with_tags_def.assume_dictionary_form:
+                    final_okurigana += okurigana
+                    final_rest_kana = ""
+                else:
+                    final_okurigana += partial_result["okurigana"]
+                    final_rest_kana += partial_result["rest_kana"]
                 final_right_word += cur_word
                 final_edge = partial_result["edge"]
                 log(
@@ -1684,6 +1700,7 @@ def test(
     test_name: str,
     kanji: str,
     sentence: str,
+    assume_dictionary_form: bool = False,
     expected_furigana: Optional[str] = None,
     expected_furigana_with_tags_split: Optional[str] = None,
     expected_furigana_with_tags_merged: Optional[str] = None,
@@ -1698,15 +1715,39 @@ def test(
     Function that tests the kana_highlight function
     """
     cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
-        ("furigana", WithTagsDef(False, False), expected_furigana),
-        ("furigana", WithTagsDef(True, False), expected_furigana_with_tags_split),
-        ("furigana", WithTagsDef(True, True), expected_furigana_with_tags_merged),
-        ("furikanji", WithTagsDef(False, False), expected_furikanji),
-        ("furikanji", WithTagsDef(True, False), expected_furikanji_with_tags_split),
-        ("furikanji", WithTagsDef(True, True), expected_furikanji_with_tags_merged),
-        ("kana_only", WithTagsDef(False, False), expected_kana_only),
-        ("kana_only", WithTagsDef(True, False), expected_kana_only_with_tags_split),
-        ("kana_only", WithTagsDef(True, True), expected_kana_only_with_tags_merged),
+        ("furigana", WithTagsDef(False, False, assume_dictionary_form), expected_furigana),
+        (
+            "furigana",
+            WithTagsDef(True, False, assume_dictionary_form),
+            expected_furigana_with_tags_split,
+        ),
+        (
+            "furigana",
+            WithTagsDef(True, True, assume_dictionary_form),
+            expected_furigana_with_tags_merged,
+        ),
+        ("furikanji", WithTagsDef(False, False, assume_dictionary_form), expected_furikanji),
+        (
+            "furikanji",
+            WithTagsDef(True, False, assume_dictionary_form),
+            expected_furikanji_with_tags_split,
+        ),
+        (
+            "furikanji",
+            WithTagsDef(True, True, assume_dictionary_form),
+            expected_furikanji_with_tags_merged,
+        ),
+        ("kana_only", WithTagsDef(False, False, assume_dictionary_form), expected_kana_only),
+        (
+            "kana_only",
+            WithTagsDef(True, False, assume_dictionary_form),
+            expected_kana_only_with_tags_split,
+        ),
+        (
+            "kana_only",
+            WithTagsDef(True, True, assume_dictionary_form),
+            expected_kana_only_with_tags_merged,
+        ),
     ]
     for return_type, with_tags_def, expected in cases:
         if not expected:
@@ -2491,11 +2532,28 @@ def main():
         ),
     )
     test(
-        test_name="Should be able to get okurigana of jukujikun reading 1/",
+        test_name="Should be able to get okurigana of jukujikun reading if assumed dictionary form",
         kanji="逆",
         # No kunyomi to match, the okurigana would need to be analyzed to get the dictionary form
         # and then determine where the okurigana ends
+        sentence="逆上[のぼ]せる",
+        # Only dictionary forms can be handled for now
+        assume_dictionary_form=True,
+        expected_kana_only="<b>の</b>ぼせる",
+        expected_furigana="<b> 逆[の]</b> 上[ぼ]せる",
+        expected_furikanji="<b> の[逆]</b> ぼ[上]せる",
+        expected_kana_only_with_tags_split="<b><juk>の</juk></b><juk>ぼ</juk><oku>せる</oku>",
+        expected_furigana_with_tags_split="<b><juk> 逆[の]</juk></b><juk> 上[ぼ]</juk><oku>せる</oku>",
+        expected_furikanji_with_tags_split="<b><juk> の[逆]</juk></b><juk> ぼ[上]</juk><oku>せる</oku>",
+        expected_kana_only_with_tags_merged="<b><juk>の</juk></b><juk>ぼ</juk><oku>せる</oku>",
+        expected_furigana_with_tags_merged="<b><juk> 逆[の]</juk></b><juk> 上[ぼ]</juk><oku>せる</oku>",
+        expected_furikanji_with_tags_merged="<b><juk> の[逆]</juk></b><juk> ぼ[上]</juk><oku>せる</oku>",
+    )
+    test(
+        test_name="Should be able to get okurigana of jukujikun reading 12",
+        kanji="逆",
         sentence="逆上[のぼ]せたので",
+        # This test fails TODO: Fix this
         expected_kana_only="<b>の</b>せたので",
         expected_furigana="<b> 逆[の]</b> 上[ぼ]せたので",
         expected_furikanji="<b> の[逆]</b> ぼ[上]せたので",
@@ -2512,6 +2570,34 @@ def main():
         ),
         expected_furikanji_with_tags_merged=(
             "<b><juk> の[逆]</juk></b><juk> ぼ[上]</juk><oku>せた</oku>ので"
+        ),
+    )
+    test(
+        test_name="Should be able to get okurigana of kunyomi reading 1/",
+        kanji="置",
+        sentence=" 風上[かざかみ]にも 置[お]けない",
+        expected_kana_only=" かざかみにも <b>おけない</b>",
+        expected_furigana=" 風上[かざかみ]にも<b> 置[お]けない</b>",
+        expected_furikanji=" かざかみ[風上]にも<b> お[置]けない</b>",
+        expected_kana_only_with_tags_split=(
+            " <kun>かざ</kun><kun>かみ</kun>にも <b><kun>お</kun><oku>けない</oku></b>"
+        ),
+        expected_furigana_with_tags_split=(
+            " <kun> 風[かざ]</kun><kun> 上[かみ]</kun>にも <b><kun>"
+            " 置[お]</kun><oku>けない</oku></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            " <kun> かざ[風]</kun><kun> かみ[上]</kun>にも <b><kun>"
+            " お[置]</kun><oku>けない</oku></b>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            " <kun>かざかみ</kun>にも <b><kun>お</kun><oku>けない</oku></b>"
+        ),
+        expected_furigana_with_tags_merged=(
+            " <kun> 風上[かざかみ]</kun>にも <b><kun> 置[お]</kun><oku>けない</oku></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            " <kun> かざかみ[風上]</kun>にも <b><kun> お[置]</kun><oku>けない</oku></b>"
         ),
     )
     test(

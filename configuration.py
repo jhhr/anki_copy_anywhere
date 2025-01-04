@@ -72,6 +72,9 @@ class KanaHighlightProcess(TypedDict):
     name: str
     kanji_field: str
     return_type: FuriReconstruct
+    assume_dictionary_form: bool
+    wrap_readings_in_tags: bool
+    merge_consecutive_tags: bool
 
 
 AnyProcess = Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]
@@ -126,6 +129,9 @@ NEW_PROCESS_DEFAULTS: dict[str, AnyProcess] = {
         name=KANA_HIGHLIGHT_PROCESS,
         kanji_field="",
         return_type="kana_only",
+        wrap_readings_in_tags=True,
+        merge_consecutive_tags=True,
+        assume_dictionary_form=False,
     ),
 }
 

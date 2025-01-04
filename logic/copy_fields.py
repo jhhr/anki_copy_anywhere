@@ -24,6 +24,7 @@ from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
 from .interpolate_fields import interpolate_from_text, TARGET_NOTES_COUNT
 from .kana_highlight_process import kana_highlight_process
+from .kana_highlight_process import WithTagsDef
 from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
 from ..configuration import (
@@ -566,6 +567,11 @@ def apply_process_chain(
                     text=text,
                     kanji_field=process.get("kanji_field", ""),
                     return_type=process.get("return_type", "kana_only"),
+                    with_tags_def=WithTagsDef(
+                        process.get("wrap_readings_in_tags", True),
+                        process.get("merge_consecutive_tags", True),
+                        process.get("assume_dictionary_form", False),
+                    ),
                     note=destination_note,
                     show_error_message=show_error_message,
                 )

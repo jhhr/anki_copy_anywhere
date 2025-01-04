@@ -28,11 +28,6 @@ def kana_highlight_process(
         def show_error_message(message: str):
             print(message)
 
-    # show_error_message(
-    #     f"kana_highlight_process: {onyomi_field}, {kunyomi_field}, {kanji_field}, {text},"
-    #     f" {return_type}"
-    # )
-
     if not kanji_field:
         show_error_message("Error in kana_highlight: Missing 'kanji_field'")
         return kana_filter(text)
