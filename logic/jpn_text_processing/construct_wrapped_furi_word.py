@@ -58,13 +58,15 @@ def match_tags_with_kanji(word: str, furigana: str) -> list[WrapMatchResult]:
     kanji_tags = []
     kanji_index = 0
 
-    for tag, highlight, kana, _ in tag_order:
+    for i, cur_tag in enumerate(tag_order):
+        tag, highlight, kana, _ = cur_tag
         if tag == "juk":
             # jukujikun reading should encompass the entire word
+            # Check if the next tag is also jukujikun, and if so, merge them
+            next_tag = tag_order[i + 1] if i + 1 < len(tag_order) else None
+            if next_tag and next_tag.tag == "juk" and next_tag.highlight == highlight:
+                kana = kana + next_tag.contents
             kanji_tags.append(WrapMatchResult(word, tag, highlight, kana))
-            if len(tag_order) > 1:
-                # Something's wrong if there's more than one tag, can't do anything about it
-                log("Warning match_tags_with_kanji[]: jukujikun reading should be the only reading")
             break
         if kanji_index < len(word):
             cur_kanji = word[kanji_index]
@@ -81,7 +83,10 @@ def match_tags_with_kanji(word: str, furigana: str) -> list[WrapMatchResult]:
 
 
 def construct_wrapped_furi_word(
-    word: str, furigana: str, return_type: FuriReconstruct, merge_consecutive: bool = True
+    word: str,
+    furigana: str,
+    return_type: FuriReconstruct,
+    merge_consecutive: bool = True,
 ) -> str:
     """
     Construct the word with furigana wrapped in the appropriate tags
