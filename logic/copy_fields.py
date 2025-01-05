@@ -327,6 +327,7 @@ def copy_fields(
         # If an undo_entry isn't passed, create one
         nonlocal undo_entry
         if undo_entry is None:
+            note_count = None
             if note_ids is not None:
                 note_count = len(note_ids)
             elif note_ids_per_definition is not None:
@@ -711,7 +712,7 @@ def copy_for_single_trigger_note(
         )
 
     # Step 2: Get value for each field we are copying into
-    for destination_note in destination_notes:
+    for i, destination_note in enumerate(destination_notes):
         success = copy_into_single_note(
             field_to_field_defs=field_to_field_defs,
             destination_note=destination_note,
@@ -729,7 +730,13 @@ def copy_for_single_trigger_note(
             progress_updater.update_counts(
                 processed_destinations_inc=1,
             )
-            progress_updater.render_update()
+            single_source_and_dest = len(source_notes) == 1 and len(destination_notes) == 1
+            if i != len(destination_notes) - 1 or single_source_and_dest:
+                # Skip render updates on single notes and last notes, except if there's only
+                # one of both, otherwise we'd render no updates at all
+                # Running renders too fast might the cause of progress_def.label inexplicably
+                # getting overwritten in the middle of a render_update, causing a crash
+                progress_updater.render_update()
         if copied_into_notes is not None:
             copied_into_notes.append(destination_note)
         if not success:
@@ -1121,7 +1128,11 @@ def get_field_values_from_notes(
 
         if progress_updater is not None:
             progress_updater.update_counts(processed_sources_inc=1)
-            progress_updater.render_update()
+            if i != len(notes) - 1:
+                # Don't render update on the last note, as there will be another update right
+                # on this loop ending
+                # This'll also skip single notes
+                progress_updater.render_update()
         result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
 
     return result_val

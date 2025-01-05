@@ -1138,7 +1138,7 @@ def check_kunyomi_readings(
             }
 
         # Also check for changed kana
-        if kunyomi_stem[0] in HIRAGANA_CONVERSION_DICT:
+        if kunyomi_stem and kunyomi_stem[0] in HIRAGANA_CONVERSION_DICT:
             for kunyomi_kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
                 converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kunyomi_kana, 1)
                 if converted_kunyomi in target_furigana_section:
@@ -1166,7 +1166,7 @@ def check_kunyomi_readings(
         # Then also check for small tsu conversion of some consonants
         # this only happens in the last kana of the reading
         for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
-            if kunyomi_stem[-1] == tsu_kana:
+            if kunyomi_stem and kunyomi_stem[-1] == tsu_kana:
                 converted_kunyomi = kunyomi_stem[:-1] + "っ"
                 if converted_kunyomi in target_furigana_section:
                     log(f"\n3 converted_kunyomi: {converted_kunyomi}")
