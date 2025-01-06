@@ -761,6 +761,7 @@ def process_readings(
         word_data.get("edge"),
         show_error_message,
     )
+    # Check both onyomi and kunyomi readings and use the longest match we get
     onyomi_match = check_onyomi_readings(
         highlight_args.get("onyomi", ""),
         furigana,
@@ -770,8 +771,9 @@ def process_readings(
         process_type=process_type,
         wrap_readings_with_tags=with_tags_def.with_tags,
     )
+    onyomi_process_result = None
     if onyomi_match["type"] == "onyomi":
-        return ReadingProcessResult(onyomi_match, "", maybe_okuri)
+        onyomi_process_result = ReadingProcessResult(onyomi_match, "", maybe_okuri)
 
     kunyomi_results = check_kunyomi_readings(
         highlight_args,
@@ -782,6 +784,7 @@ def process_readings(
         process_type=process_type,
         wrap_readings_with_tags=with_tags_def.with_tags,
     )
+    kunyomi_process_result = None
     log(
         f"\nkunyomi_results: {kunyomi_results}, word_data: {word_data}, kana_highlight:"
         f" {highlight_args}"
@@ -796,6 +799,8 @@ def process_readings(
         partial_okuri_results: list[OkuriResults] = []
         rest_kana = maybe_okuri
         kunyomi_readings = iter(kunyomi.split("、"))
+        matched_kunyomi_stem = kunyomi_results["matched_reading"].split(".")[0]
+        log(f"\ncheck_kunyomi_readings - matched_kunyomi_stem: {matched_kunyomi_stem}")
         while not okurigana_to_highlight and (next_kunyomi := next(kunyomi_readings, None)):
             log(
                 f"\ncheck_kunyomi_readings - okurigana: {not okurigana_to_highlight},"
@@ -805,6 +810,10 @@ def process_readings(
                 log(f"\ncheck_kunyomi_readings while - next_kunyomi: {next_kunyomi}")
                 kunyomi_reading, kunyomi_okurigana = next_kunyomi.split(".")
             except ValueError:
+                continue
+            # The reading stems must match
+            if kunyomi_reading != matched_kunyomi_stem:
+                log(f"\ncheck_kunyomi_readings while - non-matching stem: {kunyomi_reading}")
                 continue
             res = check_okurigana_for_kunyomi_inflection(
                 kunyomi_okurigana, kunyomi_reading, word_data, highlight_args
@@ -839,16 +848,48 @@ def process_readings(
             "\ncheck_kunyomi_readings while result - okurigana:"
             f" {okurigana_to_highlight}, rest_kana: {rest_kana}"
         )
-        return ReadingProcessResult(kunyomi_results, okurigana_to_highlight, rest_kana)
-
-    if kunyomi_results["type"] == "kunyomi":
+        kunyomi_process_result = ReadingProcessResult(
+            kunyomi_results, okurigana_to_highlight, rest_kana
+        )
+    elif kunyomi_results["type"] == "kunyomi":
         if with_tags_def.assume_dictionary_form:
             # If we assume that this is a dictionary form word, we don't need to process
             # just return the okurigana as-is
-            return ReadingProcessResult(kunyomi_results, maybe_okuri, "")
+            kunyomi_process_result = ReadingProcessResult(kunyomi_results, maybe_okuri, "")
         # Ohterwise, we can only assume its rest_kana
-        return ReadingProcessResult(kunyomi_results, "", maybe_okuri)
+        kunyomi_process_result = ReadingProcessResult(kunyomi_results, "", maybe_okuri)
 
+    # Compare the onyomi and kunyomi results and return the one that matched the most
+    if onyomi_process_result and kunyomi_process_result:
+        on_length = len(onyomi_process_result.yomi_match["matched_reading"])
+        kun_length = len(kunyomi_process_result.yomi_match["matched_reading"].split(".")[0])
+        log(
+            "\nfound both onyomi and kunyomi - on_match:"
+            f" {onyomi_process_result.yomi_match['matched_reading']}, kun_match:"
+            f" {kunyomi_process_result.yomi_match['matched_reading']}"
+        )
+        # If one is longer than the other, return the longer one
+        if on_length > kun_length:
+            log("\nonyomi_process_result is longer")
+            return onyomi_process_result
+        if kun_length > on_length:
+            log("\nkunyomi_process_result is longer")
+            return kunyomi_process_result
+        # If same length, return kunyomi if we have okurigana
+        if kunyomi_process_result.okurigana:
+            log("\nsame length kunyomi_process_result has okurigana")
+            return kunyomi_process_result
+        # Otherwise return onyomi
+        log("\nreturn same length onyomi_process_result")
+        return onyomi_process_result
+    if onyomi_process_result:
+        log("\nonyomi_process_result is returned")
+        return onyomi_process_result
+    if kunyomi_process_result:
+        log("\nkunyomi_process_result is returned")
+        return kunyomi_process_result
+
+    # Neither onyomi nor kunyomi matched, get jukujikun or nothing
     kanji_count = word_data.get("kanji_count")
     kanji_pos = word_data.get("kanji_pos")
 
@@ -1353,7 +1394,7 @@ def handle_jukujikun_case(
         elif kanji_index == kanji_pos + 1 and kanji_pos != -1:
             log(
                 f"\njuku mora 3 closing bold - kanji_index: {kanji_index}, kanji_pos: {kanji_pos},"
-                f" has_bold: {new_furigana[-3:]== '<b>'}, new_furigana: {new_furigana}"
+                f" has_bold: {new_furigana[-3:] == '<b>'}, new_furigana: {new_furigana}"
             )
             new_furigana += "</b>" if new_furigana[-4:] != "</b>" else ""
 
@@ -1368,7 +1409,7 @@ def handle_jukujikun_case(
         if kanji_index == kanji_pos:
             log(
                 f"\njuku mora 4 closing bold - kanji_index: {kanji_index}, kanji_pos: {kanji_pos},"
-                f" has_bold: {new_furigana[-3:]== '<b>'}, new_furigana: {new_furigana}"
+                f" has_bold: {new_furigana[-3:] == '<b>'}, new_furigana: {new_furigana}"
             )
             new_furigana += "</b>" if new_furigana[-4:] != "</b>" else ""
         cur_mora_index = cur_mora_range_max
@@ -2313,7 +2354,7 @@ def main():
         ),
     )
     test(
-        test_name="Should match the full reading match when there are multiple",
+        test_name="Should match the full reading match when there are multiple /1",
         kanji="由",
         # Both ゆ and ゆい are in the furigana but the correct match is ゆい
         sentence="彼女[かのじょ]は 由緒[ゆいしょ]ある 家柄[いえがら]の 出[で]だ。",
@@ -2322,30 +2363,45 @@ def main():
         expected_furikanji=" かのジョ[彼女]は<b> ユイ[由]</b> ショ[緒]ある いえがら[家柄]の で[出]だ。",
         expected_kana_only_with_tags_split=(
             "<kun>かの</kun><on>ジョ</on>は <b><on>ユイ</on></b><on>ショ</on>ある"
-            " <kun>いえ</kun><kun>がら</kun>の <kun>で</kun><oku>だ</oku>。"
+            " <kun>いえ</kun><kun>がら</kun>の <kun>で</kun>だ。"
         ),
         expected_furigana_with_tags_split=(
             "<kun> 彼[かの]</kun><on> 女[ジョ]</on>は <b><on> 由[ユイ]</on></b><on>"
             " 緒[ショ]</on>ある <kun> 家[いえ]</kun><kun> 柄[がら]</kun>の <kun>"
-            " 出[で]</kun><oku>だ</oku>。"
+            " 出[で]</kun>だ。"
         ),
         expected_furikanji_with_tags_split=(
             "<kun> かの[彼]</kun><on> ジョ[女]</on>は <b><on> ユイ[由]</on></b><on>"
             " ショ[緒]</on>ある <kun> いえ[家]</kun><kun> がら[柄]</kun>の <kun>"
-            " で[出]</kun><oku>だ</oku>。"
+            " で[出]</kun>だ。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>かの</kun><on>ジョ</on>は <b><on>ユイ</on></b><on>ショ</on>ある"
-            " <kun>いえがら</kun>の <kun>で</kun><oku>だ</oku>。"
+            " <kun>いえがら</kun>の <kun>で</kun>だ。"
         ),
         expected_furigana_with_tags_merged=(
             "<kun> 彼[かの]</kun><on> 女[ジョ]</on>は <b><on> 由[ユイ]</on></b><on>"
-            " 緒[ショ]</on>ある <kun> 家柄[いえがら]</kun>の <kun> 出[で]</kun><oku>だ</oku>。"
+            " 緒[ショ]</on>ある <kun> 家柄[いえがら]</kun>の <kun> 出[で]</kun>だ。"
         ),
         expected_furikanji_with_tags_merged=(
             "<kun> かの[彼]</kun><on> ジョ[女]</on>は <b><on> ユイ[由]</on></b><on>"
-            " ショ[緒]</on>ある <kun> いえがら[家柄]</kun>の <kun> で[出]</kun><oku>だ</oku>。"
+            " ショ[緒]</on>ある <kun> いえがら[家柄]</kun>の <kun> で[出]</kun>だ。"
         ),
+    )
+    test(
+        test_name="Should match the full reading match when there are multiple 2/",
+        kanji="口",
+        # Both ク (on) and くち (kun) are in the furigana but the correct match is くち
+        sentence="口紅[くちべに]",
+        expected_kana_only="<b>くち</b>べに",
+        expected_furigana="<b> 口[くち]</b> 紅[べに]",
+        expected_furikanji="<b> くち[口]</b> べに[紅]",
+        expected_kana_only_with_tags_split="<b><kun>くち</kun></b><kun>べに</kun>",
+        expected_furigana_with_tags_split="<b><kun> 口[くち]</kun></b><kun> 紅[べに]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> くち[口]</kun></b><kun> べに[紅]</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>くち</kun></b><kun>べに</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 口[くち]</kun></b><kun> 紅[べに]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> くち[口]</kun></b><kun> べに[紅]</kun>",
     )
     test(
         test_name="small tsu 1/",
