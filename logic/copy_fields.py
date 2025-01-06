@@ -707,9 +707,7 @@ def copy_for_single_trigger_note(
         return False
 
     if len(source_notes) == 0:
-        show_error_message(
-            f"Error in copy fields: No source/destination notes for note {trigger_note.id}"
-        )
+        return False
 
     # Step 2: Get value for each field we are copying into
     for i, destination_note in enumerate(destination_notes):
