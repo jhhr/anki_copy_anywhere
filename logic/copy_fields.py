@@ -516,6 +516,7 @@ def copy_fields_in_background(
             break
 
         if not success:
+            # Something went wrong, stop operation so the issue can be debugged
             return results
 
     # When syncing, don't show a pointless message that nothing was done
@@ -636,7 +637,7 @@ def copy_for_single_trigger_note(
     :param show_error_message: Optional function to show error messages
     :param file_cache: A dictionary to cache opened files' content
     :param progress_updater: Optional object to update the progress bar
-    :return: Tuple of the op success + number of destination and source notes processed
+    :return: bool indicating success
     """
     if not show_error_message:
 
@@ -707,7 +708,10 @@ def copy_for_single_trigger_note(
         return False
 
     if len(source_notes) == 0:
-        return False
+        # This case is ok, there's just nothing to do
+        # But we need to end early here so that the target fields aren't wiped
+        # So, return True
+        return True
 
     # Step 2: Get value for each field we are copying into
     for i, destination_note in enumerate(destination_notes):
