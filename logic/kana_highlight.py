@@ -3,7 +3,7 @@ import re
 import sys
 import json
 import os
-from typing import Callable, TypedDict, Literal, Optional, Tuple, NamedTuple
+from typing import Callable, TypedDict, Literal, Optional, Tuple, NamedTuple, cast
 
 from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
 from .jpn_text_processing.get_conjugatable_okurigana_stem import (
@@ -33,7 +33,7 @@ all_kanji_data: dict[str, KanjiData] = {}
 with open(json_file_path, "r", encoding="utf-8") as f:
     all_kanji_data = json.load(f)
 
-HIRAGANA_CONVERSION_DICT = {
+RENDAKU_CONVERSION_DICT = {
     "か": ["が"],
     "き": ["ぎ"],
     "く": ["ぐ"],
@@ -57,7 +57,7 @@ HIRAGANA_CONVERSION_DICT = {
 }
 # Convert HIRAGANA_CONVERSION_DICT to katakana with to_katakana
 KATAKANA_CONVERSION_DICT = {
-    to_katakana(k): [to_katakana(v) for v in vs] for k, vs in HIRAGANA_CONVERSION_DICT.items()
+    to_katakana(k): [to_katakana(v) for v in vs] for k, vs in RENDAKU_CONVERSION_DICT.items()
 }
 
 # Include う just for the special case of 秘蔵[ひぞ]っ子[こ]
@@ -949,6 +949,78 @@ def get_target_furigana_section(
     return furigana
 
 
+ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu"]
+
+
+def is_reading_in_furigana_section(
+    reading: str,
+    furigana_section: str,
+    edge: Edge,
+) -> Tuple[str, ReadingType]:
+    """
+    Function that checks if a reading is in the furigana section
+
+    :return: str, the reading that matched the furigana section
+    """
+    # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
+    # This only applies to the first kana in the reading and if the reading isn't a single kana
+    rendaku_readings = []
+    if possible_rendaku_kana := RENDAKU_CONVERSION_DICT.get(reading[0]):
+        for kana in possible_rendaku_kana:
+            rendaku_readings.append(f"{kana}{reading[1:]}")
+    # Then also check for small tsu conversion of some consonants
+    # this only happens in the last kana of the reading
+    small_tsu_readings = []
+    for kana in SMALL_TSU_POSSIBLE_HIRAGANA:
+        if reading[-1] == kana:
+            small_tsu_readings.append(f"{reading[:-1]}っ")
+    if edge == "whole":
+        # match the whole furigana or repeat twice in it, possibly with rendaku or small tsu
+        # (eg. the next kanji is the same or 々)
+        if reading == furigana_section:
+            return reading, "plain"
+        if reading * 2 == furigana_section:
+            return reading * 2, "plain"
+        for rendaku_reading in rendaku_readings:
+            if rendaku_reading == furigana_section:
+                return rendaku_reading, "rendaku"
+            if f"{reading}{rendaku_reading}" == furigana_section:
+                return f"{reading}{rendaku_reading}", "rendaku"
+        for small_tsu_reading in small_tsu_readings:
+            if small_tsu_reading == furigana_section:
+                return small_tsu_reading, "small_tsu"
+            if f"{small_tsu_reading}{reading}" == furigana_section:
+                return f"{small_tsu_reading}{reading}", "small_tsu"
+        return "", "none"
+    # For non-whole edge, also check readings are both rendaku and small tsu
+    rendaku_small_tsu_readings = []
+    for rendaku_reading in rendaku_readings:
+        for kana in SMALL_TSU_POSSIBLE_HIRAGANA:
+            if rendaku_reading[-1] == kana:
+                rendaku_small_tsu_readings.append(f"{rendaku_reading[:-1]}っ")
+    all_readings = (
+        [(reading, "plain")]
+        + [(r, "rendaku") for r in rendaku_readings]
+        + [(r, "small_tsu") for r in small_tsu_readings]
+        + [(r, "rendaku_small_tsu") for r in rendaku_small_tsu_readings]
+    )
+    if edge == "left":
+        for r, t in all_readings:
+            if furigana_section.startswith(r):
+                return r, cast(ReadingType, t)
+        return "", "none"
+    if edge == "right":
+        for r, t in all_readings:
+            if furigana_section.endswith(r):
+                return r, cast(ReadingType, t)
+        return "", "none"
+    # middle
+    for r, t in all_readings:
+        if r in furigana_section:
+            return r, cast(ReadingType, t)
+    return "", "none"
+
+
 def check_onyomi_readings(
     onyomi: str,
     furigana: str,
@@ -970,6 +1042,11 @@ def check_onyomi_readings(
     # order readings by length so that we try to match the longest reading first
     onyomi_readings.sort(key=len, reverse=True)
 
+    log(
+        f"\ncheck_onyomi_readings - target_furigana_section: {target_furigana_section}, edge:"
+        f" {edge}"
+    )
+
     for onyomi_reading in onyomi_readings:
         # remove text in () in the reading
         onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
@@ -978,19 +1055,14 @@ def check_onyomi_readings(
             continue
         # Convert the onyomi to hiragana since the furigana is in hiragana
         onyomi_reading = to_hiragana(onyomi_reading)
-        onyomi_is_in_section = False
-        if edge == "whole":
-            # onyomi should match the whole furigana or repeat twice within in it
-            onyomi_is_in_section = (
-                onyomi_reading == target_furigana_section
-                or onyomi_reading * 2 == target_furigana_section
-            )
-
-        else:
-            onyomi_is_in_section = onyomi_reading in target_furigana_section
-        log(f"\ncheck_onyomi_readings - onyomi_is_in_section: {onyomi_is_in_section}")
-        if onyomi_is_in_section:
-            log(f"\n1 onyomi_reading: {onyomi_reading}")
+        match_in_section, match_type = is_reading_in_furigana_section(
+            onyomi_reading, target_furigana_section, edge
+        )
+        log(
+            f"\ncheck_onyomi_readings - onyomi_reading: {onyomi_reading}, in_section:"
+            f" {match_in_section}, type: {match_type}"
+        )
+        if match_in_section:
             if return_on_or_kun_match_only:
                 return {
                     "text": "",
@@ -1001,7 +1073,7 @@ def check_onyomi_readings(
             return {
                 "text": process_onyomi_match(
                     furigana,
-                    onyomi_reading,
+                    match_in_section,
                     edge,
                     process_type,
                     wrap_readings_with_tags,
@@ -1010,59 +1082,6 @@ def check_onyomi_readings(
                 "match_edge": edge,
                 "matched_reading": onyomi_reading,
             }
-        # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
-        # This only applies to the first kana in the reading and if the reading isn't a single kana
-        if onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
-            for onyomi_kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
-                converted_onyomi = onyomi_reading.replace(onyomi_reading[0], onyomi_kana, 1)
-                log(f"\n2 converted_onyomi: {converted_onyomi}")
-                if converted_onyomi in target_furigana_section:
-                    log(f"\n2 converted_onyomi match: {converted_onyomi}")
-                    if return_on_or_kun_match_only:
-                        return {
-                            "text": "",
-                            "type": "onyomi",
-                            "match_edge": edge,
-                            "matched_reading": onyomi_reading,
-                        }
-                    return {
-                        "text": process_onyomi_match(
-                            furigana,
-                            converted_onyomi,
-                            edge,
-                            process_type,
-                            wrap_readings_with_tags,
-                        ),
-                        "type": "onyomi",
-                        "match_edge": edge,
-                        "matched_reading": onyomi_reading,
-                    }
-        # Then also check for small tsu conversion of some consonants
-        # this only happens in the last kana of the reading
-        for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
-            if onyomi_reading[-1] == tsu_kana:
-                converted_onyomi = onyomi_reading[:-1] + "っ"
-                if converted_onyomi in target_furigana_section:
-                    log(f"\n3 converted_onyomi: {converted_onyomi}")
-                    if return_on_or_kun_match_only:
-                        return {
-                            "text": "",
-                            "type": "onyomi",
-                            "match_edge": edge,
-                            "matched_reading": "",
-                        }
-                    return {
-                        "text": process_onyomi_match(
-                            furigana,
-                            converted_onyomi,
-                            edge,
-                            process_type,
-                            wrap_readings_with_tags,
-                        ),
-                        "type": "onyomi",
-                        "match_edge": edge,
-                        "matched_reading": onyomi_reading,
-                    }
     return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
 
 
@@ -1184,6 +1203,9 @@ def check_kunyomi_readings(
     kunyomi = highlight_args.get("kunyomi", "")
     if not kunyomi:
         return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
+
+    # There are often kunyomi with the same stem, gather the stems to avoid checking the same
+    checked_stems = set()
     kunyomi_readings = kunyomi.split("、")
     for kunyomi_reading in kunyomi_readings:
         if not kunyomi_reading:
@@ -1204,21 +1226,19 @@ def check_kunyomi_readings(
                     "match_edge": edge,
                     "matched_reading": "",
                 }
+        if kunyomi_stem in checked_stems:
+            continue
+        checked_stems.add(kunyomi_stem)
 
         # For kunyomi check for a match with the stem
-        kunyomi_is_in_section = False
-        if edge == "whole":
-            # kunyomi should match the whole furigana or repeat twice within in it
-            kunyomi_is_in_section = (
-                kunyomi_stem == target_furigana_section
-                or kunyomi_stem * 2 == target_furigana_section
-            )
-        else:
-            kunyomi_is_in_section = (
-                kunyomi_stem in target_furigana_section and edge in ["right", "middle"]
-            ) or (target_furigana_section.startswith(kunyomi_stem) and edge == "left")
-        if kunyomi_is_in_section:
-            log(f"\n1 kunyomi_stem: {kunyomi_stem}")
+        match_in_section, match_type = is_reading_in_furigana_section(
+            kunyomi_stem, target_furigana_section, edge
+        )
+        log(
+            f"\ncheck_kunyomi_readings - kunyomi_stem: {kunyomi_stem}, in_section:"
+            f" {match_in_section}, type: {match_type}"
+        )
+        if match_in_section:
             if return_on_or_kun_match_only:
                 return {
                     "text": "",
@@ -1229,7 +1249,7 @@ def check_kunyomi_readings(
             return {
                 "text": process_kunyomi_match(
                     furigana,
-                    kunyomi_stem,
+                    match_in_section,
                     edge,
                     process_type,
                     wrap_readings_with_tags,
@@ -1238,59 +1258,6 @@ def check_kunyomi_readings(
                 "type": "kunyomi",
                 "matched_reading": kunyomi_reading,
             }
-
-        # Also check for changed kana
-        if kunyomi_stem and kunyomi_stem[0] in HIRAGANA_CONVERSION_DICT:
-            for kunyomi_kana in HIRAGANA_CONVERSION_DICT[kunyomi_stem[0]]:
-                converted_kunyomi = kunyomi_stem.replace(kunyomi_stem[0], kunyomi_kana, 1)
-                if converted_kunyomi in target_furigana_section:
-                    log(f"\n2 converted_kunyomi: {converted_kunyomi}")
-                    if return_on_or_kun_match_only:
-                        return {
-                            "text": "",
-                            "type": "kunyomi",
-                            "match_edge": edge,
-                            "matched_reading": kunyomi_reading,
-                        }
-                    return {
-                        "text": process_kunyomi_match(
-                            furigana,
-                            converted_kunyomi,
-                            edge,
-                            process_type,
-                            wrap_readings_with_tags,
-                        ),
-                        "match_edge": edge,
-                        "type": "kunyomi",
-                        "matched_reading": kunyomi_reading,
-                    }
-
-        # Then also check for small tsu conversion of some consonants
-        # this only happens in the last kana of the reading
-        for tsu_kana in SMALL_TSU_POSSIBLE_HIRAGANA:
-            if kunyomi_stem and kunyomi_stem[-1] == tsu_kana:
-                converted_kunyomi = kunyomi_stem[:-1] + "っ"
-                if converted_kunyomi in target_furigana_section:
-                    log(f"\n3 converted_kunyomi: {converted_kunyomi}")
-                    if return_on_or_kun_match_only:
-                        return {
-                            "text": "",
-                            "type": "kunyomi",
-                            "match_edge": edge,
-                            "matched_reading": kunyomi_reading,
-                        }
-                    return {
-                        "text": process_kunyomi_match(
-                            furigana,
-                            converted_kunyomi,
-                            edge,
-                            process_type,
-                            wrap_readings_with_tags,
-                        ),
-                        "match_edge": edge,
-                        "type": "kunyomi",
-                        "matched_reading": kunyomi_reading,
-                    }
 
     # Exception for 尻尾[しっぽ] where 尾[ぽ] should be considered a kunyomi, not jukujikun
     # 尻 already gets matched with small tsu conversion so handle 尾[ぽ] here
@@ -2250,7 +2217,7 @@ def main():
         ),
     )
     test(
-        test_name="Is able to pick the right reading when there is multiple matches",
+        test_name="Is able to pick the right reading when there are multiple matches 1/",
         kanji="靴",
         # ながぐつ　has が (onyomi か match) and ぐつ (kunyomi くつ) as matches
         sentence="お 前[まえ]いつも 長靴[ながぐつ]に 傘[かさ]さしてキメーんだよ！！",
@@ -2280,6 +2247,29 @@ def main():
         expected_furikanji_with_tags_merged=(
             "お <kun> まえ[前]</kun>いつも <kun> なが[長]</kun><b><kun> ぐつ[靴]</kun></b>に"
             " <kun> かさ[傘]</kun>さしてキメーんだよ！！"
+        ),
+    )
+    test(
+        test_name="Is able to pick the right reading when there are multiple matches 2/",
+        kanji="輸",
+        # 輸 has ゆ and しゅ as onyomi readings, should correctly match to the left edge
+        sentence="輸出[ゆしゅつ]可能[かのう]。",
+        expected_kana_only="<b>ユ</b>シュツカノウ。",
+        expected_furigana="<b> 輸[ユ]</b> 出[シュツ] 可能[カノウ]。",
+        expected_furikanji="<b> ユ[輸]</b> シュツ[出] カノウ[可能]。",
+        expected_kana_only_with_tags_split="<b><on>ユ</on></b><on>シュツ</on><on>カ</on><on>ノウ</on>。",
+        expected_furigana_with_tags_split=(
+            "<b><on> 輸[ユ]</on></b><on> 出[シュツ]</on><on> 可[カ]</on><on> 能[ノウ]</on>。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><on> ユ[輸]</on></b><on> シュツ[出]</on><on> カ[可]</on><on> ノウ[能]</on>。"
+        ),
+        expected_kana_only_with_tags_merged="<b><on>ユ</on></b><on>シュツ</on><on>カノウ</on>。",
+        expected_furigana_with_tags_merged=(
+            "<b><on> 輸[ユ]</on></b><on> 出[シュツ]</on><on> 可能[カノウ]</on>。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><on> ユ[輸]</on></b><on> シュツ[出]</on><on> カノウ[可能]</on>。"
         ),
     )
     test(
