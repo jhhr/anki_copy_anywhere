@@ -1680,6 +1680,9 @@ def kana_highlight(
         # For the partial case, we need to split the furigana for each kanji using the kanji_data
         # for each one, highlight the kanji_to_match and reconstruct the furigana
         for index, kanji in enumerate(word):
+            if kanji == "々":
+                # Skip repeater as this will have been handled in the previous iteration
+                continue
             is_first_kanji = index == 0
             is_last_kanji = index == len(word) - 1
             is_middle_kanji = not is_first_kanji and not is_last_kanji
@@ -1725,22 +1728,24 @@ def kana_highlight(
 
             next_kanji = word[index + 1] if not is_last_kanji else ""
             if next_kanji == "々":
+                log(f"\nrepeater kanji: {next_kanji}")
                 rep_kanji = next_kanji
                 cur_word = cur_word[2:]
+                # if we had the repeater kanji, we should add more furigana to this result
+                # If this was a normal match, the furigana should be repeating
+                if not is_jukujikun:
+                    log(f"\nrepeater kanji - doubling furigana: {matched_furigana}")
+                    matched_furigana *= 2
+                    wrapped_furigana = matched_furigana
             else:
                 rep_kanji = ""
                 cur_word = cur_word[1:]
 
-            if with_tags_def.with_tags and matched_furigana:
-                # if we had the repeater kanji, we should add more furigana to this result
-                # If this was a normal match, the furigana should be repeating
-                if rep_kanji and not is_jukujikun:
-                    matched_furigana *= 2
-
+            if with_tags_def.with_tags:
                 if partial_result["match_type"] == "onyomi":
-                    wrapped_furigana = f"<on>{wrapped_furigana}</on>"
+                    wrapped_furigana = f"<on>{matched_furigana}</on>"
                 elif partial_result["match_type"] == "kunyomi":
-                    wrapped_furigana = f"<kun>{wrapped_furigana}</kun>"
+                    wrapped_furigana = f"<kun>{matched_furigana}</kun>"
                 # jukujikun furigana is wrapped in <juk> tags by handle_jukujikun_case
                 # we'll need to handle the rep_kanji case separately
 
@@ -2154,6 +2159,20 @@ def main():
         expected_kana_only_with_tags_merged="<on>シン</on><b><on>プ</on></b>",
         expected_furigana_with_tags_merged="<on> 新[シン]</on><b><on> 婦[プ]</on></b>",
         expected_furikanji_with_tags_merged="<on> シン[新]</on><b><on> プ[婦]</on></b>",
+    )
+    test(
+        test_name="Matches repeater in the middle of the word",
+        kanji="菜",
+        sentence="娃々菜[わわさい]",
+        expected_kana_only="ワワ<b>サイ</b>",
+        expected_furigana=" 娃々[ワワ]<b> 菜[サイ]</b>",
+        expected_furikanji=" ワワ[娃々]<b> サイ[菜]</b>",
+        expected_kana_only_with_tags_split="<on>ワワ</on><b><on>サイ</on></b>",
+        expected_furigana_with_tags_split="<on> 娃々[ワワ]</on><b><on> 菜[サイ]</on></b>",
+        expected_furikanji_with_tags_split="<on> ワワ[娃々]</on><b><on> サイ[菜]</on></b>",
+        expected_kana_only_with_tags_merged="<on>ワワ</on><b><on>サイ</on></b>",
+        expected_furigana_with_tags_merged="<on> 娃々[ワワ]</on><b><on> 菜[サイ]</on></b>",
+        expected_furikanji_with_tags_merged="<on> ワワ[娃々]</on><b><on> サイ[菜]</on></b>",
     )
     test(
         test_name="Matches word that uses the repeater 々 with small tsu",
