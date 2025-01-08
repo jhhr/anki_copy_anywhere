@@ -962,6 +962,8 @@ def is_reading_in_furigana_section(
 
     :return: str, the reading that matched the furigana section
     """
+    if not reading:
+        return "", "none"
     # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
     # This only applies to the first kana in the reading and if the reading isn't a single kana
     rendaku_readings = []
