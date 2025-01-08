@@ -855,9 +855,12 @@ def process_readings(
         if with_tags_def.assume_dictionary_form:
             # If we assume that this is a dictionary form word, we don't need to process
             # just return the okurigana as-is
+            log("\nassumeing dictionary form - kunyomi_process_result with okurigana")
             kunyomi_process_result = ReadingProcessResult(kunyomi_results, maybe_okuri, "")
         # Ohterwise, we can only assume its rest_kana
-        kunyomi_process_result = ReadingProcessResult(kunyomi_results, "", maybe_okuri)
+        else:
+            log("\nnot assuming dictionary form - kunyomi_process_result with rest_kana")
+            kunyomi_process_result = ReadingProcessResult(kunyomi_results, "", maybe_okuri)
 
     # Compare the onyomi and kunyomi results and return the one that matched the most
     if onyomi_process_result and kunyomi_process_result:
@@ -3113,6 +3116,18 @@ def main():
             "<kun> おさなな[幼馴]</kun><b><kun> じ[染]</kun><oku>み</oku></b>と <kun>"
             " ひさ[久]</kun><oku>し</oku>ぶりに <kun> あ[会]</kun><oku>った</oku>。"
         ),
+    )
+    test(
+        test_name="Verb okurigana is gotten correctly when assuming dictionary form/",
+        kanji="試",
+        assume_dictionary_form=True,
+        sentence="試[こころ]みる",
+        expected_kana_only="<b>こころみる</b>",
+        expected_furigana="<b> 試[こころ]みる</b>",
+        expected_furikanji="<b> こころ[試]みる</b>",
+        expected_kana_only_with_tags_split="<b><kun>こころ</kun><oku>みる</oku></b>",
+        expected_furigana_with_tags_split="<b><kun> 試[こころ]</kun><oku>みる</oku></b>",
+        expected_furikanji_with_tags_split="<b><kun> こころ[試]</kun><oku>みる</oku></b>",
     )
     test(
         test_name="Adjective okurigana test 1/",
