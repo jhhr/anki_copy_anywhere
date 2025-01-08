@@ -17,6 +17,7 @@ from .jpn_text_processing.construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
     FuriReconstruct,
 )
+from .jpn_text_processing.okurigana_dict import get_verb_noun_form_okuri
 
 
 class KanjiData(TypedDict):
@@ -460,12 +461,14 @@ class YomiMatchResult(TypedDict):
     :param text
     :param type
     :param match_edge
+    :param actual_match
     :param matched_reading
     """
 
     text: str
     type: MatchType
     match_edge: Edge
+    actual_match: str
     matched_reading: str
 
 
@@ -741,7 +744,6 @@ def process_readings(
     word_data: WordData,
     process_type: MatchProcess,
     with_tags_def: WithTagsDef,
-    return_on_or_kun_match_only: bool = False,
     show_error_message: Callable = print,
 ) -> ReadingProcessResult:
     """
@@ -767,7 +769,6 @@ def process_readings(
         furigana,
         target_furigana_section,
         edge,
-        return_on_or_kun_match_only,
         process_type=process_type,
         wrap_readings_with_tags=with_tags_def.with_tags,
     )
@@ -780,7 +781,6 @@ def process_readings(
         furigana,
         target_furigana_section,
         edge,
-        return_on_or_kun_match_only,
         process_type=process_type,
         wrap_readings_with_tags=with_tags_def.with_tags,
     )
@@ -906,6 +906,7 @@ def process_readings(
                 "text": word_data.get("furigana", ""),
                 "type": "none",
                 "match_edge": edge,
+                "actual_match": "",
                 "matched_reading": "",
             },
             "",
@@ -1028,7 +1029,6 @@ def check_onyomi_readings(
     furigana: str,
     target_furigana_section: str,
     edge: Edge,
-    return_on_or_kun_match_only: bool,
     wrap_readings_with_tags: bool = True,
     process_type: MatchProcess = "match",
 ) -> YomiMatchResult:
@@ -1039,7 +1039,13 @@ def check_onyomi_readings(
       or [True, False] when return_on_or_kun_match_only
     """
     if not onyomi:
-        return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
+        return {
+            "text": "",
+            "type": "none",
+            "match_edge": "none",
+            "actual_match": "",
+            "matched_reading": "",
+        }
     onyomi_readings = onyomi.split("、")
     # order readings by length so that we try to match the longest reading first
     onyomi_readings.sort(key=len, reverse=True)
@@ -1065,13 +1071,6 @@ def check_onyomi_readings(
             f" {match_in_section}, type: {match_type}"
         )
         if match_in_section:
-            if return_on_or_kun_match_only:
-                return {
-                    "text": "",
-                    "type": "onyomi",
-                    "match_edge": edge,
-                    "matched_reading": onyomi_reading,
-                }
             return {
                 "text": process_onyomi_match(
                     furigana,
@@ -1082,9 +1081,16 @@ def check_onyomi_readings(
                 ),
                 "type": "onyomi",
                 "match_edge": edge,
+                "actual_match": match_in_section,
                 "matched_reading": onyomi_reading,
             }
-    return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
+    return {
+        "text": "",
+        "type": "none",
+        "match_edge": "none",
+        "actual_match": "",
+        "matched_reading": "",
+    }
 
 
 def process_onyomi_match(
@@ -1193,7 +1199,6 @@ def check_kunyomi_readings(
     furigana: str,
     target_furigana_section: str,
     edge: Edge,
-    return_on_or_kun_match_only: bool,
     wrap_readings_with_tags: bool = True,
     process_type: MatchProcess = "match",
 ) -> YomiMatchResult:
@@ -1204,19 +1209,27 @@ def check_kunyomi_readings(
     """
     kunyomi = highlight_args.get("kunyomi", "")
     if not kunyomi:
-        return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
+        return {
+            "text": "",
+            "type": "none",
+            "match_edge": "none",
+            "actual_match": "",
+            "matched_reading": "",
+        }
 
-    # There are often kunyomi with the same stem, gather the stems to avoid checking the same
-    checked_stems = set()
     kunyomi_readings = kunyomi.split("、")
+    stem_match_result: Optional[YomiMatchResult] = None
+    kunyomi_stems: set[Tuple[str, str]] = set()
+    kunyomi_stem_and_okuris: list[Tuple[str, str, str]] = []
     for kunyomi_reading in kunyomi_readings:
         if not kunyomi_reading:
             continue
         # Split the reading into the stem and the okurigana
         kunyomi_stem = kunyomi_reading
+        kunyomi_dict_form_okuri = ""
         if "." in kunyomi_reading:
             try:
-                kunyomi_stem, _ = kunyomi_reading.split(".")
+                kunyomi_stem, kunyomi_dict_form_okuri = kunyomi_reading.split(".")
             except ValueError:
                 log(
                     "\nError in kana_highlight[]: kunyomi contained multiple dots:"
@@ -1226,13 +1239,19 @@ def check_kunyomi_readings(
                     "text": furigana,
                     "type": "kunyomi",
                     "match_edge": edge,
+                    "actual_match": "",
                     "matched_reading": "",
                 }
-        if kunyomi_stem in checked_stems:
-            continue
-        checked_stems.add(kunyomi_stem)
+        # We only need to check unique stems
+        kunyomi_stems.add((kunyomi_stem, kunyomi_reading))
+        # And noun forms for readings that have okuri
+        if kunyomi_dict_form_okuri:
+            kunyomi_stem_and_okuris.append((kunyomi_stem, kunyomi_dict_form_okuri, kunyomi_reading))
 
-        # For kunyomi check for a match with the stem
+    # First check matches against the stem
+    for kunyomi_stem, full_reading in kunyomi_stems:
+        if not kunyomi_stem:
+            continue
         match_in_section, match_type = is_reading_in_furigana_section(
             kunyomi_stem, target_furigana_section, edge
         )
@@ -1241,14 +1260,7 @@ def check_kunyomi_readings(
             f" {match_in_section}, type: {match_type}"
         )
         if match_in_section:
-            if return_on_or_kun_match_only:
-                return {
-                    "text": "",
-                    "type": "kunyomi",
-                    "match_edge": edge,
-                    "matched_reading": kunyomi_reading,
-                }
-            return {
+            stem_match_result = {
                 "text": process_kunyomi_match(
                     furigana,
                     match_in_section,
@@ -1258,8 +1270,75 @@ def check_kunyomi_readings(
                 ),
                 "match_edge": edge,
                 "type": "kunyomi",
-                "matched_reading": kunyomi_reading,
+                "actual_match": match_in_section,
+                "matched_reading": full_reading,
             }
+            break
+    okurigana = highlight_args.get("okurigana", "")
+    kanji_to_match = highlight_args.get("kanji_to_match", "")
+    log(
+        f"\ncheck_kunyomi_readings - noun form: {kunyomi_stem}, kunyomi_dict_form_okuri:"
+        f" {kunyomi_dict_form_okuri}\nokurigana: {{okurigana}}, kanji_to_match:"
+        " {kanji_to_match}"
+    )
+
+    # Then also with noun forms of the whole kunyomi reading
+    # In this case there should be no okurigana as it would be a reading where those are omitted
+    # e.g. 曳舟--曳き舟, 取調--取り調べ, 書留--書き留め
+    noun_form_result: Optional[YomiMatchResult] = None
+    for kunyomi_stem, kunyomi_dict_form_okuri, full_reading in kunyomi_stem_and_okuris:
+        if (
+            not okurigana
+            and kunyomi_dict_form_okuri
+            and (
+                noun_form_okuri := get_verb_noun_form_okuri(
+                    kunyomi_dict_form_okuri, kanji_to_match, kunyomi_reading
+                )
+            )
+        ):
+            # Replace last kana in dict form okuri with the noun form ending
+            noun_form_kunyomi_reading = f"{kunyomi_stem}{noun_form_okuri}"
+            match_in_section, match_type = is_reading_in_furigana_section(
+                noun_form_kunyomi_reading, target_furigana_section, edge
+            )
+            log(
+                f"\ncheck_kunyomi_readings - noun_form: {noun_form_kunyomi_reading}, in_section:"
+                f" {match_in_section}, type: {match_type}"
+            )
+            if match_in_section:
+                noun_form_result = {
+                    "text": process_kunyomi_match(
+                        furigana,
+                        match_in_section,
+                        edge,
+                        process_type,
+                        wrap_readings_with_tags,
+                    ),
+                    "match_edge": edge,
+                    "type": "kunyomi",
+                    "actual_match": match_in_section,
+                    "matched_reading": full_reading,
+                }
+                break
+    log(
+        f"\ncheck_kunyomi_readings - stem_match_result: {stem_match_result}, noun_form_result:"
+        f" {noun_form_result}"
+    )
+    # If both results are found, return the one with the longest match
+    if stem_match_result and noun_form_result:
+        noun_match_length = len(noun_form_result["matched_reading"])
+        stem_match_length = len(stem_match_result["matched_reading"])
+        if noun_match_length > stem_match_length:
+            return stem_match_result
+        if stem_match_length > noun_match_length:
+            return noun_form_result
+        # Same length, return the noun form, this could a middle edge match at a different position
+        return noun_form_result
+    if stem_match_result:
+        return stem_match_result
+    if noun_form_result:
+        return noun_form_result
+    # No match for either check exceptions...
 
     # Exception for 尻尾[しっぽ] where 尾[ぽ] should be considered a kunyomi, not jukujikun
     # 尻 already gets matched with small tsu conversion so handle 尾[ぽ] here
@@ -1274,10 +1353,17 @@ def check_kunyomi_readings(
             ),
             "match_edge": edge,
             "type": "kunyomi",
+            "actual_match": "ぽ",
             "matched_reading": "ほ",
         }
     log("\ncheck_kunyomi_readings - no match")
-    return {"text": "", "type": "none", "match_edge": "none", "matched_reading": ""}
+    return {
+        "text": "",
+        "type": "none",
+        "match_edge": "none",
+        "actual_match": "",
+        "matched_reading": "",
+    }
 
 
 def process_kunyomi_match(
@@ -1342,6 +1428,8 @@ def handle_jukujikun_case(
     match_edge: Edge = "left"
     cur_mora_index = 0
     kanji_index = 0
+    actual_match = ""
+    is_kanji_match = False
     while kanji_index < kanji_count:
         next_kanji = word[kanji_index + 1] if kanji_index < kanji_count - 1 else ""
         cur_mora_range_max = cur_mora_index + mora_per_kanji
@@ -1358,7 +1446,8 @@ def handle_jukujikun_case(
         if remainder > 0:
             cur_mora_range_max += 1
             remainder -= 1
-        if kanji_index == kanji_pos:
+        is_kanji_match = kanji_index == kanji_pos
+        if is_kanji_match:
             new_furigana += "<b>"
             if kanji_index == 0:
                 match_edge = "left"
@@ -1379,6 +1468,8 @@ def handle_jukujikun_case(
             new_furigana += f"<juk>{mora}</juk>"
         else:
             new_furigana += mora
+        if is_kanji_match:
+            actual_match = mora
         log(f"\njuku mora 5 - new_furigana: {new_furigana}")
 
         if kanji_index == kanji_pos:
@@ -1398,6 +1489,7 @@ def handle_jukujikun_case(
         "text": new_furigana,
         "type": "jukujikun",
         "match_edge": match_edge,
+        "actual_match": actual_match,
         "matched_reading": "",
     }
 
@@ -1430,7 +1522,6 @@ def handle_whole_word_case(
         word_data,
         process_type="replace",
         with_tags_def=with_tags_def,
-        return_on_or_kun_match_only=True,
         show_error_message=show_error_message,
     )
     log(
@@ -2799,6 +2890,35 @@ def main():
         expected_furikanji_with_tags_merged=(
             "<b><juk> の[逆]</juk></b><juk> ぼ[上]</juk><oku>せた</oku>ので"
         ),
+    )
+    test(
+        test_name="Should be able match noun form okuriganaless kunyomi reading 1/",
+        kanji="曳",
+        # ひ.く is a kunyomi for 曳 and both 曳き舟 and 曳船 are valid readings
+        sentence="曳船[ひきふね]",
+        expected_kana_only="<b>ひき</b>ふね",
+        expected_furigana="<b> 曳[ひき]</b> 船[ふね]",
+        expected_furikanji="<b> ひき[曳]</b> ふね[船]",
+        expected_kana_only_with_tags_split="<b><kun>ひき</kun></b><kun>ふね</kun>",
+        expected_furigana_with_tags_split="<b><kun> 曳[ひき]</kun></b><kun> 船[ふね]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> ひき[曳]</kun></b><kun> ふね[船]</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>ひき</kun></b><kun>ふね</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 曳[ひき]</kun></b><kun> 船[ふね]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> ひき[曳]</kun></b><kun> ふね[船]</kun>",
+    )
+    test(
+        test_name="Should be able match noun form okuriganaless kunyomi reading 2/",
+        kanji="留",
+        sentence="書留[かきとめ]",
+        expected_kana_only="かき<b>とめ</b>",
+        expected_furigana=" 書[かき]<b> 留[とめ]</b>",
+        expected_furikanji=" かき[書]<b> とめ[留]</b>",
+        expected_kana_only_with_tags_split="<kun>かき</kun><b><kun>とめ</kun></b>",
+        expected_furigana_with_tags_split="<kun> 書[かき]</kun><b><kun> 留[とめ]</kun></b>",
+        expected_furikanji_with_tags_split="<kun> かき[書]</kun><b><kun> とめ[留]</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>かき</kun><b><kun>とめ</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 書[かき]</kun><b><kun> 留[とめ]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> かき[書]</kun><b><kun> とめ[留]</kun></b>",
     )
     test(
         test_name="Should be able to get okurigana of kunyomi reading 1/",

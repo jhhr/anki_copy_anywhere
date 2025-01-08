@@ -65,6 +65,55 @@ GODAN_ENDINGS: dict[str, str] = {
     "る": "r",
 }
 
+# Ending kana for noun-form per ending kana in dictionary form
+GODAN_FORM_VERB_ENDINGS: dict[str, str] = {
+    "う": "い",
+    "く": "き",
+    "ぐ": "ぎ",
+    "す": "し",
+    "つ": "ち",
+    "ぬ": "に",
+    "ぶ": "び",
+    "む": "み",
+    "る": "り",
+}
+
+
+def get_verb_noun_form_okuri(dict_form_verb_okuri: str, kanji: str, kanji_reading: str) -> str:
+    """
+    Get the okurigana for the noun form of a verb.
+    :param dict_form_verb_okuri: The okurigana for the dictionary form of the verb.
+    :return: The okurigana for the noun form of the verb.
+    """
+    pos = get_part_of_speech(dict_form_verb_okuri, kanji, kanji_reading)
+    if pos is None:
+        return ""
+    # All the godan verbs, including special class 来る, 問う, 有る, 切る
+    if pos in [
+        "v5b",
+        "v5g",
+        "v5k",
+        "v5m",
+        "v5n",
+        "v5r",
+        "v5s",
+        "v5t",
+        "v5u",
+        "v5u-s",
+        "vk",
+        "v5aru",
+        "v5r-i",
+    ]:
+        # Change last kana to noun form
+        return f"{dict_form_verb_okuri[:-1]}{GODAN_FORM_VERB_ENDINGS[dict_form_verb_okuri[-1]]}"
+    # Ichidan verb
+    if pos == "v1":
+        # Remove last kana
+        return dict_form_verb_okuri[:-1]
+    # Others don't apply
+    return ""
+
+
 LOG = False
 
 
