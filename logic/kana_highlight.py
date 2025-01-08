@@ -973,6 +973,7 @@ def check_onyomi_readings(
     for onyomi_reading in onyomi_readings:
         # remove text in () in the reading
         onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
+        log(f"\ncheck_onyomi_readings - onyomi_reading: {onyomi_reading}")
         if not onyomi_reading:
             continue
         # Convert the onyomi to hiragana since the furigana is in hiragana
@@ -987,6 +988,7 @@ def check_onyomi_readings(
 
         else:
             onyomi_is_in_section = onyomi_reading in target_furigana_section
+        log(f"\ncheck_onyomi_readings - onyomi_is_in_section: {onyomi_is_in_section}")
         if onyomi_is_in_section:
             log(f"\n1 onyomi_reading: {onyomi_reading}")
             if return_on_or_kun_match_only:
@@ -1010,11 +1012,12 @@ def check_onyomi_readings(
             }
         # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
         # This only applies to the first kana in the reading and if the reading isn't a single kana
-        if len(onyomi_reading) != 1 and onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
+        if onyomi_reading[0] in HIRAGANA_CONVERSION_DICT:
             for onyomi_kana in HIRAGANA_CONVERSION_DICT[onyomi_reading[0]]:
                 converted_onyomi = onyomi_reading.replace(onyomi_reading[0], onyomi_kana, 1)
+                log(f"\n2 converted_onyomi: {converted_onyomi}")
                 if converted_onyomi in target_furigana_section:
-                    log(f"\n2 converted_onyomi: {converted_onyomi}")
+                    log(f"\n2 converted_onyomi match: {converted_onyomi}")
                     if return_on_or_kun_match_only:
                         return {
                             "text": "",
@@ -2137,6 +2140,20 @@ def main():
             "<b><kun> ときどき[時々]</kun></b> <kun> あめ[雨]</kun>が <kun>"
             " ふ[降]</kun><oku>る</oku>。"
         ),
+    )
+    test(
+        test_name="Rendaku test 1/",
+        kanji="婦",
+        sentence="新婦[しんぷ]",
+        expected_kana_only="シン<b>プ</b>",
+        expected_furigana=" 新[シン]<b> 婦[プ]</b>",
+        expected_furikanji=" シン[新]<b> プ[婦]</b>",
+        expected_kana_only_with_tags_split="<on>シン</on><b><on>プ</on></b>",
+        expected_furigana_with_tags_split="<on> 新[シン]</on><b><on> 婦[プ]</on></b>",
+        expected_furikanji_with_tags_split="<on> シン[新]</on><b><on> プ[婦]</on></b>",
+        expected_kana_only_with_tags_merged="<on>シン</on><b><on>プ</on></b>",
+        expected_furigana_with_tags_merged="<on> 新[シン]</on><b><on> 婦[プ]</on></b>",
+        expected_furikanji_with_tags_merged="<on> シン[新]</on><b><on> プ[婦]</on></b>",
     )
     test(
         test_name="Matches word that uses the repeater 々 with small tsu",
