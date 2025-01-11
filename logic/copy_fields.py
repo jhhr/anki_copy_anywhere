@@ -182,6 +182,7 @@ class ProgressUpdater:
         self.note_cnt = 0
         self.total_processed_sources = 0
         self.total_processed_destinations = 0
+        self.last_render_update = 0.0
 
     def update_counts(
         self,
@@ -199,8 +200,16 @@ class ProgressUpdater:
     def get_counts(self) -> Tuple[int, int, int]:
         return self.note_cnt, self.total_processed_sources, self.total_processed_destinations
 
-    def render_update(self):
+    def maybe_render_update(self):
         elapsed_s = time.time() - self.start_time
+        elapsed_since_last_update = elapsed_s - self.last_render_update
+        if elapsed_since_last_update < 1.0:
+            # Don't update the progress bar too often, it can cause a crash as apparently
+            # two progress updates could happen simultaneously causing
+            # self.progress_update_def.label to be None
+            return
+        self.last_render_update = elapsed_s
+
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
         self.progress_update_def.label = f"""<strong>{self.definition_name}</strong>:
         <br>Copied {self.note_cnt}/{self.total_notes_count} notes
@@ -729,16 +738,8 @@ def copy_for_single_trigger_note(
             progress_updater=progress_updater,
         )
         if progress_updater is not None:
-            progress_updater.update_counts(
-                processed_destinations_inc=1,
-            )
-            single_source_and_dest = len(source_notes) == 1 and len(destination_notes) == 1
-            if i != len(destination_notes) - 1 or single_source_and_dest:
-                # Skip render updates on single notes and last notes, except if there's only
-                # one of both, otherwise we'd render no updates at all
-                # Running renders too fast might the cause of progress_def.label inexplicably
-                # getting overwritten in the middle of a render_update, causing a crash
-                progress_updater.render_update()
+            progress_updater.update_counts(processed_destinations_inc=1)
+            progress_updater.maybe_render_update()
         if copied_into_notes is not None:
             copied_into_notes.append(destination_note)
         if not success:
@@ -1130,11 +1131,7 @@ def get_field_values_from_notes(
 
         if progress_updater is not None:
             progress_updater.update_counts(processed_sources_inc=1)
-            if i != len(notes) - 1:
-                # Don't render update on the last note, as there will be another update right
-                # on this loop ending
-                # This'll also skip single notes
-                progress_updater.render_update()
+            progress_updater.maybe_render_update()
         result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
 
     return result_val
