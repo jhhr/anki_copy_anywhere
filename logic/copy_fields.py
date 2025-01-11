@@ -1,6 +1,7 @@
 import base64
 import random
 import time
+import html
 from typing import Callable, Union, Optional, Tuple, Sequence, Any
 
 from anki.collection import Progress, OpChanges
@@ -211,7 +212,7 @@ class ProgressUpdater:
         self.last_render_update = elapsed_s
 
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
-        self.progress_update_def.label = f"""<strong>{self.definition_name}</strong>:
+        self.progress_update_def.label = f"""<strong>{html.escape(self.definition_name)}</strong>:
         <br>Copied {self.note_cnt}/{self.total_notes_count} notes
         <br><small>Notes processed - destinations: {self.total_processed_destinations}
             {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
