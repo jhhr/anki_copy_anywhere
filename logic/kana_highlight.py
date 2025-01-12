@@ -1240,12 +1240,13 @@ def check_kunyomi_readings(
         }
 
     kunyomi_readings = kunyomi.split("、")
-    stem_match_result: Optional[YomiMatchResult] = None
+    stem_match_results: list[YomiMatchResult] = []
     kunyomi_stems: set[Tuple[str, str]] = set()
     kunyomi_stem_and_okuris: list[Tuple[str, str, str]] = []
     for kunyomi_reading in kunyomi_readings:
         if not kunyomi_reading:
             continue
+        log(f"\ncheck_kunyomi_readings - kunyomi_reading: {kunyomi_reading}")
         # Split the reading into the stem and the okurigana
         kunyomi_stem = kunyomi_reading
         kunyomi_dict_form_okuri = ""
@@ -1283,7 +1284,7 @@ def check_kunyomi_readings(
             f" {match_in_section}, type: {match_type}"
         )
         if match_in_section:
-            stem_match_result = {
+            stem_match_results.append({
                 "text": process_kunyomi_match(
                     furigana,
                     match_in_section,
@@ -1295,8 +1296,7 @@ def check_kunyomi_readings(
                 "type": "kunyomi",
                 "actual_match": match_in_section,
                 "matched_reading": full_reading,
-            }
-            break
+            })
     kanji_to_match = highlight_args.get("kanji_to_match", "")
     log(
         f"\ncheck_kunyomi_readings - noun form: {kunyomi_stem}, kunyomi_dict_form_okuri:"
@@ -1307,7 +1307,7 @@ def check_kunyomi_readings(
     # Then also readings with okurigana included in the furigana, noun forms and others
     # In this case there should be no okurigana as it would be a reading where those are omitted
     # e.g. 曳舟--曳き舟, 取調--取り調べ, 書留--書き留め
-    noun_form_result: Optional[YomiMatchResult] = None
+    okuri_included_results: list[YomiMatchResult] = []
     for kunyomi_stem, kunyomi_dict_form_okuri, full_reading in kunyomi_stem_and_okuris:
         noun_form_okuri = get_verb_noun_form_okuri(
             kunyomi_dict_form_okuri, kanji_to_match, kunyomi_reading
@@ -1323,11 +1323,11 @@ def check_kunyomi_readings(
                 okuri_included_reading, target_furigana_section, okurigana, edge
             )
             log(
-                f"\ncheck_kunyomi_readings - noun_form: {okuri_included_reading}, in_section:"
-                f" {match_in_section}, type: {match_type}"
+                f"\ncheck_kunyomi_readings - okuri_included form: {okuri_included_reading},"
+                f" in_section: {match_in_section}, type: {match_type}"
             )
             if match_in_section:
-                noun_form_result = {
+                okuri_included_results.append({
                     "text": process_kunyomi_match(
                         furigana,
                         match_in_section,
@@ -1339,26 +1339,24 @@ def check_kunyomi_readings(
                     "type": "kunyomi",
                     "actual_match": match_in_section,
                     "matched_reading": full_reading,
-                }
-                break
+                })
     log(
-        f"\ncheck_kunyomi_readings - stem_match_result: {stem_match_result}, noun_form_result:"
-        f" {noun_form_result}"
+        f"\ncheck_kunyomi_readings - stem_match_results: {stem_match_results},"
+        f" okuri_included_results: {okuri_included_results}"
     )
     # If both results are found, return the one with the longest match
-    if stem_match_result and noun_form_result:
-        noun_match_length = len(noun_form_result["matched_reading"])
-        stem_match_length = len(stem_match_result["matched_reading"])
-        if noun_match_length > stem_match_length:
-            return stem_match_result
-        if stem_match_length > noun_match_length:
-            return noun_form_result
-        # Same length, return the noun form, this could a middle edge match at a different position
-        return noun_form_result
-    if stem_match_result:
-        return stem_match_result
-    if noun_form_result:
-        return noun_form_result
+    results_by_length: list[list[YomiMatchResult]] = []
+    for result in stem_match_results + okuri_included_results:
+        result_length = len(result["actual_match"])
+        while len(results_by_length) < result_length:
+            results_by_length.append([])
+        results_by_length[result_length - 1].append(result)
+    if results_by_length:
+        longest_results = results_by_length[-1]
+        # Even if there are multiple results with the same length, just return the first one
+        # they all have the same kana, after all
+        return longest_results[0]
+
     # No match for either check exceptions...
 
     # Exception for 尻尾[しっぽ] where 尾[ぽ] should be considered a kunyomi, not jukujikun
