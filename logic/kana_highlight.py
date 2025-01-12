@@ -2747,6 +2747,196 @@ def main():
         expected_furikanji_with_tags_merged="<b><kun> ほう[放]</kun><oku>ったら</oku></b>かす",
     )
     test(
+        test_name="sound change readings 1/",
+        kanji="青",
+        # あお -> さお
+        sentence="真[ま]っ青[さお]",
+        expected_kana_only="まっ<b>さお</b>",
+        expected_furigana=" 真[ま]っ<b> 青[さお]</b>",
+        expected_furikanji=" ま[真]っ<b> さお[青]</b>",
+        expected_kana_only_with_tags_split="<kun>ま</kun>っ<b><kun>さお</kun></b>",
+        expected_furigana_with_tags_split="<kun> 真[ま]</kun>っ<b><kun> 青[さお]</kun></b>",
+        expected_furikanji_with_tags_split="<kun> ま[真]</kun>っ<b><kun> さお[青]</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>ま</kun>っ<b><kun>さお</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 真[ま]</kun>っ<b><kun> 青[さお]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> ま[真]</kun>っ<b><kun> さお[青]</kun></b>",
+    )
+    test(
+        test_name="sound change readings 2/",
+        kanji="赤",
+        # あか -> か
+        sentence="真っ赤[まっか]",
+        expected_kana_only="まっ<b>か</b>",
+        expected_furigana=" 真[ま]っ<b> 赤[か]</b>",
+        expected_furikanji=" ま[真]っ<b> か[赤]</b>",
+        expected_kana_only_with_tags_split="<kun>ま</kun>っ<b><kun>か</kun></b>",
+        expected_furigana_with_tags_split="<kun> 真[ま]</kun>っ<b><kun> 赤[か]</kun></b>",
+        expected_furikanji_with_tags_split="<kun> ま[真]</kun>っ<b><kun> か[赤]</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>ま</kun>っ<b><kun>か</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 真[ま]</kun>っ<b><kun> 赤[か]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> ま[真]</kun>っ<b><kun> か[赤]</kun></b>",
+    )
+    test(
+        test_name="sound change readings 3/",
+        kanji="新",
+        # あら -> さら
+        sentence="真っ新[まっさら]",
+        expected_kana_only="まっ<b>さら</b>",
+        expected_furigana=" 真[ま]っ<b> 新[さら]</b>",
+        expected_furikanji=" ま[真]っ<b> さら[新]</b>",
+        expected_kana_only_with_tags_split="<kun>ま</kun>っ<b><kun>さら</kun></b>",
+        expected_furigana_with_tags_split="<kun> 真[ま]</kun>っ<b><kun> 新[さら]</kun></b>",
+        expected_furikanji_with_tags_split="<kun> ま[真]</kun>っ<b><kun> さら[新]</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>ま</kun>っ<b><kun>さら</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 真[ま]</kun>っ<b><kun> 新[さら]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> ま[真]</kun>っ<b><kun> さら[新]</kun></b>",
+    )
+    test(
+        test_name="sound change readings 4/",
+        kanji="雨",
+        # あめ -> さめ
+        sentence="春雨[はるさめ]",
+        expected_kana_only="はる<b>さめ</b>",
+        expected_furigana=" 春[はる]<b> 雨[さめ]</b>",
+        expected_furikanji=" はる[春]<b> さめ[雨]</b>",
+        expected_kana_only_with_tags_split="<kun>はる</kun><b><kun>さめ</kun></b>",
+        expected_furigana_with_tags_split="<kun> 春[はる]</kun><b><kun> 雨[さめ]</kun></b>",
+        expected_furikanji_with_tags_split="<kun> はる[春]</kun><b><kun> さめ[雨]</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>はる</kun><b><kun>さめ</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 春[はる]</kun><b><kun> 雨[さめ]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> はる[春]</kun><b><kun> さめ[雨]</kun></b>",
+    )
+    test(
+        test_name="sound change readings 4/",
+        kanji="雨",
+        # あめ -> あま
+        sentence="雨傘[あまがさ]",
+        expected_kana_only="<b>あま</b>がさ",
+        expected_furigana="<b> 雨[あま]</b> 傘[がさ]",
+        expected_furikanji="<b> あま[雨]</b> がさ[傘]",
+        expected_kana_only_with_tags_split="<b><kun>あま</kun></b><kun>がさ</kun>",
+        expected_furigana_with_tags_split="<b><kun> 雨[あま]</kun></b><kun> 傘[がさ]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> あま[雨]</kun></b><kun> がさ[傘]</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>あま</kun></b><kun>がさ</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 雨[あま]</kun></b><kun> 傘[がさ]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> あま[雨]</kun></b><kun> がさ[傘]</kun>",
+    )
+    test(
+        test_name="sound change readings 5/",
+        kanji="酒",
+        # さけ -> さか
+        sentence="居酒屋[いざかや]",
+        expected_kana_only="い<b>ざか</b>や",
+        expected_furigana=" 居[い]<b> 酒[ざか]</b> 屋[や]",
+        expected_furikanji=" い[居]<b> ざか[酒]</b> や[屋]",
+        expected_kana_only_with_tags_split="<kun>い</kun><b><kun>ざか</kun></b><kun>や</kun>",
+        expected_furigana_with_tags_split=(
+            "<kun> 居[い]</kun><b><kun> 酒[ざか]</kun></b><kun> 屋[や]</kun>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<kun> い[居]</kun><b><kun> ざか[酒]</kun></b><kun> や[屋]</kun>"
+        ),
+        expected_kana_only_with_tags_merged="<kun>い</kun><b><kun>ざか</kun></b><kun>や</kun>",
+        expected_furigana_with_tags_merged=(
+            "<kun> 居[い]</kun><b><kun> 酒[ざか]</kun></b><kun> 屋[や]</kun>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<kun> い[居]</kun><b><kun> ざか[酒]</kun></b><kun> や[屋]</kun>"
+        ),
+    )
+    test(
+        test_name="sound change readings 6/",
+        kanji="応",
+        # おう -> のう
+        sentence="反応[はんのう]",
+        expected_kana_only="ハン<b>ノウ</b>",
+        expected_furigana=" 反[ハン]<b> 応[ノウ]</b>",
+        expected_furikanji=" ハン[反]<b> ノウ[応]</b>",
+        expected_kana_only_with_tags_split="<on>ハン</on><b><on>ノウ</on></b>",
+        expected_furigana_with_tags_split="<on> 反[ハン]</on><b><on> 応[ノウ]</on></b>",
+        expected_furikanji_with_tags_split="<on> ハン[反]</on><b><on> ノウ[応]</on></b>",
+        expected_kana_only_with_tags_merged="<on>ハン</on><b><on>ノウ</on></b>",
+        expected_furigana_with_tags_merged="<on> 反[ハン]</on><b><on> 応[ノウ]</on></b>",
+        expected_furikanji_with_tags_merged="<on> ハン[反]</on><b><on> ノウ[応]</on></b>",
+    )
+    test(
+        test_name="sound change readings 7/",
+        kanji="皇",
+        # おう -> のう
+        sentence="天皇[てんのう]",
+        expected_kana_only="テン<b>ノウ</b>",
+        expected_furigana=" 天[テン]<b> 皇[ノウ]</b>",
+        expected_furikanji=" テン[天]<b> ノウ[皇]</b>",
+        expected_kana_only_with_tags_split="<on>テン</on><b><on>ノウ</on></b>",
+        expected_furigana_with_tags_split="<on> 天[テン]</on><b><on> 皇[ノウ]</on></b>",
+        expected_furikanji_with_tags_split="<on> テン[天]</on><b><on> ノウ[皇]</on></b>",
+        expected_kana_only_with_tags_merged="<on>テン</on><b><on>ノウ</on></b>",
+        expected_furigana_with_tags_merged="<on> 天[テン]</on><b><on> 皇[ノウ]</on></b>",
+        expected_furikanji_with_tags_merged="<on> テン[天]</on><b><on> ノウ[皇]</on></b>",
+    )
+    test(
+        test_name="sound dropped readings 1/",
+        kanji="裸",
+        # はだか -> はだ
+        sentence="裸足[はだあし]",
+        expected_kana_only="<b>はだ</b>あし",
+        expected_furigana="<b> 裸[はだ]</b> 足[あし]",
+        expected_furikanji="<b> はだ[裸]</b> あし[足]",
+        expected_kana_only_with_tags_split="<b><kun>はだ</kun></b><kun>あし</kun>",
+        expected_furigana_with_tags_split="<b><kun> 裸[はだ]</kun></b><kun> 足[あし]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> はだ[裸]</kun></b><kun> あし[足]</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>はだ</kun></b><kun>あし</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 裸[はだ]</kun></b><kun> 足[あし]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> はだ[裸]</kun></b><kun> あし[足]</kun>",
+    )
+    test(
+        test_name="sound dropped readings 2/",
+        kanji="原",
+        # はら -> は
+        sentence="河原[かわら]",
+        expected_kana_only="かわ<b>ら</b>",
+        expected_furigana=" 河[かわ]<b> 原[ら]</b>",
+        expected_furikanji=" かわ[河]<b> ら[原]</b>",
+        expected_kana_only_with_tags_split="<kun>かわ</kun><b><kun>ら</kun></b>",
+        expected_furigana_with_tags_split="<kun> 河[かわ]</kun><b><kun> 原[ら]</kun></b>",
+        expected_furikanji_with_tags_split="<kun> かわ[河]</kun><b><kun> ら[原]</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>かわ</kun><b><kun>ら</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 河[かわ]</kun><b><kun> 原[ら]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> かわ[河]</kun><b><kun> ら[原]</kun></b>",
+    )
+    test(
+        test_name="sound fusion readings 1/",
+        kanji="胡",
+        # Likely by 黄[き] + 瓜[うり] forming 黄瓜[きゅうり] through sound fusion
+        # 胡瓜 is read as きゅうり making 胡[きゅ] techinically jukujikun
+        # However, since 瓜[うり] is a normal kunyomi reading, 黄瓜[きゅうり] can't be considered
+        # jukujikun, thus we'll note 胡[きゅ] as a kunyomi
+        sentence="胡瓜[きゅうり]",
+        expected_kana_only="<b>きゅ</b>うり",
+        expected_furigana="<b> 胡[きゅ]</b> 瓜[うり]",
+        expected_furikanji="<b> きゅ[胡]</b> うり[瓜]",
+        expected_kana_only_with_tags_split="<b><kun>きゅ</kun></b><kun>うり</kun>",
+        expected_furigana_with_tags_split="<b><kun> 胡[きゅ]</kun></b><kun> 瓜[うり]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> きゅ[胡]</kun></b><kun> うり[瓜]</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>きゅ</kun></b><kun>うり</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 胡[きゅ]</kun></b><kun> 瓜[うり]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> きゅ[胡]</kun></b><kun> うり[瓜]</kun>",
+    )
+    test(
+        test_name="sound fusion readings 2/",
+        kanji="狩",
+        sentence="狩人[かりゅうど]",
+        expected_kana_only="<b>かりゅ</b>うど",
+        expected_furigana="<b> 狩[かりゅ]</b> 人[うど]",
+        expected_furikanji="<b> かりゅ[狩]</b> うど[人]",
+        expected_kana_only_with_tags_split="<b><kun>かりゅ</kun></b><kun>うど</kun>",
+        expected_furigana_with_tags_split="<b><kun> 狩[かりゅ]</kun></b><kun> 人[うど]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> かりゅ[狩]</kun></b><kun> うど[人]</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>かりゅ</kun></b><kun>うど</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 狩[かりゅ]</kun></b><kun> 人[うど]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> かりゅ[狩]</kun></b><kun> うど[人]</kun>",
+    )
+    test(
         test_name="Single kana reading conversion 1/",
         # 祖 usually only lists ソ as the only onyomi
         kanji="祖",
