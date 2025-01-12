@@ -61,8 +61,7 @@ KATAKANA_CONVERSION_DICT = {
     to_katakana(k): [to_katakana(v) for v in vs] for k, vs in RENDAKU_CONVERSION_DICT.items()
 }
 
-# Include う just for the special case of 秘蔵[ひぞ]っ子[こ]
-SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "う", "り", "ん"]
+SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
@@ -767,6 +766,7 @@ def process_readings(
     onyomi_match = check_onyomi_readings(
         highlight_args.get("onyomi", ""),
         furigana,
+        word_data.get("okurigana", ""),
         target_furigana_section,
         edge,
         process_type=process_type,
@@ -778,6 +778,7 @@ def process_readings(
 
     kunyomi_results = check_kunyomi_readings(
         highlight_args,
+        word_data,
         furigana,
         target_furigana_section,
         edge,
@@ -956,6 +957,7 @@ ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_ts
 def is_reading_in_furigana_section(
     reading: str,
     furigana_section: str,
+    okurigana: str,
     edge: Edge,
 ) -> Tuple[str, ReadingType]:
     """
@@ -977,11 +979,23 @@ def is_reading_in_furigana_section(
     for kana in SMALL_TSU_POSSIBLE_HIRAGANA:
         if reading[-1] == kana:
             small_tsu_readings.append(f"{reading[:-1]}っ")
+    # Handle う-->っ cases, these can have the っ in the okurigana so it's more like
+    # the う is dropped in these cases. So, check if the first okuri char is っ and this
+    # reading ends in う. If so, add a reading with う removed
+    # These only apply when the okuri could belong to this reading, so "whole" or "right" edge
+    u_dropped_readings = []
+    if okurigana and okurigana[0] == "っ" and reading[-1] == "う":
+        u_dropped_readings.append(f"{reading[:-1]}")
+        for rendaku_reading in rendaku_readings:
+            u_dropped_readings.append(f"{rendaku_reading[:-1]}")
     if edge == "whole":
         # match the whole furigana or repeat twice in it, possibly with rendaku or small tsu
         # (eg. the next kanji is the same or 々)
         if reading == furigana_section:
             return reading, "plain"
+        for u_dropped_reading in u_dropped_readings:
+            if u_dropped_reading == furigana_section:
+                return u_dropped_reading, "small_tsu"
         if reading * 2 == furigana_section:
             return reading * 2, "plain"
         for rendaku_reading in rendaku_readings:
@@ -1016,6 +1030,9 @@ def is_reading_in_furigana_section(
         for r, t in all_readings:
             if furigana_section.endswith(r):
                 return r, cast(ReadingType, t)
+        for u_dropped_reading in u_dropped_readings:
+            if u_dropped_reading == furigana_section:
+                return u_dropped_reading, "small_tsu"
         return "", "none"
     # middle
     for r, t in all_readings:
@@ -1027,6 +1044,7 @@ def is_reading_in_furigana_section(
 def check_onyomi_readings(
     onyomi: str,
     furigana: str,
+    okurigana: str,
     target_furigana_section: str,
     edge: Edge,
     wrap_readings_with_tags: bool = True,
@@ -1064,7 +1082,10 @@ def check_onyomi_readings(
         # Convert the onyomi to hiragana since the furigana is in hiragana
         onyomi_reading = to_hiragana(onyomi_reading)
         match_in_section, match_type = is_reading_in_furigana_section(
-            onyomi_reading, target_furigana_section, edge
+            onyomi_reading,
+            target_furigana_section,
+            okurigana,
+            edge,
         )
         log(
             f"\ncheck_onyomi_readings - onyomi_reading: {onyomi_reading}, in_section:"
@@ -1196,6 +1217,7 @@ def check_okurigana_for_kunyomi_inflection(
 
 def check_kunyomi_readings(
     highlight_args: HighlightArgs,
+    word_data: WordData,
     furigana: str,
     target_furigana_section: str,
     edge: Edge,
@@ -1248,12 +1270,13 @@ def check_kunyomi_readings(
         if kunyomi_dict_form_okuri:
             kunyomi_stem_and_okuris.append((kunyomi_stem, kunyomi_dict_form_okuri, kunyomi_reading))
 
+    okurigana = word_data.get("okurigana", "")
     # First check matches against the stem
     for kunyomi_stem, full_reading in kunyomi_stems:
         if not kunyomi_stem:
             continue
         match_in_section, match_type = is_reading_in_furigana_section(
-            kunyomi_stem, target_furigana_section, edge
+            kunyomi_stem, target_furigana_section, okurigana, edge
         )
         log(
             f"\ncheck_kunyomi_readings - kunyomi_stem: {kunyomi_stem}, in_section:"
@@ -1274,7 +1297,6 @@ def check_kunyomi_readings(
                 "matched_reading": full_reading,
             }
             break
-    okurigana = highlight_args.get("okurigana", "")
     kanji_to_match = highlight_args.get("kanji_to_match", "")
     log(
         f"\ncheck_kunyomi_readings - noun form: {kunyomi_stem}, kunyomi_dict_form_okuri:"
@@ -1282,27 +1304,26 @@ def check_kunyomi_readings(
         " {kanji_to_match}"
     )
 
-    # Then also with noun forms of the whole kunyomi reading
+    # Then also readings with okurigana included in the furigana, noun forms and others
     # In this case there should be no okurigana as it would be a reading where those are omitted
     # e.g. 曳舟--曳き舟, 取調--取り調べ, 書留--書き留め
     noun_form_result: Optional[YomiMatchResult] = None
     for kunyomi_stem, kunyomi_dict_form_okuri, full_reading in kunyomi_stem_and_okuris:
+        noun_form_okuri = get_verb_noun_form_okuri(
+            kunyomi_dict_form_okuri, kanji_to_match, kunyomi_reading
+        )
         if (
-            not okurigana
-            and kunyomi_dict_form_okuri
-            and (
-                noun_form_okuri := get_verb_noun_form_okuri(
-                    kunyomi_dict_form_okuri, kanji_to_match, kunyomi_reading
-                )
-            )
-        ):
+            (not okurigana and edge in ["right", "whole"]) or (edge in ["left", "middle"])
+        ) and kunyomi_dict_form_okuri:
             # Replace last kana in dict form okuri with the noun form ending
-            noun_form_kunyomi_reading = f"{kunyomi_stem}{noun_form_okuri}"
+            okuri_included_reading = f"{kunyomi_stem}{kunyomi_dict_form_okuri}"
+            if noun_form_okuri:
+                okuri_included_reading = f"{kunyomi_stem}{noun_form_okuri}"
             match_in_section, match_type = is_reading_in_furigana_section(
-                noun_form_kunyomi_reading, target_furigana_section, edge
+                okuri_included_reading, target_furigana_section, okurigana, edge
             )
             log(
-                f"\ncheck_kunyomi_readings - noun_form: {noun_form_kunyomi_reading}, in_section:"
+                f"\ncheck_kunyomi_readings - noun_form: {okuri_included_reading}, in_section:"
                 f" {match_in_section}, type: {match_type}"
             )
             if match_in_section:
@@ -1896,8 +1917,6 @@ def kana_highlight(
 
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)
-    # Special case 秘蔵[ひぞ]っ子[こ] needs to be converted to 秘蔵[ひぞっ]子[こ]
-    clean_text = clean_text.replace("秘蔵[ひぞ]っ", "秘蔵[ひぞっ]")
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
     # Clean any double spaces that might have been created by the furigana reconstruction
     # Including those right before a <b> tag as the space is added with those
@@ -2583,26 +2602,6 @@ def main():
     )
     test(
         test_name="small tsu 5/",
-        kanji="蔵",
-        sentence="秘蔵っ子[ひぞっこ]",
-        expected_kana_only="ヒ<b>ゾッ</b>こ",
-        expected_furigana=" 秘[ヒ]<b> 蔵[ゾッ]</b> 子[こ]",
-        expected_furikanji=" ヒ[秘]<b> ゾッ[蔵]</b> こ[子]",
-        expected_kana_only_with_tags_split="<on>ヒ</on><b><on>ゾッ</on></b><kun>こ</kun>",
-        expected_furigana_with_tags_split="<on> 秘[ヒ]</on><b><on> 蔵[ゾッ]</on></b><kun> 子[こ]</kun>",
-        expected_furikanji_with_tags_split=(
-            "<on> ヒ[秘]</on><b><on> ゾッ[蔵]</on></b><kun> こ[子]</kun>"
-        ),
-        expected_kana_only_with_tags_merged="<on>ヒ</on><b><on>ゾッ</on></b><kun>こ</kun>",
-        expected_furigana_with_tags_merged=(
-            "<on> 秘[ヒ]</on><b><on> 蔵[ゾッ]</on></b><kun> 子[こ]</kun>"
-        ),
-        expected_furikanji_with_tags_merged=(
-            "<on> ヒ[秘]</on><b><on> ゾッ[蔵]</on></b><kun> こ[子]</kun>"
-        ),
-    )
-    test(
-        test_name="small tsu 6/",
         kanji="尻",
         # Should be considered a kunyomi match, it's the only instance of お->ぽ conversion
         # with small tsu
@@ -2618,7 +2617,7 @@ def main():
         expected_furikanji_with_tags_merged="<b><kun> しっ[尻]</kun></b><kun> ぽ[尾]</kun>",
     )
     test(
-        test_name="small tsu 7/",
+        test_name="small tsu 6/",
         kanji="呆",
         sentence="呆気[あっけ]ない",
         expected_kana_only="<b>あっ</b>ケない",
@@ -2632,7 +2631,7 @@ def main():
         expected_furikanji_with_tags_merged="<b><kun> あっ[呆]</kun></b><on> ケ[気]</on>ない",
     )
     test(
-        test_name="small tsu 8/",
+        test_name="small tsu 7/",
         kanji="甲",
         sentence="甲冑[かっちゅう]の 試着[しちゃく]をお 願[ねが]いします｡",
         expected_kana_only="<b>カッ</b>チュウの シチャクをお ねがいします｡",
@@ -2664,7 +2663,7 @@ def main():
         ),
     )
     test(
-        test_name="small tsu 9/",
+        test_name="small tsu 8/",
         kanji="百",
         sentence="百貨店[ひゃっかてん]",
         expected_kana_only="<b>ヒャッ</b>カテン",
@@ -2678,6 +2677,76 @@ def main():
         expected_kana_only_with_tags_merged="<b><on>ヒャッ</on></b><on>カテン</on>",
         expected_furigana_with_tags_merged="<b><on> 百[ヒャッ]</on></b><on> 貨店[カテン]</on>",
         expected_furikanji_with_tags_merged="<b><on> ヒャッ[百]</on></b><on> カテン[貨店]</on>",
+    )
+    test(
+        test_name="small tsu 秘蔵っ子 with う dropped",
+        kanji="蔵",
+        sentence="秘蔵っ子[ひぞっこ]",
+        expected_kana_only="ヒ<b>ゾ</b>っこ",
+        expected_furigana=" 秘[ヒ]<b> 蔵[ゾ]</b>っ 子[こ]",
+        expected_furikanji=" ヒ[秘]<b> ゾ[蔵]</b>っ こ[子]",
+        expected_kana_only_with_tags_split="<on>ヒ</on><b><on>ゾ</on></b>っ<kun>こ</kun>",
+        expected_furigana_with_tags_split="<on> 秘[ヒ]</on><b><on> 蔵[ゾ]</on></b>っ<kun> 子[こ]</kun>",
+        expected_furikanji_with_tags_split=(
+            "<on> ヒ[秘]</on><b><on> ゾ[蔵]</on></b>っ<kun> こ[子]</kun>"
+        ),
+        expected_kana_only_with_tags_merged="<on>ヒ</on><b><on>ゾ</on></b>っ<kun>こ</kun>",
+        expected_furigana_with_tags_merged=(
+            "<on> 秘[ヒ]</on><b><on> 蔵[ゾ]</on></b>っ<kun> 子[こ]</kun>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> ヒ[秘]</on><b><on> ゾ[蔵]</on></b>っ<kun> こ[子]</kun>"
+        ),
+    )
+    test(
+        test_name="small tsu 秘蔵っ子 with う included",
+        kanji="蔵",
+        sentence="秘蔵っ子[ひぞうっこ]",
+        expected_kana_only="ヒ<b>ゾウ</b>っこ",
+        expected_furigana=" 秘[ヒ]<b> 蔵[ゾウ]</b>っ 子[こ]",
+        expected_furikanji=" ヒ[秘]<b> ゾウ[蔵]</b>っ こ[子]",
+        expected_kana_only_with_tags_split="<on>ヒ</on><b><on>ゾウ</on></b>っ<kun>こ</kun>",
+        expected_furigana_with_tags_split=(
+            "<on> 秘[ヒ]</on><b><on> 蔵[ゾウ]</on></b>っ<kun> 子[こ]</kun>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> ヒ[秘]</on><b><on> ゾウ[蔵]</on></b>っ<kun> こ[子]</kun>"
+        ),
+        expected_kana_only_with_tags_merged="<on>ヒ</on><b><on>ゾウ</on></b>っ<kun>こ</kun>",
+        expected_furigana_with_tags_merged=(
+            "<on> 秘[ヒ]</on><b><on> 蔵[ゾウ]</on></b>っ<kun> 子[こ]</kun>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> ヒ[秘]</on><b><on> ゾウ[蔵]</on></b>っ<kun> こ[子]</kun>"
+        ),
+    )
+    test(
+        test_name="small tsu 放[ほ]ったら with う dropped",
+        kanji="放",
+        sentence="放[ほ]ったらかす",
+        expected_kana_only="<b>ほったら</b>かす",
+        expected_furigana="<b> 放[ほ]ったら</b>かす",
+        expected_furikanji="<b> ほ[放]ったら</b>かす",
+        expected_kana_only_with_tags_split="<b><kun>ほ</kun><oku>ったら</oku></b>かす",
+        expected_furigana_with_tags_split="<b><kun> 放[ほ]</kun><oku>ったら</oku></b>かす",
+        expected_furikanji_with_tags_split="<b><kun> ほ[放]</kun><oku>ったら</oku></b>かす",
+        expected_kana_only_with_tags_merged="<b><kun>ほ</kun><oku>ったら</oku></b>かす",
+        expected_furigana_with_tags_merged="<b><kun> 放[ほ]</kun><oku>ったら</oku></b>かす",
+        expected_furikanji_with_tags_merged="<b><kun> ほ[放]</kun><oku>ったら</oku></b>かす",
+    )
+    test(
+        test_name="small tsu 放[ほ]ったら with う included",
+        kanji="放",
+        sentence="放[ほう]ったらかす",
+        expected_kana_only="<b>ほうったら</b>かす",
+        expected_furigana="<b> 放[ほう]ったら</b>かす",
+        expected_furikanji="<b> ほう[放]ったら</b>かす",
+        expected_kana_only_with_tags_split="<b><kun>ほう</kun><oku>ったら</oku></b>かす",
+        expected_furigana_with_tags_split="<b><kun> 放[ほう]</kun><oku>ったら</oku></b>かす",
+        expected_furikanji_with_tags_split="<b><kun> ほう[放]</kun><oku>ったら</oku></b>かす",
+        expected_kana_only_with_tags_merged="<b><kun>ほう</kun><oku>ったら</oku></b>かす",
+        expected_furigana_with_tags_merged="<b><kun> 放[ほう]</kun><oku>ったら</oku></b>かす",
+        expected_furikanji_with_tags_merged="<b><kun> ほう[放]</kun><oku>ったら</oku></b>かす",
     )
     test(
         test_name="Single kana reading conversion 1/",
