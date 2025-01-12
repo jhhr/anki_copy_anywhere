@@ -60,14 +60,6 @@ def match_tags_with_kanji(word: str, furigana: str) -> list[WrapMatchResult]:
 
     for i, cur_tag in enumerate(tag_order):
         tag, highlight, kana, _ = cur_tag
-        if tag == "juk":
-            # jukujikun reading should encompass the entire word
-            # Check if the next tag is also jukujikun, and if so, merge them
-            next_tag = tag_order[i + 1] if i + 1 < len(tag_order) else None
-            if next_tag and next_tag.tag == "juk" and next_tag.highlight == highlight:
-                kana = kana + next_tag.contents
-            kanji_tags.append(WrapMatchResult(word, tag, highlight, kana))
-            break
         if kanji_index < len(word):
             cur_kanji = word[kanji_index]
             next_kanji = word[kanji_index + 1] if kanji_index + 1 < len(word) else None
@@ -95,9 +87,6 @@ def construct_wrapped_furi_word(
         f"construct_wrapped_furi_word word: {word}, furigana: {furigana}, return_type:"
         f" {return_type}, merge_consecutive: {merge_consecutive}"
     )
-    if return_type == "kana_only" and not merge_consecutive:
-        # Don't need to match kanji with furigana sections or merge, so just return the furigana
-        return furigana
     kanji_tags = match_tags_with_kanji(word, furigana)
     log(f"kanji_tags: {kanji_tags}")
     wrapped_furi_word = ""
@@ -202,13 +191,12 @@ def main():
     )
     test(
         word="大人",
-        # only a single tag, no difference when merging
-        furigana="<juk>おとな</juk>",
-        expected_kana_only="<juk>おとな</juk>",
+        furigana="<juk>おと</juk><juk>な</juk>",
+        expected_kana_only="<juk>おと</juk><juk>な</juk>",
         expected_kana_only_merged="<juk>おとな</juk>",
-        expected_furigana="<juk> 大人[おとな]</juk>",
+        expected_furigana="<juk> 大[おと]</juk><juk> 人[な]</juk>",
         expected_furigana_merged="<juk> 大人[おとな]</juk>",
-        expected_furikanji="<juk> おとな[大人]</juk>",
+        expected_furikanji="<juk> おと[大]</juk><juk> な[人]</juk>",
         expected_furikanji_merged="<juk> おとな[大人]</juk>",
     )
     test(

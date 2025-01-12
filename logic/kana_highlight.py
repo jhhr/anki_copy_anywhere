@@ -3,7 +3,7 @@ import re
 import sys
 import json
 import os
-from typing import Callable, TypedDict, Literal, Optional, Tuple, NamedTuple, cast
+from typing import Callable, TypedDict, Literal, Optional, Tuple, NamedTuple, cast, Union
 
 from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
 from .jpn_text_processing.get_conjugatable_okurigana_stem import (
@@ -725,7 +725,7 @@ def log(*args):
         print(*args)
 
 
-MatchProcess = Literal["replace", "match"]
+MatchProcess = Literal["replace", "match", "juku"]
 
 
 class ReadingProcessResult(NamedTuple):
@@ -744,7 +744,7 @@ def process_readings(
     process_type: MatchProcess,
     with_tags_def: WithTagsDef,
     show_error_message: Callable = print,
-) -> ReadingProcessResult:
+) -> Union[ReadingProcessResult, None]:
     """
     Function that processes furigana by checking all possible onyomi and kunyomi readings on it
     Either returns the furigana as-is when there is no match or modifies the furigana by
@@ -892,6 +892,19 @@ def process_readings(
     if kunyomi_process_result:
         log("\nkunyomi_process_result is returned")
         return kunyomi_process_result
+
+    return None
+
+
+def process_jukujikun_reading(
+    highlight_args: HighlightArgs,
+    word_data: WordData,
+    with_tags_def: WithTagsDef,
+    show_error_message: Callable = print,
+) -> ReadingProcessResult:
+
+    maybe_okuri = word_data.get("okurigana", "")
+    edge = word_data.get("edge", "none")
 
     # Neither onyomi nor kunyomi matched, get jukujikun or nothing
     kanji_count = word_data.get("kanji_count")
@@ -1120,11 +1133,11 @@ def process_onyomi_match(
     edge: Edge,
     process_type: MatchProcess,
     wrap_readings_with_tags: bool,
-):
+) -> str:
     """
     Function that replaces the furigana with the onyomi reading that matched
 
-    :return: string, the modified furigana
+    :return: string, the modified furigana or the matched part, depending on the process_type
     """
     if edge == "right":
         reg = re_match_from_right(onyomi_that_matched)
@@ -1394,7 +1407,7 @@ def process_kunyomi_match(
 ) -> str:
     """
     Function that replaces the furigana with the kunyomi reading that matched
-    :return: string, the modified furigana
+    :return: string, the modified furigana or the matched part, depending on the process_type
     """
     if edge == "right":
         reg = re_match_from_right(kunyomi_that_matched)
@@ -1429,6 +1442,7 @@ def handle_jukujikun_case(
     ), f"handle_jukujikun_case[]: incorrect kanji_count: {word_data.get('kanji_count')}"
     word = word_data.get("word", "")
     kanji_pos = word.find(kanji_to_highlight)
+    # kanji_pos can be -1, in which case no highlighting happens
     assert kanji_pos < kanji_count, (
         f"handle_jukujikun_case[]: incorrect kanji_pos: {kanji_pos}, kanji_to_highlight:"
         f" {kanji_to_highlight}"
@@ -1536,13 +1550,22 @@ def handle_whole_word_case(
         "word": word,
         "okurigana": okurigana,
     }
-    result, okurigana_to_highlight, rest_kana = process_readings(
+    res = process_readings(
         highlight_args,
         word_data,
         process_type="replace",
         with_tags_def=with_tags_def,
         show_error_message=show_error_message,
     )
+    if res is None:
+        log("\nhandle_whole_word_case - handle as jukujikun")
+        res = process_jukujikun_reading(
+            highlight_args,
+            word_data,
+            with_tags_def=with_tags_def,
+            show_error_message=show_error_message,
+        )
+    result, okurigana_to_highlight, rest_kana = res
     log(
         f"\nhandle_whole_word_case - word: {word}, result: {result}, okurigana:"
         f" {okurigana_to_highlight}, rest_kana: {rest_kana}"
@@ -1578,7 +1601,7 @@ def handle_partial_word_case(
     okurigana: str,
     with_tags_def: WithTagsDef,
     show_error_message: Callable,
-) -> PartialResult:
+) -> Union[PartialResult, None]:
     """
     The case when the word contains other kanji in addition to the kanji to highlight.
     Could be 2 or more kanji in the word.
@@ -1629,13 +1652,23 @@ def handle_partial_word_case(
         f" edge: {edge}"
     )
 
-    main_result, okurigana_to_highlight, rest_kana = process_readings(
+    # Exception handling for 風邪[かぜ] where we don't want the kunyomi かぜ for 風 to be matched
+    if word.startswith("風邪") and furigana.startswith("かぜ"):
+        # Force this into the jukujikun processing
+        return None
+
+    res = process_readings(
         highlight_args,
         word_data,
         process_type="match",
         with_tags_def=with_tags_def,
         show_error_message=show_error_message,
     )
+    if res is None:
+        log("\nhandle_partial_word_case - no result from process_readings")
+        return None
+
+    main_result, okurigana_to_highlight, rest_kana = res
 
     furi_okuri_result: PartialResult = {
         "matched_furigana": "",
@@ -1756,6 +1789,11 @@ def kana_highlight(
         final_middle_word = ""
         final_right_word = ""
 
+        juku_word_start = None
+        juku_word_end = None
+        juku_furigana = None
+        juku_word_start_edge = None
+        juku_word_pos_to_highlight: Union[Literal["left", "middle", "right"], None] = None
         # For the partial case, we need to split the furigana for each kanji using the kanji_data
         # for each one, highlight the kanji_to_match and reconstruct the furigana
         for index, kanji in enumerate(word):
@@ -1801,9 +1839,17 @@ def kana_highlight(
                 f"\npartial_result: {partial_result}, is_kanji_to_highlight:"
                 f" {is_kanji_to_highlight}"
             )
+            if partial_result is None:
+                # Need to handle this as jukujikun, break and
+                # proceed to reverse processing of the rest of the word
+                juku_word_start_edge = cur_edge
+                juku_word_start = index
+                juku_furigana = cur_furigana_section
+                if kanji_to_highlight_passed:
+                    juku_word_pos_to_highlight = "right"
+                break
             matched_furigana = partial_result["matched_furigana"]
             wrapped_furigana = matched_furigana
-            is_jukujikun = partial_result["match_type"] == "jukujikun"
 
             next_kanji = word[index + 1] if not is_last_kanji else ""
             if next_kanji == "々":
@@ -1812,10 +1858,9 @@ def kana_highlight(
                 cur_word = cur_word[2:]
                 # if we had the repeater kanji, we should add more furigana to this result
                 # If this was a normal match, the furigana should be repeating
-                if not is_jukujikun:
-                    log(f"\nrepeater kanji - doubling furigana: {matched_furigana}")
-                    matched_furigana *= 2
-                    wrapped_furigana = matched_furigana
+                log(f"\nrepeater kanji - doubling furigana: {matched_furigana}")
+                matched_furigana *= 2
+                wrapped_furigana = matched_furigana
             else:
                 rep_kanji = ""
                 cur_word = cur_word[1:]
@@ -1825,10 +1870,8 @@ def kana_highlight(
                     wrapped_furigana = f"<on>{matched_furigana}</on>"
                 elif partial_result["match_type"] == "kunyomi":
                     wrapped_furigana = f"<kun>{matched_furigana}</kun>"
-                # jukujikun furigana is wrapped in <juk> tags by handle_jukujikun_case
-                # we'll need to handle the rep_kanji case separately
 
-            if is_kanji_to_highlight and wrapped_furigana and not is_jukujikun:
+            if is_kanji_to_highlight and wrapped_furigana:
                 final_furigana += f"<b>{wrapped_furigana}</b>"
             elif matched_furigana:
                 final_furigana += wrapped_furigana
@@ -1866,27 +1909,6 @@ def kana_highlight(
                 final_rest_kana = partial_result["rest_kana"]
                 final_okurigana = partial_result["okurigana"]
 
-            if is_jukujikun:
-                # jukujikun case, the match will already contain the highlight and the rest
-                # of the furigana, return what we got so far as normally a jukujikun word is not
-                # a part of a compound word where it's preceded or followed by a normal word
-                # read using onyomi or kunyomi
-                if with_tags_def.assume_dictionary_form:
-                    final_okurigana += okurigana
-                    final_rest_kana = ""
-                else:
-                    final_okurigana += partial_result["okurigana"]
-                    final_rest_kana += partial_result["rest_kana"]
-                final_right_word += cur_word
-                final_edge = partial_result["edge"]
-                log(
-                    f"\njukujikun case - final_furigana: {final_furigana}, final_okurigana:"
-                    f" {final_okurigana}, final_rest_kana: {final_rest_kana}, final_left_word:"
-                    f" {final_left_word}, final_middle_word: {final_middle_word}, final_right_word:"
-                    f" {final_right_word}, final_edge: {final_edge}"
-                )
-                break
-
             if not matched_furigana:
                 show_error_message(
                     f"Error in kana_highlight[]: no match found for kanji {kanji} in word {word}"
@@ -1896,15 +1918,217 @@ def kana_highlight(
                 final_furigana += cur_furigana_section
                 final_okurigana += okurigana
                 final_right_word += cur_word
+                cur_word = ""
+                cur_furigana_section = ""
                 break
 
+        # If cur_word is not empty, we need to handle the rest of the word as jukujikun
+        # Process backward until we once more get to a non-match marking the juku_word_end
+        # the kanji from juku_word_start to juku_word_end is what is considered jukujikun
+        # Then get the intersection of juku_furigana and the remaining cur_furigana_section
+        # to get the furigana for the jukujikun part
+        reverse_final_furigana = ""
+        reverse_final_left_word = ""
+        reverse_final_middle_word = ""
+        reverse_final_right_word = ""
+        juku_word_length = len(cur_word)
+        juku_word_reversed = "".join(list(reversed(cur_word)))
+        log(
+            f"\npartial_result is None - juku_word_start: {juku_word_start}, juku_furigana:"
+            f" {juku_furigana} juku_word_pos_to_highlight:"
+            f" {juku_word_pos_to_highlight} juku_word_start_edge: {juku_word_start_edge},"
+            f" juku_word_reversed: {juku_word_reversed}"
+        )
+        for i, kanji in enumerate(juku_word_reversed):
+            if kanji == "々":
+                # Skip repeater as this will be handled in the next iteration
+                continue
+            # The edge is reversed now, so the first kanji is the right edge
+            is_first_kanji = i == juku_word_length - 1
+            is_last_kanji = i == 0
+            original_word_index = len(word) - i - 1
+            # Last kanji is where we left off with the previous loop, so we can stop there
+            if is_first_kanji:
+                juku_word_end = original_word_index
+                continue
+
+            is_middle_kanji = not is_first_kanji and not is_last_kanji
+            if is_first_kanji:
+                cur_edge = juku_word_start_edge
+            elif is_middle_kanji:
+                cur_edge = "middle"
+            kanji_data_key = NUMBER_TO_KANJI.get(kanji, kanji)
+            kanji_data = all_kanji_data.get(kanji_data_key)
+            if not kanji_data:
+                show_error_message(
+                    f"Error in kana_highlight[]: kanji '{kanji}' not found in all_kanji_data"
+                )
+                return furigana + okurigana
+            is_kanji_to_highlight = kanji == kanji_to_highlight
+            highlight_args = {
+                "text": text,
+                "kanji_to_highlight": kanji_to_highlight,
+                "kanji_to_match": kanji,
+                "onyomi": kanji_data.get("onyomi", ""),
+                "kunyomi": kanji_data.get("kunyomi", ""),
+                "add_highlight": is_kanji_to_highlight,
+                # Right edge now, as we're going backwards
+                "edge": "right" if not is_first_kanji else "whole",
+            }
+            cur_word = kanji
+            partial_result = handle_partial_word_case(
+                highlight_args,
+                cur_word,
+                cur_furigana_section,
+                okurigana if is_last_kanji else "",
+                with_tags_def=with_tags_def,
+                show_error_message=show_error_message,
+            )
+            log(
+                f"\nreversing, partial_result: {partial_result}, is_kanji_to_highlight:"
+                f" {is_kanji_to_highlight}"
+            )
+            if partial_result is None:
+                # Found the end of the jukujikun part, this can be the same as juku_word_start
+                juku_word_end = original_word_index
+                log(f"\nreversing end juku_word_end: {juku_word_end}")
+                break
+            matched_furigana = partial_result["matched_furigana"]
+            wrapped_furigana = matched_furigana
+
+            prev_kanji = juku_word_reversed[i - 1] if i > 0 else ""
+            if prev_kanji == "々":
+                # Add the repeater to be processed as part of the current kanji
+                kanji = f"{kanji}{prev_kanji}"
+                rep_kanji = prev_kanji
+                # if we had the repeater kanji, we should add more furigana to this result
+                # If this was a normal match, the furigana should be repeating
+                log(f"\nreverseing, repeater kanji - doubling furigana: {matched_furigana}")
+                matched_furigana *= 2
+                wrapped_furigana = matched_furigana
+            else:
+                rep_kanji = ""
+
+            if with_tags_def.with_tags:
+                if partial_result["match_type"] == "onyomi":
+                    wrapped_furigana = f"<on>{matched_furigana}</on>"
+                elif partial_result["match_type"] == "kunyomi":
+                    wrapped_furigana = f"<kun>{matched_furigana}</kun>"
+
+            if is_kanji_to_highlight and wrapped_furigana:
+                reverse_final_furigana = f"<b>{wrapped_furigana}</b>" + reverse_final_furigana
+            elif matched_furigana:
+                reverse_final_furigana = wrapped_furigana + reverse_final_furigana
+
+            # Slice the furigana and word from the end to remove the part that was already processed
+            cur_furigana_section = cur_furigana_section[: -len(matched_furigana)]
+            # This is also the furigana to be eventually processed as jukujikun
+            juku_furigana = cur_furigana_section
+            log(
+                f"\nwrapped_furigana: {wrapped_furigana}, matched_furigana: {matched_furigana},"
+                f" cur_furigana_section: {cur_furigana_section}, cur_word: {cur_word}"
+            )
+            # If this was the kanji to highlight, this edge should be in the final_result as
+            # reconstructed furigana needs it
+            if is_kanji_to_highlight:
+                final_edge = cur_edge
+                kanji_to_highlight_passed = True
+                juku_word_pos_to_highlight = "left"
+
+            # The complex part is putting the furigana back together
+            # A bit more so now that we're going backwards
+            if is_last_kanji:
+                reverse_final_right_word = kanji + rep_kanji + reverse_final_right_word
+            elif is_middle_kanji and is_kanji_to_highlight:
+                # Same as before
+                reverse_final_middle_word = kanji + rep_kanji + reverse_final_middle_word
+            elif is_middle_kanji and not kanji_to_highlight_passed:
+                # Reversed to right word
+                reverse_final_right_word = kanji + rep_kanji + reverse_final_right_word
+            if is_middle_kanji and kanji_to_highlight_passed:
+                # Reversed to left word
+                reverse_final_left_word = kanji + rep_kanji + reverse_final_left_word
+            # Final kanji (at juku_word_start) should never be encountered here as we'll break out
+            # of the loop at latest on it due not finding a match
+
+            if is_last_kanji:
+                final_rest_kana = partial_result["rest_kana"]
+                final_okurigana = partial_result["okurigana"]
+
+        log(
+            f"\nreversing processed, juku_word_start: {juku_word_start}, juku_word_end:"
+            f" {juku_word_end}, juku_furigana: {juku_furigana}"
+        )
+        if juku_word_start is not None and juku_word_end is not None and juku_furigana is not None:
+            juku_word = word[juku_word_start : juku_word_end + 1]
+            juku_at_word_right_edge = juku_word_end == len(word) - 1
+            log(
+                f"\nreversed handle_jukujikun_case - juku_word: {juku_word}, juku_furigana:"
+                f" {juku_furigana}"
+            )
+            kanji_pos = juku_word.find(kanji_to_highlight)
+            word_data: WordData = {
+                "kanji_pos": kanji_pos,
+                "kanji_count": len(juku_word),
+                "furigana": juku_furigana,
+                "edge": "whole",
+                "word": juku_word,
+                "okurigana": okurigana if juku_at_word_right_edge else "",
+            }
+            juku_highlight_args: HighlightArgs = {
+                "text": text,
+                "kanji_to_highlight": kanji_to_highlight,
+                "kanji_to_match": kanji_to_highlight,
+                # Jukujikun processing doesn't need readings, just pass empty strings
+                "onyomi": "",
+                "kunyomi": "",
+                "add_highlight": True,
+                "edge": "whole",
+            }
+            juku_result, juku_okuri, juku_rest_kana = process_jukujikun_reading(
+                juku_highlight_args,
+                word_data,
+                with_tags_def=with_tags_def,
+                show_error_message=show_error_message,
+            )
+            log(f"\nhandle_jukujikun_case - juku_result: {juku_result}")
+            reverse_final_furigana = juku_result["text"] + reverse_final_furigana
+            if juku_word_pos_to_highlight == "left":
+                reverse_final_left_word = juku_word + reverse_final_left_word
+            elif juku_word_pos_to_highlight == "right":
+                reverse_final_right_word = juku_word + reverse_final_right_word
+            elif kanji_pos != -1:
+                # Kanji to highlight is in the juku word
+                kanji_to_left = juku_word[:kanji_pos]
+                kanji_to_right = juku_word[kanji_pos + 1 :]
+                highlight_word = kanji_to_highlight
+                if kanji_to_right and kanji_to_right[0] == "々":
+                    kanji_to_right = kanji_to_right[1:]
+                    highlight_word += "々"
+                final_edge = juku_result["match_edge"]
+                if final_edge == "left":
+                    reverse_final_left_word = highlight_word + reverse_final_left_word
+                    reverse_final_right_word = kanji_to_right + reverse_final_right_word
+                elif final_edge == "right":
+                    reverse_final_right_word = highlight_word + reverse_final_right_word
+                    reverse_final_left_word = kanji_to_left + reverse_final_left_word
+                else:
+                    reverse_final_middle_word = juku_word + reverse_final_middle_word
+            else:
+                # No kanji_to_highlight was passed
+                reverse_final_left_word = juku_word + reverse_final_left_word
+
+            if not final_okurigana and juku_at_word_right_edge:
+                final_okurigana = juku_okuri
+                final_rest_kana = juku_rest_kana
+
         final_result = {
-            "furigana": final_furigana,
+            "furigana": final_furigana + reverse_final_furigana,
             "okurigana": final_okurigana,
             "rest_kana": final_rest_kana,
-            "left_word": final_left_word,
-            "middle_word": final_middle_word,
-            "right_word": final_right_word,
+            "left_word": final_left_word + reverse_final_left_word,
+            "middle_word": final_middle_word + reverse_final_middle_word,
+            "right_word": final_right_word + reverse_final_right_word,
             "edge": final_edge,
         }
         return reconstruct_furigana(
@@ -3074,8 +3298,12 @@ def main():
         expected_furigana="<b> 明々[しあ]</b> 後日[さって]",
         expected_furikanji="<b> しあ[明々]</b> さって[後日]",
         expected_kana_only_with_tags_split="<b><juk>しあ</juk></b><juk>さっ</juk><juk>て</juk>",
-        expected_furigana_with_tags_split="<b><juk> 明々[しあ]</juk></b><juk> 後日[さって]</juk>",
-        expected_furikanji_with_tags_split="<b><juk> しあ[明々]</juk></b><juk> さって[後日]</juk>",
+        expected_furigana_with_tags_split=(
+            "<b><juk> 明々[しあ]</juk></b><juk> 後[さっ]</juk><juk> 日[て]</juk>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><juk> しあ[明々]</juk></b><juk> さっ[後]</juk><juk> て[日]</juk>"
+        ),
         expected_kana_only_with_tags_merged="<b><juk>しあ</juk></b><juk>さって</juk>",
         expected_furigana_with_tags_merged="<b><juk> 明々[しあ]</juk></b><juk> 後日[さって]</juk>",
         expected_furikanji_with_tags_merged="<b><juk> しあ[明々]</juk></b><juk> さって[後日]</juk>",
@@ -3103,6 +3331,74 @@ def main():
         ),
         expected_furikanji_with_tags_merged=(
             "<juk> あ[明]</juk><b><juk> さっ[後]</juk></b><juk> て[日]</juk>"
+        ),
+    )
+    test(
+        test_name="jukujikun test 風邪 matched",
+        kanji="風",
+        # 風 has the kunyomi かぜ, but 風邪 should be read as the jukujikun かぜ
+        sentence="風邪[かぜ]",
+        expected_kana_only="<b>か</b>ぜ",
+        expected_furigana="<b> 風[か]</b> 邪[ぜ]",
+        expected_furikanji="<b> か[風]</b> ぜ[邪]",
+        expected_kana_only_with_tags_split="<b><juk>か</juk></b><juk>ぜ</juk>",
+        expected_furigana_with_tags_split="<b><juk> 風[か]</juk></b><juk> 邪[ぜ]</juk>",
+        expected_furikanji_with_tags_split="<b><juk> か[風]</juk></b><juk> ぜ[邪]</juk>",
+    )
+    test(
+        test_name="jukujikun test 風邪 not matched",
+        kanji="引",
+        # When not matched, jukujikun are automatically merged together
+        # This is done intentionally in match_tags_with_kanji.py, so could be changed
+        # Kind of makes sense you can't really choose which kanji matches with
+        # which part of the furigana
+        sentence="風邪[かぜ]を引[ひ]いた。",
+        expected_kana_only="かぜを<b>ひいた</b>。",
+        expected_furigana=" 風邪[かぜ]を<b> 引[ひ]いた</b>。",
+        expected_furikanji=" かぜ[風邪]を<b> ひ[引]いた</b>。",
+        expected_kana_only_with_tags_split=(
+            "<juk>か</juk><juk>ぜ</juk>を<b><kun>ひ</kun><oku>いた</oku></b>。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<juk> 風[か]</juk><juk> 邪[ぜ]</juk>を<b><kun> 引[ひ]</kun><oku>いた</oku></b>。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> か[風]</juk><juk> ぜ[邪]</juk>を<b><kun> ひ[引]</kun><oku>いた</oku></b>。"
+        ),
+        expected_kana_only_with_tags_merged="<juk>かぜ</juk>を<b><kun>ひ</kun><oku>いた</oku></b>。",
+        expected_furigana_with_tags_merged=(
+            "<juk> 風邪[かぜ]</juk>を<b><kun> 引[ひ]</kun><oku>いた</oku></b>。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<juk> かぜ[風邪]</juk>を<b><kun> ひ[引]</kun><oku>いた</oku></b>。"
+        ),
+    )
+    test(
+        test_name="jukujikun test with other readings after juku word",
+        kanji="買",
+        sentence="風邪薬[かぜぐすり]を買[か]った",
+        expected_kana_only="かぜぐすりを<b>かった</b>",
+        expected_furigana=" 風邪薬[かぜぐすり]を<b> 買[か]った</b>",
+        expected_furikanji=" かぜぐすり[風邪薬]を<b> か[買]った</b>",
+        expected_kana_only_with_tags_split=(
+            "<juk>か</juk><juk>ぜ</juk><kun>ぐすり</kun>を<b><kun>か</kun><oku>った</oku></b>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<juk> 風[か]</juk><juk> 邪[ぜ]</juk><kun> 薬[ぐすり]</kun>を<b><kun>"
+            " 買[か]</kun><oku>った</oku></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> か[風]</juk><juk> ぜ[邪]</juk><kun> ぐすり[薬]</kun>を<b><kun>"
+            " か[買]</kun><oku>った</oku></b>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<juk>かぜ</juk><kun>ぐすり</kun>を<b><kun>か</kun><oku>った</oku></b>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<juk> 風邪[かぜ]</juk><kun> 薬[ぐすり]</kun>を<b><kun> 買[か]</kun><oku>った</oku></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<juk> かぜ[風邪]</juk><kun> ぐすり[薬]</kun>を<b><kun> か[買]</kun><oku>った</oku></b>"
         ),
     )
     test(
