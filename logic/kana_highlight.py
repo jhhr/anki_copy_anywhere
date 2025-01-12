@@ -3736,6 +3736,65 @@ def main():
             " ふ[振]</kun><oku>り</oku>で <b><kun> は[恥]</kun><oku>じらって</oku></b>ください。"
         ),
     )
+    test(
+        test_name="numbers of people /1",
+        kanji="一",
+        sentence="一人[ひとり]",
+        expected_kana_only="<b>ひと</b>り",
+        expected_furigana="<b> 一[ひと]</b> 人[り]",
+        expected_furikanji="<b> ひと[一]</b> り[人]",
+        expected_kana_only_with_tags_split="<b><kun>ひと</kun></b><kun>り</kun>",
+        expected_furigana_with_tags_split="<b><kun> 一[ひと]</kun></b><kun> 人[り]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> ひと[一]</kun></b><kun> り[人]</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>ひと</kun></b><kun>り</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 一[ひと]</kun></b><kun> 人[り]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> ひと[一]</kun></b><kun> り[人]</kun>",
+    )
+    test(
+        test_name="numbers of people /2",
+        kanji="沁",
+        sentence="二人[ふたり]でしみじみと 語り合[かたりあ]った。",
+        expected_kana_only="ふたりでしみじみと かたりあった。",
+        expected_furigana=" 二人[ふたり]でしみじみと 語[かた]り 合[あ]った。",
+        expected_furikanji=" ふたり[二人]でしみじみと かた[語]り あ[合]った。",
+        expected_kana_only_with_tags_split=(
+            "<kun>ふた</kun><kun>り</kun>でしみじみと"
+            " <kun>かた</kun><oku>り</oku><kun>あ</kun><oku>った</oku>。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<kun> 二[ふた]</kun><kun> 人[り]</kun>でしみじみと <kun>"
+            " 語[かた]</kun><oku>り</oku><kun> 合[あ]</kun><oku>った</oku>。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<kun> ふた[二]</kun><kun> り[人]</kun>でしみじみと <kun>"
+            " かた[語]</kun><oku>り</oku><kun> あ[合]</kun><oku>った</oku>。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<kun>ふたり</kun>でしみじみと <kun>かた</kun><oku>り</oku><kun>あ</kun><oku>った</oku>。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<kun> 二人[ふたり]</kun>でしみじみと <kun> 語[かた]</kun><oku>り</oku><kun>"
+            " 合[あ]</kun><oku>った</oku>。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<kun> ふたり[二人]</kun>でしみじみと <kun> かた[語]</kun><oku>り</oku><kun>"
+            " あ[合]</kun><oku>った</oku>。"
+        ),
+    )
+    test(
+        test_name="numbers of people /3",
+        kanji="三",
+        sentence="三人[さんにん]",
+        expected_kana_only="<b>サン</b>ニン",
+        expected_furigana="<b> 三[サン]</b> 人[ニン]",
+        expected_furikanji="<b> サン[三]</b> ニン[人]",
+        expected_kana_only_with_tags_split="<b><on>サン</on></b><on>ニン</on>",
+        expected_furigana_with_tags_split="<b><on> 三[サン]</on></b><on> 人[ニン]</on>",
+        expected_furikanji_with_tags_split="<b><on> サン[三]</on></b><on> ニン[人]</on>",
+        expected_kana_only_with_tags_merged="<b><on>サン</on></b><on>ニン</on>",
+        expected_furigana_with_tags_merged="<b><on> 三[サン]</on></b><on> 人[ニン]</on>",
+        expected_furikanji_with_tags_merged="<b><on> サン[三]</on></b><on> ニン[人]</on>",
+    )
     print("\n\033[92mTests passed\033[0m")
 
 
