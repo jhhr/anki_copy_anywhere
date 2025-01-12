@@ -3795,6 +3795,34 @@ def main():
         expected_furigana_with_tags_merged="<b><on> 三[サン]</on></b><on> 人[ニン]</on>",
         expected_furikanji_with_tags_merged="<b><on> サン[三]</on></b><on> ニン[人]</on>",
     )
+    test(
+        test_name="miscellaneous readings /1",
+        kanji="生",
+        sentence="生粋[きっすい]",
+        expected_kana_only="<b>きっ</b>スイ",
+        expected_furigana="<b> 生[きっ]</b> 粋[スイ]",
+        expected_furikanji="<b> きっ[生]</b> スイ[粋]",
+        expected_kana_only_with_tags_split="<b><kun>きっ</kun></b><on>スイ</on>",
+        expected_furigana_with_tags_split="<b><kun> 生[きっ]</kun></b><on> 粋[スイ]</on>",
+        expected_furikanji_with_tags_split="<b><kun> きっ[生]</kun></b><on> スイ[粋]</on>",
+        expected_kana_only_with_tags_merged="<b><kun>きっ</kun></b><on>スイ</on>",
+        expected_furigana_with_tags_merged="<b><kun> 生[きっ]</kun></b><on> 粋[スイ]</on>",
+        expected_furikanji_with_tags_merged="<b><kun> きっ[生]</kun></b><on> スイ[粋]</on>",
+    )
+    test(
+        test_name="miscellaneous readings /2",
+        kanji="生",
+        sentence="生地[きじ]",
+        expected_kana_only="<b>き</b>ジ",
+        expected_furigana="<b> 生[き]</b> 地[ジ]",
+        expected_furikanji="<b> き[生]</b> ジ[地]",
+        expected_kana_only_with_tags_split="<b><kun>き</kun></b><on>ジ</on>",
+        expected_furigana_with_tags_split="<b><kun> 生[き]</kun></b><on> 地[ジ]</on>",
+        expected_furikanji_with_tags_split="<b><kun> き[生]</kun></b><on> ジ[地]</on>",
+        expected_kana_only_with_tags_merged="<b><kun>き</kun></b><on>ジ</on>",
+        expected_furigana_with_tags_merged="<b><kun> 生[き]</kun></b><on> 地[ジ]</on>",
+        expected_furikanji_with_tags_merged="<b><kun> き[生]</kun></b><on> ジ[地]</on>",
+    )
     print("\n\033[92mTests passed\033[0m")
 
 
