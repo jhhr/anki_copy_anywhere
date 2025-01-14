@@ -1652,9 +1652,12 @@ def handle_partial_word_case(
         f" edge: {edge}"
     )
 
-    # Exception handling for 風邪[かぜ] where we don't want the kunyomi かぜ for 風 to be matched
-    if word.startswith("風邪") and furigana.startswith("かぜ"):
-        # Force this into the jukujikun processing
+    # Exception handling for jukujikun where a single kanji has a kunyomi matching thejukujikun
+    # E.g. 風邪[かぜ] where 風 has かぜ, 薔薇[ばら] where 薔 has ばら
+    if (word.startswith("風邪") and furigana.startswith("かぜ")) or (
+        word.startswith("薔薇") and furigana.startswith("ばら")
+    ):
+        # Force these into the jukujikun processing
         return None
 
     res = process_readings(
@@ -3374,7 +3377,7 @@ def main():
         ),
     )
     test(
-        test_name="jukujikun test with other readings after juku word",
+        test_name="jukujikun test with other readings after juku word /1",
         kanji="買",
         sentence="風邪薬[かぜぐすり]を買[か]った",
         expected_kana_only="かぜぐすりを<b>かった</b>",
@@ -3400,6 +3403,24 @@ def main():
         expected_furikanji_with_tags_merged=(
             "<juk> かぜ[風邪]</juk><kun> ぐすり[薬]</kun>を<b><kun> か[買]</kun><oku>った</oku></b>"
         ),
+    )
+    test(
+        test_name="jukujikun test with other readings after juku word /2",
+        kanji="色",
+        sentence="薔薇色[ばらいろ]",
+        expected_kana_only="ばら<b>いろ</b>",
+        expected_furigana=" 薔薇[ばら]<b> 色[いろ]</b>",
+        expected_furikanji=" ばら[薔薇]<b> いろ[色]</b>",
+        expected_kana_only_with_tags_split="<juk>ば</juk><juk>ら</juk><b><kun>いろ</kun></b>",
+        expected_furigana_with_tags_split=(
+            "<juk> 薔[ば]</juk><juk> 薇[ら]</juk><b><kun> 色[いろ]</kun></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> ば[薔]</juk><juk> ら[薇]</juk><b><kun> いろ[色]</kun></b>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ばら</juk><b><kun>いろ</kun></b>",
+        expected_furigana_with_tags_merged="<juk> 薔薇[ばら]</juk><b><kun> 色[いろ]</kun></b>",
+        expected_furikanji_with_tags_merged="<juk> ばら[薔薇]</juk><b><kun> いろ[色]</kun></b>",
     )
     test(
         test_name="Should be able to get dictionary form okurigana of jukujikun reading",
