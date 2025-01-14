@@ -4162,7 +4162,7 @@ def main():
         expected_furikanji_with_tags_merged="<b><on> サン[三]</on></b><on> ニン[人]</on>",
     )
     test(
-        test_name="miscellaneous readings /1",
+        test_name="生 readings /1",
         kanji="生",
         sentence="生粋[きっすい]",
         expected_kana_only="<b>きっ</b>スイ",
@@ -4176,7 +4176,7 @@ def main():
         expected_furikanji_with_tags_merged="<b><kun> きっ[生]</kun></b><on> スイ[粋]</on>",
     )
     test(
-        test_name="miscellaneous readings /2",
+        test_name="生 readings /2",
         kanji="生",
         sentence="生地[きじ]",
         expected_kana_only="<b>き</b>ジ",
@@ -4188,6 +4188,30 @@ def main():
         expected_kana_only_with_tags_merged="<b><kun>き</kun></b><on>ジ</on>",
         expected_furigana_with_tags_merged="<b><kun> 生[き]</kun></b><on> 地[ジ]</on>",
         expected_furikanji_with_tags_merged="<b><kun> き[生]</kun></b><on> ジ[地]</on>",
+    )
+    test(
+        test_name="生 readings /3",
+        kanji="生",
+        sentence="弥生[やよい]",
+        expected_kana_only="や<b>よい</b>",
+        expected_kana_only_with_tags_split="<kun>や</kun><b><kun>よい</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>や</kun><b><kun>よい</kun></b>",
+    )
+    test(
+        test_name="生 readings /4",
+        kanji="生",
+        sentence="芝生[しばふ]",
+        expected_kana_only="しば<b>ふ</b>",
+        expected_kana_only_with_tags_split="<kun>しば</kun><b><kun>ふ</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>しば</kun><b><kun>ふ</kun></b>",
+    )
+    test(
+        test_name="生 readings /5",
+        kanji="生",
+        sentence="生憎[あいにく]",
+        expected_kana_only="<b>あい</b>にく",
+        expected_kana_only_with_tags_split="<b><kun>あい</kun></b><kun>にく</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>あい</kun></b><kun>にく</kun>",
     )
     print("\n\033[92mTests passed\033[0m")
 
