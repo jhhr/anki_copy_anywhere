@@ -1653,9 +1653,15 @@ def handle_partial_word_case(
     )
 
     # Exception handling for jukujikun where a single kanji has a kunyomi matching thejukujikun
-    # E.g. 風邪[かぜ] where 風 has かぜ, 薔薇[ばら] where 薔 has ばら
-    if (word.startswith("風邪") and furigana.startswith("かぜ")) or (
-        word.startswith("薔薇") and furigana.startswith("ばら")
+    # E.g. , 薔薇[ばら] where 薔 has ばら
+    if (
+        # 風 has kunyomi かぜ
+        (word.startswith("風邪") and furigana.startswith("かぜ"))
+        # 薔 has kunyomi ばら
+        or (word.startswith("薔薇") and furigana.startswith("ばら"))
+        # 真 has kunyomi ま, wiktionary considers 真面目 a jukujikun of まじ + kunyomi of 目
+        # with 真面 as ateji for まじ
+        or (word.startswith("真面") and furigana.startswith("まじ"))
     ):
         # Force these into the jukujikun processing
         return None
@@ -2112,6 +2118,11 @@ def kana_highlight(
                 # Correct edge if this was a single kanji juku word
                 if len(juku_word) == 1:
                     final_edge = "left" if juku_word_start == 0 else "right"
+                elif reverse_final_right_word and final_edge == "right":
+                    # multi-kanji jukujikun, highlight is at the right edge of the juku word
+                    # but there's another non-juku word after it, so the final edge is middle
+                    final_edge = "middle"
+
                 log(
                     f"\nreversed handle_jukujikun_case - juku_word: {juku_word}, kanji_to_left:"
                     f" {kanji_to_left}",
@@ -2124,7 +2135,12 @@ def kana_highlight(
                 elif final_edge == "right":
                     reverse_final_right_word = highlight_word + reverse_final_right_word
                     reverse_final_left_word = kanji_to_left + reverse_final_left_word
+                elif final_edge == "middle":
+                    reverse_final_right_word = kanji_to_right + reverse_final_right_word
+                    reverse_final_left_word = kanji_to_left + reverse_final_left_word
+                    reverse_final_middle_word = highlight_word + reverse_final_middle_word
                 else:
+                    # whole or kanji in juku word not highlighted
                     reverse_final_middle_word = juku_word + reverse_final_middle_word
             else:
                 # No kanji_to_highlight was passed
@@ -3430,6 +3446,30 @@ def main():
         expected_kana_only_with_tags_merged="<juk>ばら</juk><b><kun>いろ</kun></b>",
         expected_furigana_with_tags_merged="<juk> 薔薇[ばら]</juk><b><kun> 色[いろ]</kun></b>",
         expected_furikanji_with_tags_merged="<juk> ばら[薔薇]</juk><b><kun> いろ[色]</kun></b>",
+    )
+    test(
+        test_name="multi-kanji jukujikun word with other readings after juku word non-matched",
+        kanji="目",
+        sentence="真面目[まじめ]",
+        expected_kana_only="まじ<b>め</b>",
+        expected_kana_only_with_tags_split="<juk>ま</juk><juk>じ</juk><b><kun>め</kun></b>",
+        expected_kana_only_with_tags_merged="<juk>まじ</juk><b><kun>め</kun></b>",
+    )
+    test(
+        test_name="multi-kanji jukujikun word with other readings after juku word matched left ",
+        kanji="真",
+        sentence="真面目[まじめ]",
+        expected_kana_only="<b>ま</b>じめ",
+        expected_kana_only_with_tags_split="<b><juk>ま</juk></b><juk>じ</juk><kun>め</kun>",
+        expected_kana_only_with_tags_merged="<b><juk>ま</juk></b><juk>じ</juk><kun>め</kun>",
+    )
+    test(
+        test_name="multi-kanji jukujikun word with other readings after juku word matched right",
+        kanji="面",
+        sentence="真面目[まじめ]",
+        expected_kana_only="ま<b>じ</b>め",
+        expected_kana_only_with_tags_split="<juk>ま</juk><b><juk>じ</juk></b><kun>め</kun>",
+        expected_kana_only_with_tags_merged="<juk>ま</juk><b><juk>じ</juk></b><kun>め</kun>",
     )
     test(
         test_name="Should be able to get dictionary form okurigana of jukujikun reading",
