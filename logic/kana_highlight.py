@@ -2109,6 +2109,15 @@ def kana_highlight(
                     kanji_to_right = kanji_to_right[1:]
                     highlight_word += "々"
                 final_edge = juku_result["match_edge"]
+                # Correct edge if this was a single kanji juku word
+                if len(juku_word) == 1:
+                    final_edge = "left" if juku_word_start == 0 else "right"
+                log(
+                    f"\nreversed handle_jukujikun_case - juku_word: {juku_word}, kanji_to_left:"
+                    f" {kanji_to_left}",
+                    f" kanji_to_right: {kanji_to_right}, highlight_word: {highlight_word}",
+                    f" final_edge: {final_edge}",
+                )
                 if final_edge == "left":
                     reverse_final_left_word = highlight_word + reverse_final_left_word
                     reverse_final_right_word = kanji_to_right + reverse_final_right_word
