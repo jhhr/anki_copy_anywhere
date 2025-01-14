@@ -944,6 +944,9 @@ def get_target_furigana_section(
     :return: string, the part of the furigana that should be matched against the onyomi or kunyomi
         None for empty furigana or incorrect edge
     """
+    if len(furigana) == 1:
+        # If the furigana is only one character, we can't split it
+        return furigana
     if edge == "whole":
         # Highlight the whole furigana
         return furigana
@@ -3360,6 +3363,14 @@ def main():
         expected_furikanji_with_tags_merged=(
             "<juk> あ[明]</juk><b><juk> さっ[後]</juk></b><juk> て[日]</juk>"
         ),
+    )
+    test(
+        test_name="jukujikun test 蕎麦 not matched",
+        kanji="屋",
+        sentence="蕎麦屋[そばや]",
+        expected_kana_only="そば<b>や</b>",
+        expected_kana_only_with_tags_split="<juk>そ</juk><juk>ば</juk><b><kun>や</kun></b>",
+        expected_kana_only_with_tags_merged="<juk>そば</juk><b><kun>や</kun></b>",
     )
     test(
         test_name="jukujikun test 風邪 matched",
