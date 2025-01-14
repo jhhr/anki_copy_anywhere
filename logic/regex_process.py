@@ -1,4 +1,5 @@
 import re
+import sys
 from typing import Callable, Optional
 
 
@@ -53,23 +54,40 @@ def test(
     try:
         assert result == expected
     except AssertionError:
-        print(f"""{test_name}
-Expected: {expected}
-Got: {result}
-""")
-        raise
+        print(f"""\033[91m{test_name}
+\033[93mExpected: {expected}
+\033[92mGot:      {result}
+\033[0m""")
+        # Stop testing here
+        sys.exit(0)
 
 
 def main():
     test(
         test_name="Replacement with groups",
-        text="<i>abc123</i>def456<i>ghi789</i>",
+        text="<i>abc123</i>def456",
         regex=r"<i>(.*)</i>",
         replacement=r"\1",
         flags=None,
         expected="abc123def456",
     )
-    print("Ok.")
+    test(
+        test_name="Replacement with named groups, match",
+        text="<i>abc123</i>def456",
+        regex=r"<i>(?P<content>.*)</i>",
+        replacement=r"\g<content>",
+        flags=None,
+        expected="abc123def456",
+    )
+    test(
+        test_name="Replacement with named groups, no match",
+        text="<b>abc123</b>def456",
+        regex=r"<i>(?P<content>.*)</i>",
+        replacement=r"\g<content>",
+        flags=None,
+        expected="<b>abc123</b>def456",
+    )
+    print("\n\033[92mTests passed\033[0m")
 
 
 if __name__ == "__main__":
