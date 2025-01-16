@@ -172,13 +172,13 @@ class ProgressUpdater:
         start_time: float,
         definition_name: str,
         total_notes_count: int,
-        progrss_update_def: ProgressUpdateDef,
+        progress_update_def: ProgressUpdateDef,
         is_across: bool,
     ):
         self.start_time = start_time
         self.definition_name = definition_name
         self.total_notes_count = total_notes_count
-        self.progress_update_def = progrss_update_def
+        self.progress_update_def = progress_update_def
         self.is_across = is_across
         self.note_cnt = 0
         self.total_processed_sources = 0
@@ -201,14 +201,17 @@ class ProgressUpdater:
     def get_counts(self) -> Tuple[int, int, int]:
         return self.note_cnt, self.total_processed_sources, self.total_processed_destinations
 
-    def maybe_render_update(self):
+    def maybe_render_update(self, force: bool = False):
         elapsed_s = time.time() - self.start_time
         elapsed_since_last_update = elapsed_s - self.last_render_update
-        if elapsed_since_last_update < 1.0:
+        print(f"elapsed_since_last_update: {elapsed_since_last_update}, elapsed_s: {elapsed_s}")
+        if (elapsed_since_last_update < 1.0 and not force) or not self.total_notes_count > 0:
+            print("elapsed_since_last_update < 1.0")
             # Don't update the progress bar too often, it can cause a crash as apparently
             # two progress updates could happen simultaneously causing
             # self.progress_update_def.label to be None
             return
+        print("elapsed_since_last_update >= 1.0")
         self.last_render_update = elapsed_s
 
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
@@ -315,7 +318,9 @@ def copy_fields(
 
     # We'll mutate this object in copy_fields_in_background, so that when
     # the progress callback is called, it will have the latest values
-    progress_update_def = ProgressUpdateDef()
+    progress_update_def = ProgressUpdateDef(
+        label=f"<strong>{html.escape(copy_definitions[0]['definition_name'])}</strong>",
+    )
 
     def on_progress(_: Progress, update: ProgressUpdate):
         # progress contains some text that the sync progress bar uses, so it's useless
@@ -494,9 +499,11 @@ def copy_fields_in_background(
         start_time=start_time,
         definition_name=definition_name,
         total_notes_count=total_notes_count,
-        progrss_update_def=progress_update_def,
+        progress_update_def=progress_update_def,
         is_across=is_across,
     )
+
+    progress_updater.maybe_render_update(force=True)
 
     # Cache any opened files, so process chains can use them instead of needing to open them again
     # contents will be cached by file name
@@ -537,7 +544,7 @@ def copy_fields_in_background(
         _, total_processed_sources, total_processed_destinations = progress_updater.get_counts()
         results.add_result_text(f"""<br><span>
             {time.time() - start_time:.2f}s -
-            <i>{copy_definition['definition_name']}:</i>
+            <i>{html.escape(copy_definition['definition_name'])}:</i>
             {total_processed_destinations} destinations
             {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
         </span>""")
