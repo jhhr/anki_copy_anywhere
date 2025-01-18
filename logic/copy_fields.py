@@ -204,7 +204,10 @@ class ProgressUpdater:
     def maybe_render_update(self, force: bool = False):
         elapsed_s = time.time() - self.start_time
         elapsed_since_last_update = elapsed_s - self.last_render_update
-        print(f"elapsed_since_last_update: {elapsed_since_last_update}, elapsed_s: {elapsed_s}")
+        print(
+            f"self.last_render_update: {self.last_render_update:.5f}, elapsed_since_last_update:"
+            f" {elapsed_since_last_update:.5f}, elapsed_s: {elapsed_s:.5f}"
+        )
         if (elapsed_since_last_update < 1.0 and not force) or not self.total_notes_count > 0:
             print("elapsed_since_last_update < 1.0")
             # Don't update the progress bar too often, it can cause a crash as apparently
@@ -730,6 +733,8 @@ def copy_for_single_trigger_note(
         # So, return True
         return True
 
+    if progress_updater is not None:
+        progress_updater.update_counts(processed_sources_inc=len(source_notes))
     # Step 2: Get value for each field we are copying into
     for i, destination_note in enumerate(destination_notes):
         success = copy_into_single_note(
@@ -747,7 +752,6 @@ def copy_for_single_trigger_note(
         )
         if progress_updater is not None:
             progress_updater.update_counts(processed_destinations_inc=1)
-            progress_updater.maybe_render_update()
         if copied_into_notes is not None:
             copied_into_notes.append(destination_note)
         if not success:
@@ -1138,7 +1142,6 @@ def get_field_values_from_notes(
             )
 
         if progress_updater is not None:
-            progress_updater.update_counts(processed_sources_inc=1)
             progress_updater.maybe_render_update()
         result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
 
