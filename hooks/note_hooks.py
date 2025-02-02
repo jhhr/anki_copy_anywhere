@@ -143,9 +143,15 @@ def run_copy_fields_on_review(card: Card):
         return
     note_type_name = note_type["name"]
 
+    copy_definitions_to_run: list[CopyDefinition] = []
+    has_definitions_to_process_on_sync = False
+
     for copy_definition in config.copy_definitions:
         copy_on_review = copy_definition.get("copy_on_review", False)
         if not copy_on_review:
+            copy_on_sync = copy_definition.get("copy_on_sync", False)
+            if copy_on_sync:
+                has_definitions_to_process_on_sync = True
             continue
         copy_into_note_types = copy_definition.get("copy_into_note_types", None)
         # Split note_types by comma
@@ -155,22 +161,32 @@ def run_copy_fields_on_review(card: Card):
         if note_type_name not in note_type_names:
             continue
 
+        copy_definitions_to_run.append(copy_definition)
+
+    if not copy_definitions_to_run:
+        return
+
         # Get the current Answer card undo entry
-        undo_status = mw.col.undo_status()
-        answer_card_undo_entry = undo_status.last_step
-        copied_into_notes: list[Note] = []
+    undo_status = mw.col.undo_status()
+    answer_card_undo_entry = undo_status.last_step
+    copied_into_notes: list[Note] = []
+    for copy_definition in copy_definitions_to_run:
         copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
             copied_into_notes=copied_into_notes,
         )
-        write_custom_data(card, key="fc", value="1")
-        # update_card adds a new undo entry Update card
-        mw.col.update_card(card)
-        # update_note adds a new undo entry Update note
-        mw.col.update_notes(copied_into_notes)
-        # But now they are both merged into the Answer card undo entry
-        mw.col.merge_undo_entries(answer_card_undo_entry)
+    if has_definitions_to_process_on_sync:
+        # In order to not have on_sync definitions run twice, we'll set a different fc value
+        write_custom_data(card, key="fc", value=-1)
+    else:
+        write_custom_data(card, key="fc", value=1)
+    # update_card adds a new undo entry Update card
+    mw.col.update_card(card)
+    # update_note adds a new undo entry Update note
+    mw.col.update_notes(copied_into_notes)
+    # But now they are both merged into the Answer card undo entry
+    mw.col.merge_undo_entries(answer_card_undo_entry)
 
 
 editor_for_note_id: dict[EditorMode, Union[Tuple[Editor, NoteId], None]] = {
