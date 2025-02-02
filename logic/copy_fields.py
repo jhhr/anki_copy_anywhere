@@ -379,7 +379,7 @@ def copy_fields(
                 break
         if is_sync:
             for card in copied_into_cards:
-                write_custom_data(card, key="fc", value="1")
+                write_custom_data(card, key="fc", value=1)
             mw.col.update_cards(copied_into_cards)
             results.changes = mw.col.merge_undo_entries(undo_entry)
         # undo_entry has to be updated after every undoable op or the last_step will
@@ -460,6 +460,10 @@ def copy_fields_in_background(
         filter(None, [mw.col.models.id_for_name(name) for name in note_type_names])
     )
 
+    copy_on_review = copy_definition.get("copy_on_review", False)
+    copy_on_sync = copy_definition.get("copy_on_sync", False)
+    copy_on_sync_after_review = not copy_on_review and copy_on_sync
+
     assert mw.col.db is not None
 
     nids_query = f"AND n.id IN {ids2str(note_ids)}" if note_ids is not None else ""
@@ -467,14 +471,16 @@ def copy_fields_in_background(
         mw.col.get_note(nid)
         for nid in mw.col.db.list(
             # When syncing, only copy into notes that have been been flagged for a field change
-            # in the custom scheduler by setting the field changed flag to 1
+            # in the custom scheduler by setting the field changed flag to 0 or -1 in note_hooks.py
             # and filter by any given note_ids
             f"""
         SELECT n.id
         FROM notes n, cards c
         WHERE n.mid IN {ids2str(note_type_ids)}
         AND c.nid = n.id
-        AND json_extract(json_extract(c.data, '$.cd'), '$.fc') = 0
+        AND json_extract(json_extract(c.data, '$.cd'), '$.fc') {f"IN (0, -1)"
+                                                                if copy_on_sync_after_review
+                                                                else "= 0"}
         {nids_query}
         """
             if is_sync
