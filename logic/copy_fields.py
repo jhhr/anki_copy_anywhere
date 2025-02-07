@@ -4,13 +4,12 @@ import time
 import html
 from typing import Callable, Union, Optional, Tuple, Sequence, Any
 
-from anki.collection import Progress, OpChanges
+from anki.collection import OpChanges
 from anki.cards import Card
 from anki.notes import Note, NoteId
 from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
-from aqt.progress import ProgressUpdate
 
 from aqt.qt import (
     QWidget,
@@ -172,13 +171,11 @@ class ProgressUpdater:
         start_time: float,
         definition_name: str,
         total_notes_count: int,
-        progrss_update_def: ProgressUpdateDef,
         is_across: bool,
     ):
         self.start_time = start_time
         self.definition_name = definition_name
         self.total_notes_count = total_notes_count
-        self.progress_update_def = progrss_update_def
         self.is_across = is_across
         self.note_cnt = 0
         self.total_processed_sources = 0
@@ -201,29 +198,36 @@ class ProgressUpdater:
     def get_counts(self) -> Tuple[int, int, int]:
         return self.note_cnt, self.total_processed_sources, self.total_processed_destinations
 
-    def maybe_render_update(self):
+    def maybe_render_update(self, force: bool = False):
         elapsed_s = time.time() - self.start_time
         elapsed_since_last_update = elapsed_s - self.last_render_update
-        if elapsed_since_last_update < 1.0:
-            # Don't update the progress bar too often, it can cause a crash as apparently
-            # two progress updates could happen simultaneously causing
-            # self.progress_update_def.label to be None
+        is_last_note = self.note_cnt == self.total_notes_count
+        no_notes = not self.total_notes_count > 0
+        if (elapsed_since_last_update < 0.1 and not (force or is_last_note)) or no_notes:
             return
         self.last_render_update = elapsed_s
 
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
-        self.progress_update_def.label = f"""<strong>{html.escape(self.definition_name)}</strong>:
+        label = f"""<strong>{html.escape(self.definition_name)}</strong>:
         <br>Copied {self.note_cnt}/{self.total_notes_count} notes
         <br><small>Notes processed - destinations: {self.total_processed_destinations}
             {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
         <br>Time: {elapsed_time}"""
-        if self.note_cnt / self.total_notes_count > 0.10 or elapsed_s > 5:
+        if self.note_cnt / self.total_notes_count > 0.10 or elapsed_s > 1:
             if self.note_cnt > 0:
                 eta_s = (elapsed_s / self.note_cnt) * (self.total_notes_count - self.note_cnt)
                 eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
-                self.progress_update_def.label += f" - ETA: {eta}"
-        self.progress_update_def.value = self.note_cnt
-        self.progress_update_def.max_value = self.total_notes_count
+                label += f" - ETA: {eta}"
+        value = self.note_cnt
+        max_value = self.total_notes_count
+
+        mw.taskman.run_on_main(
+            lambda: mw.progress.update(
+                label=label,
+                value=value,
+                max=max_value,
+            )
+        )
 
 
 def make_copy_fields_undo_text(
@@ -313,20 +317,6 @@ def copy_fields(
         # Need to raise the exception to get the traceback to the cause in the console
         raise exception
 
-    # We'll mutate this object in copy_fields_in_background, so that when
-    # the progress callback is called, it will have the latest values
-    progress_update_def = ProgressUpdateDef()
-
-    def on_progress(_: Progress, update: ProgressUpdate):
-        # progress contains some text that the sync progress bar uses, so it's useless
-        # here as it never changes
-        nonlocal progress_update_def
-        if progress_update_def.has_update():
-            update.label = progress_update_def.label
-            update.value = progress_update_def.value
-            update.max = progress_update_def.max_value
-            progress_update_def.clear()
-
     def op(_) -> CacheResults:
         if not copy_definitions:
             show_error_message("Error in copy fields: No definitions given")
@@ -364,7 +354,6 @@ def copy_fields(
                 copied_into_cards=copied_into_cards,
                 copied_into_notes=copied_into_notes,
                 results=results,
-                progress_update_def=progress_update_def,
                 field_only=field_only,
             )
             if mw.progress.want_cancel():
@@ -387,7 +376,6 @@ def copy_fields(
         )
         .success(on_done)
         .failure(on_failure)
-        .with_backend_progress(on_progress)
         .run_in_background()
     )
 
@@ -397,7 +385,6 @@ def copy_fields_in_background(
     copied_into_cards: list[Card],
     copied_into_notes: list[Note],
     results: CacheResults,
-    progress_update_def: ProgressUpdateDef,
     is_sync: Optional[bool] = False,
     note_ids: Optional[Sequence[int]] = None,
     field_only: Optional[str] = None,
@@ -412,7 +399,6 @@ def copy_fields_in_background(
         notes that were copied into
     :param undo_entry: The undo entry to merge the changes into
     :param results: The results object to update with the final result text
-    :param progress_update_def: The progress update object to update the progress bar with
     :param note_ids: The note ids to copy into, if None, all notes of the note type are copied into
     :param field_only: Optional field to limit copying to. Used when copying is applied
       in the note editor
@@ -500,7 +486,6 @@ def copy_fields_in_background(
         start_time=start_time,
         definition_name=definition_name,
         total_notes_count=total_notes_count,
-        progrss_update_def=progress_update_def,
         is_across=is_across,
     )
 
@@ -527,6 +512,7 @@ def copy_fields_in_background(
         progress_updater.update_counts(note_cnt_inc=1)
 
         copied_into_cards.extend(note.cards())
+        progress_updater.maybe_render_update()
 
         if mw.progress.want_cancel():
             break
@@ -543,7 +529,7 @@ def copy_fields_in_background(
         _, total_processed_sources, total_processed_destinations = progress_updater.get_counts()
         results.add_result_text(f"""<br><span>
             {time.time() - start_time:.2f}s -
-            <i>{copy_definition['definition_name']}:</i>
+            <i>{html.escape(copy_definition['definition_name'])}:</i>
             {total_processed_destinations} destinations
             {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
         </span>""")
@@ -724,11 +710,15 @@ def copy_for_single_trigger_note(
         return False
 
     if len(source_notes) == 0:
+        if progress_updater is not None:
+            progress_updater.update_counts(processed_destinations_inc=len(destination_notes))
         # This case is ok, there's just nothing to do
         # But we need to end early here so that the target fields aren't wiped
         # So, return True
         return True
 
+    if progress_updater is not None:
+        progress_updater.update_counts(processed_sources_inc=len(source_notes))
     # Step 2: Get value for each field we are copying into
     for i, destination_note in enumerate(destination_notes):
         success = copy_into_single_note(
@@ -746,7 +736,6 @@ def copy_for_single_trigger_note(
         )
         if progress_updater is not None:
             progress_updater.update_counts(processed_destinations_inc=1)
-            progress_updater.maybe_render_update()
         if copied_into_notes is not None:
             copied_into_notes.append(destination_note)
         if not success:
@@ -1137,7 +1126,6 @@ def get_field_values_from_notes(
             )
 
         if progress_updater is not None:
-            progress_updater.update_counts(processed_sources_inc=1)
             progress_updater.maybe_render_update()
         result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
 
