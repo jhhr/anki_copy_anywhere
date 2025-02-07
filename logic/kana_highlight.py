@@ -276,6 +276,16 @@ NUMBER_TO_KANJI = {
     "９": "九",
 }
 
+# Exceptions for words where the first kanji has a kunyomi reading that is the same as the
+# the whole reading for the jukujikun compound. This is used to avoid matching the kunyomi
+# reading for the first kanji as a separate word.
+JUKUJIKUN_KUNYOMI_OVERLAP: dict[str, str] = {
+    "風邪": "かぜ",
+    "薔薇": "ばら",
+    "真面": "まじ",
+    "蕎麦": "そば",
+}
+
 # Regex for lone kanji with some hiragana to their right, then some kanji,
 # then furigana that includes the hiragana in the middle
 # This is used to match cases of furigana used for　kunyomi compound words with
@@ -1654,16 +1664,12 @@ def handle_partial_word_case(
         f" edge: {edge}"
     )
 
-    # Exception handling for jukujikun where a single kanji has a kunyomi matching thejukujikun
-    # E.g. , 薔薇[ばら] where 薔 has ばら
+    # Handle cases that should be a jukujikun reading but the first kanji has a matching kunyomi
     if (
-        # 風 has kunyomi かぜ
-        (word.startswith("風邪") and furigana.startswith("かぜ"))
-        # 薔 has kunyomi ばら
-        or (word.startswith("薔薇") and furigana.startswith("ばら"))
-        # 真 has kunyomi ま, wiktionary considers 真面目 a jukujikun of まじ + kunyomi of 目
-        # with 真面 as ateji for まじ
-        or (word.startswith("真面") and furigana.startswith("まじ"))
+        # All these cases are 2-kanji long
+        len(word) >= 2
+        and (juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(word[:2]))
+        and furigana.startswith(juku_reading)
     ):
         # Force these into the jukujikun processing
         return None
@@ -3322,6 +3328,38 @@ def main():
         ),
     )
     test(
+        test_name="jukujikun test 昨日",
+        kanji="展",
+        sentence="昨日[きのう]、 絵[え]の 展覧[てんらん] 会[かい]に 行[い]ってきました。",
+        expected_kana_only="きのう、 エの <b>テン</b>ラン カイに いってきました。",
+        expected_furigana=" 昨日[きのう]、 絵[エ]の<b> 展[テン]</b> 覧[ラン] 会[カイ]に 行[い]ってきました。",
+        expected_furikanji=" きのう[昨日]、 エ[絵]の<b> テン[展]</b> ラン[覧] カイ[会]に い[行]ってきました。",
+        expected_kana_only_with_tags_split=(
+            "<juk>きの</juk><juk>う</juk>、 <on>エ</on>の <b><on>テン</on></b><on>ラン</on>"
+            " <on>カイ</on>に <kun>い</kun><oku>って</oku>きました。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<juk> 昨[きの]</juk><juk> 日[う]</juk>、 <on> 絵[エ]</on>の <b><on> 展[テン]</on></b>"
+            "<on> 覧[ラン]</on> <on> 会[カイ]</on>に <kun> 行[い]</kun><oku>って</oku>きました。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> きの[昨]</juk><juk> う[日]</juk>、 <on> エ[絵]</on>の <b><on> テン[展]</on></b>"
+            "<on> ラン[覧]</on> <on> カイ[会]</on>に <kun> い[行]</kun><oku>って</oku>きました。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<juk>きのう</juk>、 <on>エ</on>の <b><on>テン</on></b><on>ラン</on>"
+            " <on>カイ</on>に <kun>い</kun><oku>って</oku>きました。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<juk> 昨日[きのう]</juk>、 <on> 絵[エ]</on>の <b><on> 展[テン]</on></b>"
+            "<on> 覧[ラン]</on> <on> 会[カイ]</on>に <kun> 行[い]</kun><oku>って</oku>きました。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<juk> きのう[昨日]</juk>、 <on> エ[絵]</on>の <b><on> テン[展]</on></b>"
+            "<on> ラン[覧]</on> <on> カイ[会]</on>に <kun> い[行]</kun><oku>って</oku>きました。"
+        ),
+    )
+    test(
         test_name="jukujikun test with repeater 明々後日",
         kanji="明",
         sentence="明々後日[しあさって]",
@@ -3481,6 +3519,22 @@ def main():
         expected_kana_only="ま<b>じ</b>め",
         expected_kana_only_with_tags_split="<juk>ま</juk><b><juk>じ</juk></b><kun>め</kun>",
         expected_kana_only_with_tags_merged="<juk>ま</juk><b><juk>じ</juk></b><kun>め</kun>",
+    )
+    test(
+        test_name="multi-kanji jukujikun verb reading matched left",
+        kanji="揶",
+        sentence="揶揄[からか]う",
+        expected_kana_only="<b>から</b>かう",
+        expected_kana_only_with_tags_split="<b><juk>から</juk></b><juk>か</juk>う",
+        expected_kana_only_with_tags_merged="<b><juk>から</juk></b><juk>か</juk>う",
+    )
+    test(
+        test_name="multi-kanji jukujikun verb reading matched right",
+        kanji="揄",
+        sentence="揶揄[からか]う",
+        expected_kana_only="から<b>か</b>う",
+        expected_kana_only_with_tags_split="<juk>から</juk><b><juk>か</juk></b>う",
+        expected_kana_only_with_tags_merged="<juk>から</juk><b><juk>か</juk></b>う",
     )
     test(
         test_name="Should be able to get dictionary form okurigana of jukujikun reading",
