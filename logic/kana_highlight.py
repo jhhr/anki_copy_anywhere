@@ -2138,7 +2138,12 @@ def kana_highlight(
                 final_edge = juku_result["match_edge"]
                 # Correct edge if this was a single kanji juku word
                 if len(juku_word) == 1:
-                    final_edge = "left" if juku_at_word_left_edge else "right"
+                    if juku_at_word_left_edge:
+                        final_edge = "left"
+                    elif juku_at_word_right_edge:
+                        final_edge = "right"
+                    else:
+                        final_edge = "middle"
                 elif reverse_final_right_word and final_edge == "right":
                     # multi-kanji jukujikun, highlight is at the right edge of the juku word
                     # but there's another non-juku word after it, so the final edge is middle
@@ -3416,6 +3421,14 @@ def main():
         expected_furikanji_with_tags_merged=(
             "<kun> あ[明]</kun><b><juk> さっ[後]</juk></b><juk> て[日]</juk>"
         ),
+    )
+    test(
+        test_name="single-kanji juku in middle of word",
+        kanji="気",
+        sentence="意気地[いくじ]",
+        expected_kana_only="イ<b>く</b>ジ",
+        expected_kana_only_with_tags_split="<on>イ</on><b><juk>く</juk></b><on>ジ</on>",
+        expected_kana_only_with_tags_merged="<on>イ</on><b><juk>く</juk></b><on>ジ</on>",
     )
     test(
         ignore_fail=True,
