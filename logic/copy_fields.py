@@ -179,6 +179,7 @@ class ProgressUpdater:
         definition_name: str,
         total_notes_count: int,
         is_across: bool,
+        title: Optional[str],
     ):
         self.start_time = start_time
         self.definition_name = definition_name
@@ -188,6 +189,9 @@ class ProgressUpdater:
         self.total_processed_sources = 0
         self.total_processed_destinations = 0
         self.last_render_update = 0.0
+        if title is None:
+            title = "Copying fields"
+        self.set_title(title)
 
     def update_counts(
         self,
@@ -236,6 +240,9 @@ class ProgressUpdater:
             )
         )
 
+    def set_title(self, title: str):
+        mw.progress.set_title(title)
+
 
 def make_copy_fields_undo_text(
     copy_definitions: list[CopyDefinition],
@@ -271,6 +278,7 @@ def copy_fields(
     undo_text_suffix: Optional[str] = "",
     update_sync_result: Optional[Callable[[str, int], None]] = None,
     on_done: Optional[Callable[[], None]] = None,
+    progress_title: Optional[str] = None,
 ):
     """
     Run many copy definitions at once using CollectionOp. Includes fancy progress updates
@@ -288,6 +296,7 @@ def copy_fields(
     :param update_sync_result: Provided when this is a sync operation. Used to update the sync
         result text and count
     :param on_done: Optional function to run when the operation is done
+    :param progress_title: Optional title for the progress dialog
     """
     start_time = time.time()
     debug_texts = []
@@ -304,7 +313,7 @@ def copy_fields(
         # Don't show a blank tooltip with just the time
         if result:
             main_time = (
-                f"{time.time() - start_time:.2f}s total time<br>"
+                f"{time.time() - start_time:.2f}s total time"
                 if len(copy_definitions) > 1
                 else "Finished in "
             )
@@ -372,6 +381,7 @@ def copy_fields(
                 copied_into_notes=copied_into_notes,
                 results=results,
                 field_only=field_only,
+                progress_title=progress_title,
             )
             if mw.progress.want_cancel():
                 break
@@ -406,6 +416,7 @@ def copy_fields_in_background(
     note_ids: Optional[Sequence[int]] = None,
     field_only: Optional[str] = None,
     show_message: Optional[Callable[[str], None]] = None,
+    progress_title: Optional[str] = None,
 ) -> CacheResults:
     """
     Function run to copy stuff into many notes at once.
@@ -421,6 +432,7 @@ def copy_fields_in_background(
       in the note editor
     :param show_message: Function to show error messages
     :param is_sync: Whether this is a sync operation or not
+    :param progress_title: Optional title for the progress dialog
     :return: the CacheResults object passed as results
     """
     copy_into_note_types = copy_definition.get("copy_into_note_types", None)
@@ -504,6 +516,7 @@ def copy_fields_in_background(
         definition_name=definition_name,
         total_notes_count=total_notes_count,
         is_across=is_across,
+        title=progress_title,
     )
 
     # Cache any opened files, so process chains can use them instead of needing to open them again

@@ -66,6 +66,7 @@ def local_changes_copy_definitions(sync_result: SyncResult) -> None:
     copy_fields(
         copy_definitions=copy_on_sync_definitions,
         update_sync_result=update_local_sync_result,
+        progress_title="Copying fields for local changes",
     )
 
 
@@ -73,9 +74,11 @@ def show_result_tooltip(sync_result: SyncResult) -> None:
     if sync_result.has_changes():
         result_text = ""
         if sync_result.local_changes_text:
-            result_text += f"Local changes:<br>{sync_result.local_changes_text}"
+            result_text += f"<b>Local changes:</b><br>{sync_result.local_changes_text}"
         if sync_result.remote_changes_text:
-            result_text += f"Remote changes:<br>{sync_result.remote_changes_text}"
+            if sync_result.local_changes_text:
+                result_text += "<br><br>"
+            result_text += f"<b>Remote changes:</b><br>{sync_result.remote_changes_text}"
         tooltip(
             result_text,
             parent=mw,
@@ -117,6 +120,7 @@ def remote_changes_copy_definitions(sync_result: SyncResult) -> None:
         copy_definitions=copy_on_sync_definitions,
         update_sync_result=update_remote_sync_result,
         on_done=show_tooltip_on_done,
+        progress_title="Copying fields for remote changes",
     )
 
 
