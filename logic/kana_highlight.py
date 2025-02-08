@@ -3431,6 +3431,31 @@ def main():
         expected_kana_only_with_tags_merged="<on>イ</on><b><juk>く</juk></b><on>ジ</on>",
     )
     test(
+        test_name="multi-kanji juku in middle of word matched left",
+        kanji="百",
+        # Made up word, are there any multi-kanji jukujikun words used like this?
+        sentence="赤百合花壇[あかゆりかだん]",
+        expected_kana_only="あか<b>ゆ</b>りカダン",
+        expected_kana_only_with_tags_split=(
+            "<kun>あか</kun><b><juk>ゆ</juk></b><juk>り</juk><on>カ</on><on>ダン</on>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<kun>あか</kun><b><juk>ゆ</juk></b><juk>り</juk><on>カダン</on>"
+        ),
+    )
+    test(
+        test_name="multi-kanji juku in middle of word matched right",
+        kanji="合",
+        sentence="赤百合花壇[あかゆりかだん]",
+        expected_kana_only="あかゆ<b>り</b>カダン",
+        expected_kana_only_with_tags_split=(
+            "<kun>あか</kun><juk>ゆ</juk><b><juk>り</juk></b><on>カ</on><on>ダン</on>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<kun>あか</kun><juk>ゆ</juk><b><juk>り</juk></b><on>カダン</on>"
+        ),
+    )
+    test(
         ignore_fail=True,
         test_name="jukujikun test 蕎麦 not matched",
         kanji="屋",
