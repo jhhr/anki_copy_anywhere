@@ -107,9 +107,10 @@ class CacheResults:
 
     changes: OpChanges
 
-    def __init__(self, result_text: str, changes):
+    def __init__(self, result_text: str, changes, count: int = 0):
         self.result_text = result_text
         self.changes = changes
+        self.count = count
 
     def set_result_text(self, result_text):
         self.result_text = result_text
@@ -119,6 +120,12 @@ class CacheResults:
 
     def get_result_text(self):
         return self.result_text
+
+    def incr_count(self, count: int):
+        self.count += count
+
+    def get_count(self):
+        return self.count
 
 
 class ProgressUpdateDef:
@@ -262,7 +269,8 @@ def copy_fields(
     field_only: Optional[str] = None,
     undo_entry: Optional[int] = None,
     undo_text_suffix: Optional[str] = "",
-    is_sync: bool = False,
+    update_sync_result: Optional[Callable[[str, int], None]] = None,
+    on_done: Optional[Callable[[], None]] = None,
 ):
     """
     Run many copy definitions at once using CollectionOp. Includes fancy progress updates
@@ -277,18 +285,20 @@ def copy_fields(
       in the note editor
     :param undo_text_suffix: Optional suffix to add to the undo text.
         Useless, if undo_entry is passed
-    :param is_sync: Whether this is a sync operation or not. Affects what notes are queried
-        and results reporting
+    :param update_sync_result: Provided when this is a sync operation. Used to update the sync
+        result text and count
+    :param on_done: Optional function to run when the operation is done
     """
     start_time = time.time()
     debug_texts = []
+    is_sync = update_sync_result is not None
 
     def show_error_message(message: str):
         nonlocal debug_texts
         debug_texts.append(message)
         print(message)
 
-    def on_done(copy_results: CacheResults):
+    def on_success(copy_results: CacheResults):
         mw.progress.finish()
         result = copy_results.get_result_text()
         # Don't show a blank tooltip with just the time
@@ -298,22 +308,29 @@ def copy_fields(
                 if len(copy_definitions) > 1
                 else "Finished in "
             )
-            tooltip(
-                f"{main_time}{result}",
-                parent=parent,
-                period=5000 + len(copy_definitions) * 1000,
-                # Position the tooltip higher so other tooltips don't get covered
-                # 100 is the default offset, see aqt.utils.tooltip
-                y_offset=200 if is_sync else 100,
-            )
+            result_text = f"{main_time}{result}"
+            count = copy_results.get_count()
+            if update_sync_result is not None:
+                update_sync_result(result_text, count)
+            else:
+                tooltip(
+                    result_text,
+                    parent=parent,
+                    period=5000 + len(copy_definitions) * 1000,
+                    y_offset=100,
+                )
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(debug_texts, title="Copy fields debug Messages", parent=parent)
+        if on_done is not None:
+            on_done()
 
     def on_failure(exception):
         mw.progress.finish()
         show_error_message(f"Copying failed: {exception}")
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(debug_texts, title="Copy Fields debug Messages", parent=parent)
+        if on_done is not None:
+            on_done()
         # Need to raise the exception to get the traceback to the cause in the console
         raise exception
 
@@ -374,7 +391,7 @@ def copy_fields(
             parent=parent,
             op=op,
         )
-        .success(on_done)
+        .success(on_success)
         .failure(on_failure)
         .run_in_background()
     )
@@ -533,6 +550,7 @@ def copy_fields_in_background(
             {total_processed_destinations} destinations
             {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
         </span>""")
+        results.incr_count(1)
     return results
 
 
