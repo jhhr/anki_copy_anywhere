@@ -237,6 +237,12 @@ ALL_MORA = [
 ALL_MORA_RE = "|".join([m + "っ" for m in ALL_MORA] + ALL_MORA)
 ALL_MORA_REC = re.compile(rf"({ALL_MORA_RE})")
 
+VOWEL_CHANGE_DICT = {
+    "お": ["よ", "ょ"],
+    "あ": ["や", "ゃ"],
+    "う": ["ゆ", "ゅ"],
+}
+
 # Regex matching any kanji characters
 # Include the kanji repeater punctuation as something that will be cleaned off
 # Also include numbers as they are sometimes used in furigana
@@ -976,7 +982,7 @@ def get_target_furigana_section(
     return furigana
 
 
-ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu"]
+ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu", "vowel_change"]
 
 
 def is_reading_in_furigana_section(
@@ -1013,6 +1019,12 @@ def is_reading_in_furigana_section(
         u_dropped_readings.append(f"{reading[:-1]}")
         for rendaku_reading in rendaku_readings:
             u_dropped_readings.append(f"{rendaku_reading[:-1]}")
+    # Handle vowel change
+    vowel_change_readings = []
+    if reading[0] in VOWEL_CHANGE_DICT:
+        for kana in VOWEL_CHANGE_DICT[reading[0]]:
+            vowel_change_readings.append(f"{kana}{reading[1:]}")
+
     if edge == "whole":
         # match the whole furigana or repeat twice in it, possibly with rendaku or small tsu
         # (eg. the next kanji is the same or 々)
@@ -1033,6 +1045,9 @@ def is_reading_in_furigana_section(
                 return small_tsu_reading, "small_tsu"
             if f"{small_tsu_reading}{reading}" == furigana_section:
                 return f"{small_tsu_reading}{reading}", "small_tsu"
+        for vowel_change_reading in vowel_change_readings:
+            if vowel_change_reading == furigana_section:
+                return vowel_change_reading, "vowel_change"
         return "", "none"
     # For non-whole edge, also check readings are both rendaku and small tsu
     rendaku_small_tsu_readings = []
@@ -1045,6 +1060,7 @@ def is_reading_in_furigana_section(
         + [(r, "rendaku") for r in rendaku_readings]
         + [(r, "small_tsu") for r in small_tsu_readings]
         + [(r, "rendaku_small_tsu") for r in rendaku_small_tsu_readings]
+        + [(r, "vowel_change") for r in vowel_change_readings]
     )
     if edge == "left":
         for r, t in all_readings:
@@ -2017,7 +2033,7 @@ def kana_highlight(
                 rep_kanji = prev_kanji
                 # if we had the repeater kanji, we should add more furigana to this result
                 # If this was a normal match, the furigana should be repeating
-                log(f"\nreverseing, repeater kanji - doubling furigana: {matched_furigana}")
+                log(f"\nreversing, repeater kanji - doubling furigana: {matched_furigana}")
                 matched_furigana *= 2
                 wrapped_furigana = matched_furigana
             else:
@@ -3535,6 +3551,20 @@ def main():
         expected_kana_only="から<b>か</b>う",
         expected_kana_only_with_tags_split="<juk>から</juk><b><juk>か</juk></b>う",
         expected_kana_only_with_tags_merged="<juk>から</juk><b><juk>か</juk></b>う",
+    )
+    test(
+        test_name="Should be able to handle vowel change /1",
+        kanji="端",
+        sentence="端折[はしょ]る",
+        expected_kana_only="<b>はし</b>ょる",
+        expected_kana_only_with_tags_split="<b><kun>はし</kun></b><kun>ょ</kun><oku>る</oku>",
+        expected_kana_only_with_tags_merged="<b><kun>はし</kun></b><kun>ょ</kun><oku>る</oku>",
+        expected_furigana="<b> 端[はし]</b> 折[ょ]る",
+        expected_furigana_with_tags_split="<b><kun> 端[はし]</kun></b><kun> 折[ょ]</kun><oku>る</oku>",
+        expected_furigana_with_tags_merged="<b><kun> 端[はし]</kun></b><kun> 折[ょ]</kun><oku>る</oku>",
+        expected_furikanji="<b> はし[端]</b> ょ[折]る",
+        expected_furikanji_with_tags_split="<b><kun> はし[端]</kun></b><kun> ょ[折]</kun><oku>る</oku>",
+        expected_furikanji_with_tags_merged="<b><kun> はし[端]</kun></b><kun> ょ[折]</kun><oku>る</oku>",
     )
     test(
         test_name="Should be able to get dictionary form okurigana of jukujikun reading",
