@@ -2548,6 +2548,14 @@ def main():
         expected_kana_only_with_tags_merged="<on>キソク</on><b><on>エンエン</on></b>",
     )
     test(
+        test_name="Matches repeater in the middle of the word from middle edge",
+        kanji="侃",
+        sentence="熱々侃々諤々[あつあつかんかんがくがく]",
+        expected_kana_only="あつあつ<b>カンカン</b>ガクガク",
+        expected_kana_only_with_tags_split="<kun>あつあつ</kun><b><on>カンカン</on></b><on>ガクガク</on>",
+        expected_kana_only_with_tags_merged="<kun>あつあつ</kun><b><on>カンカン</on></b><on>ガクガク</on>",
+    )
+    test(
         test_name="Matches word that uses the repeater 々 with small tsu",
         kanji="刻",
         sentence="刻々[こっこく]と 変化[へんか]する。",
