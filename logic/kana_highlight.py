@@ -1892,6 +1892,12 @@ def kana_highlight(
                 log(f"\nrepeater kanji - doubling furigana: {matched_furigana}")
                 matched_furigana *= 2
                 wrapped_furigana = matched_furigana
+                # If the repeater is the last kanji, then edge should be "right" and not "middle"
+                next_kanji_is_last = index + 2 == len(word)
+                if next_kanji_is_last:
+                    cur_edge = "right"
+                    is_last_kanji = True
+                    is_middle_kanji = False
             else:
                 rep_kanji = ""
                 cur_word = cur_word[1:]
@@ -2520,7 +2526,7 @@ def main():
         expected_furikanji_with_tags_merged="<on> シン[新]</on><b><on> プ[婦]</on></b>",
     )
     test(
-        test_name="Matches repeater in the middle of the word",
+        test_name="Matches repeater in the middle of the word from left edge",
         kanji="菜",
         sentence="娃々菜[わわさい]",
         expected_kana_only="ワワ<b>サイ</b>",
@@ -2532,6 +2538,14 @@ def main():
         expected_kana_only_with_tags_merged="<on>ワワ</on><b><on>サイ</on></b>",
         expected_furigana_with_tags_merged="<on> 娃々[ワワ]</on><b><on> 菜[サイ]</on></b>",
         expected_furikanji_with_tags_merged="<on> ワワ[娃々]</on><b><on> サイ[菜]</on></b>",
+    )
+    test(
+        test_name="Matches repeater in the middle of the word from right edge",
+        kanji="奄",
+        sentence="気息奄々[きそくえんえん]",
+        expected_kana_only="キソク<b>エンエン</b>",
+        expected_kana_only_with_tags_split="<on>キ</on><on>ソク</on><b><on>エンエン</on></b>",
+        expected_kana_only_with_tags_merged="<on>キソク</on><b><on>エンエン</on></b>",
     )
     test(
         test_name="Matches word that uses the repeater 々 with small tsu",
