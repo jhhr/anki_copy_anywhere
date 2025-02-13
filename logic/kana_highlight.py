@@ -228,6 +228,7 @@ ALL_MORA = [
     "ゆ",
     "よ",
     "わ",
+    "ん",
     "ゐ",
     "ゑ",
     "を",
@@ -3443,6 +3444,14 @@ def main():
         expected_furikanji_with_tags_merged=(
             "<kun> あ[明]</kun><b><juk> さっ[後]</juk></b><juk> て[日]</juk>"
         ),
+    )
+    test(
+        test_name="jukujikun test ん ending",
+        kanji="魁",
+        sentence="花魁[おいらん]",
+        expected_kana_only="おい<b>らん</b>",
+        expected_kana_only_with_tags_split="<juk>おい</juk><b><juk>らん</juk></b>",
+        expected_kana_only_with_tags_merged="<juk>おい</juk><b><juk>らん</juk></b>",
     )
     test(
         test_name="single-kanji juku in middle of word",
