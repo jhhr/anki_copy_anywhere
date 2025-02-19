@@ -3304,6 +3304,16 @@ def main():
         ),
     )
     test(
+        test_name="word where shorter reading is incorrect 1/",
+        # 不 has two matching onyomi フ and フウ where the shorter is correct for 不運
+        ignore_fail=True,
+        kanji="不",
+        sentence="不運[ふうん]",
+        expected_kana_only="<b>ふ</b>うん",
+        expected_kana_only_with_tags_split="<b><on>ふ</on></b><on>うん</on>",
+        expected_kana_only_with_tags_merged="<b><on>ふ</on></b><on>うん</on>",
+    )
+    test(
         test_name="jukujikun test 大人 1/",
         kanji="大",
         sentence="大人[おとな] 達[たち]は 大[おお]きいですね",
