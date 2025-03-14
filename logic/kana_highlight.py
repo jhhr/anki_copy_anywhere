@@ -65,15 +65,14 @@ SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
-ALL_MORA = [
-    # First the two kana mora, so that they are matched first
+# Palatilized (拗音) mora and other non-straight mora
+PALATALIZED_MORA = [
     "くぃ",
     "きゃ",
     "きゅ",
     "きぇ",
     "きょ",
     "ぐぃ",
-    "ご",
     "ぎゃ",
     "ぎゅ",
     "ぎぇ",
@@ -116,7 +115,6 @@ ALL_MORA = [
     "ひぇ",
     "ひょ",
     "びぃ",
-    "ぼ",
     "びゃ",
     "びゅ",
     "びぇ",
@@ -132,11 +130,9 @@ ALL_MORA = [
     "ふぉ",
     "ゔぁ",
     "ゔぃ",
-    "ゔ",
     "ゔぇ",
     "ゔぉ",
     "ぬぃ",
-    "の",
     "にゃ",
     "にゅ",
     "にぇ",
@@ -152,7 +148,9 @@ ALL_MORA = [
     "りぇ",
     "りょ",
     "いぇ",
-    # Then single kana mora
+]
+
+SINGLE_KANA_MORA = [
     "か",
     "く",
     "け",
@@ -176,7 +174,7 @@ ALL_MORA = [
     "じ",
     "ぢ",
     "た",
-    "とぅ",
+    "と",
     "て",
     "と",
     "ち",
@@ -202,7 +200,6 @@ ALL_MORA = [
     "ぽ",
     "ぴ",
     "ふ",
-    "ゔぃ",
     "ゔ",
     "な",
     "ぬ",
@@ -228,11 +225,23 @@ ALL_MORA = [
     "ゆ",
     "よ",
     "わ",
-    "ん",
     "ゐ",
     "ゑ",
     "を",
 ]
+
+# Elongated vowels of the single kana mora (直音)
+LONG_STRAIGHT_MORA = [f"{kana}ー" for kana in SINGLE_KANA_MORA]
+
+# First all two kana more, so they get matched first, then the single kana mora
+ALL_MORA = (
+    PALATALIZED_MORA
+    + LONG_STRAIGHT_MORA
+    + SINGLE_KANA_MORA
+    + [
+        "ん",
+    ]
+)
 
 # Add the small tsu versions of all mora to be matched first
 ALL_MORA_RE = "|".join([m + "っ" for m in ALL_MORA] + ALL_MORA)
