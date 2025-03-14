@@ -3718,6 +3718,14 @@ def main():
         expected_furikanji_with_tags_merged="<kun> かき[書]</kun><b><kun> とめ[留]</kun></b>",
     )
     test(
+        test_name="Should be able match noun form okuriganaless kunyomi reading 3/",
+        kanji="詣",
+        sentence="初詣[はつもうで]",
+        expected_kana_only="はつ<b>もうで</b>",
+        expected_kana_only_with_tags_split="<kun>はつ</kun><b><kun>もうで</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>はつ</kun><b><kun>もうで</kun></b>",
+    )
+    test(
         test_name="Should be able to get okurigana of kunyomi reading 1/",
         kanji="置",
         sentence=" 風上[かざかみ]にも 置[お]けない",
