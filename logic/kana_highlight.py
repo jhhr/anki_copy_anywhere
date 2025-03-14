@@ -1342,8 +1342,8 @@ def check_kunyomi_readings(
     kanji_to_match = highlight_args.get("kanji_to_match", "")
     log(
         f"\ncheck_kunyomi_readings - noun form: {kunyomi_stem}, kunyomi_dict_form_okuri:"
-        f" {kunyomi_dict_form_okuri}\nokurigana: {{okurigana}}, kanji_to_match:"
-        " {kanji_to_match}"
+        f" {kunyomi_dict_form_okuri}\nokurigana: {okurigana}, kanji_to_match:"
+        f" {kanji_to_match}"
     )
 
     # Then also readings with okurigana included in the furigana, noun forms and others
@@ -3052,6 +3052,15 @@ def main():
         expected_furikanji_with_tags_merged="<b><kun> ほう[放]</kun><oku>ったら</oku></b>かす",
     )
     test(
+        test_name="reading mixup /1",
+        kanji="口",
+        # 口 kunyomi くち is found in the furigana but the correct match is the onyomi ク
+        sentence="口調[くちょう]",
+        expected_kana_only="<b>ク</b>チョウ",
+        expected_kana_only_with_tags_split="<b><on>ク</on></b><on>チョウ</on>",
+        expected_kana_only_with_tags_merged="<b><on>ク</on></b><on>チョウ</on>",
+    )
+    test(
         test_name="sound change readings 1/",
         kanji="青",
         # あお -> さお
@@ -3434,7 +3443,7 @@ def main():
     test(
         test_name="jukujikun test 明後日",
         kanji="後",
-        # Problem with あ.かり getting kunyoimi match on 明, so the reading is not fully
+        # Problem with あ.かり getting kunyomi match on 明, so the reading is not fully
         # correctly identified as jukujikun
         sentence="明後日[あさって]",
         expected_kana_only="あ<b>さっ</b>て",
