@@ -233,7 +233,7 @@ class ProgressUpdater:
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
         label = f"""<strong>{html.escape(self.definition_name)}</strong>:
         <br>Copied {self.note_cnt}/{self.total_notes_count} notes
-        <br><small>Processed{f'-  destinations notes: {self.total_processed_destinations}'
+        <br><small>Processed{f'-  destination notes: {self.total_processed_destinations}'
                     if self.total_processed_destinations > 0 else ''}
             {f'- files: {self.total_processed_files}' if self.total_processed_files > 0 else ''}
             {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
