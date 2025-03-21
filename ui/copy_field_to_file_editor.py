@@ -26,7 +26,7 @@ from ..configuration import (
     COPY_MODE_ACROSS_NOTES,
     ALL_FIELD_TO_FIELD_PROCESS_NAMES,
     CopyDefinition,
-    CopyFieldToField,
+    CopyFieldToFile,
     DirectionType,
     CopyModeType,
     DIRECTION_SOURCE_TO_DESTINATIONS,
@@ -62,8 +62,7 @@ def get_new_base_dict(copy_mode: CopyModeType) -> dict:
 
 
 class FieldInputsDict(TypedDict):
-    copy_into_note_field: GroupedComboBox
-    target_note_field_label: QLabel
+    copy_into_filename: InterpolatedTextEditLayout
     copy_from_text_label: QLabel
     copy_from_text: InterpolatedTextEditLayout
     copy_if_empty: QCheckBox
@@ -74,10 +73,10 @@ class FieldInputsDict(TypedDict):
     process_chain: EditExtraProcessingWidget
 
 
-class CopyFieldToFieldEditor(QWidget):
+class CopyFieldToFileEditor(QWidget):
     """
-    Class for editing the list of fields to copy from and fields to copy into.
-    Shows the list of current field-to-field definitions. Add button for adding new definitions is
+    Class for editing the list of fields to copy from and write to a file
+    Shows the list of current field-to-file definitions. Add button for adding new definitions is
     at the bottom.
     Remove button for removing definitions is at the top-right of each definition.
     """
@@ -89,12 +88,9 @@ class CopyFieldToFieldEditor(QWidget):
         copy_mode: CopyModeType,
     ):
         super().__init__(parent)
-        if copy_definition is None:
-            self.field_to_field_defs = []
-            field_to_file_defs = []
-        else:
-            self.field_to_field_defs = copy_definition.get("field_to_field_defs", [])
-            field_to_file_defs = copy_definition.get("field_to_file_defs", [])
+        self.field_to_file_defs = (
+            copy_definition.get("field_to_file_defs", []) if copy_definition else []
+        )
         self.copy_definition = copy_definition
         self.copy_mode = copy_mode
         self.across_mode_direction = (
@@ -117,6 +113,8 @@ class CopyFieldToFieldEditor(QWidget):
 
         self.copy_from_menu_options_dict = get_new_base_dict(copy_mode)
         self.update_copy_from_options_dict()
+        self.filename_menu_options_dict = BASE_NOTE_MENU_DICT.copy()
+        self.update_filename_options_dict()
 
         self.copy_definition = copy_definition
 
@@ -131,23 +129,19 @@ class CopyFieldToFieldEditor(QWidget):
         self.bottom_form = QFormLayout()
         self.vbox.addLayout(self.bottom_form)
 
-        self.add_new_button = QPushButton("Add another field-to-field definition")
+        self.add_new_button = QPushButton("Add another field-to-file definition")
         self.bottom_form.addRow("", self.add_new_button)
         self.add_new_button.clicked.connect(self.add_new_definition)
 
         self.copy_field_inputs: list[FieldInputsDict] = []
 
-        # Most copy definitions copy to note fields, so
-        # Initialize with one definition, if there are none, and there are no field-to-file defs
-        if len(self.field_to_field_defs) == 0 and len(field_to_file_defs) == 0:
-            self.add_new_definition()
-        elif len(self.field_to_field_defs) > 0:
-            for index, copy_field_to_field_definition in enumerate(self.field_to_field_defs):
-                self.add_copy_field_row(index, copy_field_to_field_definition)
+        if len(self.field_to_file_defs) > 0:
+            for index, copy_field_to_file_def in enumerate(self.field_to_file_defs):
+                self.add_copy_field_row(index, copy_field_to_file_def)
 
     def add_new_definition(self):
-        new_definition: CopyFieldToField = {
-            "copy_into_note_field": "",
+        new_definition: CopyFieldToFile = {
+            "copy_into_filename": "",
             "copy_from_text": "",
             "copy_if_empty": False,
             "copy_on_unfocus_when_edit": False,
@@ -155,10 +149,10 @@ class CopyFieldToFieldEditor(QWidget):
             "copy_on_unfocus_trigger_field": "",
             "process_chain": [],
         }
-        self.field_to_field_defs.append(new_definition)
-        self.add_copy_field_row(len(self.field_to_field_defs) - 1, new_definition)
+        self.field_to_file_defs.append(new_definition)
+        self.add_copy_field_row(len(self.field_to_file_defs) - 1, new_definition)
 
-    def add_copy_field_row(self, index, copy_field_to_field_definition: CopyFieldToField):
+    def add_copy_field_row(self, index, copy_field_to_field_definition: CopyFieldToFile):
         # Create a QFrame
         frame = QFrame(self)
         frame.setFrameShape(QFrameStyledPanel)
@@ -173,21 +167,27 @@ class CopyFieldToFieldEditor(QWidget):
         frame_layout.addLayout(row_form)
 
         # Copy into field
-        field_target_cbox = GroupedComboBox(
-            placeholder_text="First select a trigger note type",
+        filename_label = QLabel("<h3>Filename to write to</h3>")
+        filename_description = """<ul>
+        <li>Reference the destination notes' field with {intr_format('Field Name')}.</li>
+        <li>Source notes' fields are not included in the filename.</li>
+        <li>The filename will be prefixed with _ if it doesn't start with it.</li>
+        """
+        filename_text_layout = InterpolatedTextEditLayout(
             is_required=True,
+            options_dict=get_new_base_dict(self.copy_mode),
+            label=filename_label,
+            description=filename_description,
         )
-        target_note_field_label = QLabel("<h3>Destination field (in the trigger note)</h3>")
-        row_form.addRow(target_note_field_label, field_target_cbox)
-        self.update_a_destination_field_target_cbox(field_target_cbox)
+        row_form.addRow(filename_text_layout)
+        filename_text_layout.update_options(self.filename_menu_options_dict)
         with suppress(KeyError):
-            field_target_cbox.setCurrentText(copy_field_to_field_definition["copy_into_note_field"])
-            field_target_cbox.update_required_style()
+            filename_text_layout.set_text(copy_field_to_field_definition["copy_into_filename"])
 
         # Copy from field
         copy_from_text_label = QLabel(
             # Default to within mode texts, these only need to be modifed in across mode
-            "<h3>Trigger note fields' content that will replace the field</h3>"
+            "<h3>Trigger note fields' content to write to file</h3>"
         )
         across = self.copy_mode == COPY_MODE_ACROSS_NOTES
         notes_word = "source notes'" if across else "note"
@@ -214,7 +214,7 @@ class CopyFieldToFieldEditor(QWidget):
         with suppress(KeyError):
             copy_from_text_layout.set_text(copy_field_to_field_definition["copy_from_text"])
 
-        copy_if_empty = QCheckBox("Only copy into field, if it's empty")
+        copy_if_empty = QCheckBox("Only write to file, if it doesn't exist")
         row_form.addRow("", copy_if_empty)
         with suppress(KeyError):
             copy_if_empty.setChecked(copy_field_to_field_definition["copy_if_empty"])
@@ -258,8 +258,7 @@ class CopyFieldToFieldEditor(QWidget):
             ALL_FIELD_TO_FIELD_PROCESS_NAMES,
         )
         copy_field_inputs_dict: FieldInputsDict = {
-            "copy_into_note_field": field_target_cbox,
-            "target_note_field_label": target_note_field_label,
+            "copy_into_filename": filename_text_layout,
             "copy_from_text_label": copy_from_text_label,
             "copy_from_text": copy_from_text_layout,
             "copy_if_empty": copy_if_empty,
@@ -279,7 +278,6 @@ class CopyFieldToFieldEditor(QWidget):
 
         def remove_row():
             for widget in [
-                field_target_cbox,
                 copy_if_empty,
                 copy_on_unfocus_when_edit,
                 remove_button,
@@ -287,7 +285,7 @@ class CopyFieldToFieldEditor(QWidget):
             ]:
                 widget.deleteLater()
                 row_form.removeWidget(widget)
-            for layout in [copy_from_text_layout]:
+            for layout in [filename_text_layout, copy_from_text_layout]:
                 for i in range(0, layout.count()):
                     item = layout.itemAt(i)
                     if item and (item_widget := item.widget()):
@@ -301,22 +299,22 @@ class CopyFieldToFieldEditor(QWidget):
 
     def remove_definition(self, definition, inputs_dict):
         """
-        Removes the selected field-to-field definition and input dict.
+        Removes the selected field-to-file definition and input dict.
         """
-        self.field_to_field_defs.remove(definition)
+        self.field_to_file_defs.remove(definition)
         self.copy_field_inputs.remove(inputs_dict)
 
-    def get_field_to_field_defs(self):
+    def get_field_to_file_defs(self):
         """
-        Returns the list of field-to-field definitions from the current state of the editor.
+        Returns the list of field-to-file definitions from the current state of the editor.
         """
-        field_to_field_defs = []
+        field_to_file_defs = []
         for copy_field_inputs in self.copy_field_inputs:
             copy_on_unfocus_when_add = cast(
                 QCheckBox, copy_field_inputs["copy_on_unfocus_when_add"]
             )
             copy_field_definition = {
-                "copy_into_note_field": copy_field_inputs["copy_into_note_field"].currentText(),
+                "copy_into_filename": copy_field_inputs["copy_into_filename"].get_text(),
                 "copy_from_text": copy_field_inputs["copy_from_text"].get_text(),
                 "copy_if_empty": copy_field_inputs["copy_if_empty"].isChecked(),
                 "copy_on_unfocus_when_edit": (
@@ -330,41 +328,37 @@ class CopyFieldToFieldEditor(QWidget):
                 ),
                 "process_chain": copy_field_inputs["process_chain"].get_process_chain(),
             }
-            field_to_field_defs.append(copy_field_definition)
-        return field_to_field_defs
+            field_to_file_defs.append(copy_field_definition)
+        return field_to_file_defs
 
     def set_selected_copy_into_models(self, models):
         self.selected_copy_into_models = models
         self.update_copy_from_options_dict()
+        self.update_filename_options_dict()
         self.update_all_field_target_cboxes()
 
     def update_all_field_target_cboxes(self):
         for copy_field_inputs in self.copy_field_inputs:
-            self.update_a_destination_field_target_cbox(copy_field_inputs["copy_into_note_field"])
             self.update_an_unfocus_trigger_field_cbox(
                 copy_field_inputs["copy_on_unfocus_trigger_field"]
             )
             copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
+            copy_field_inputs["copy_into_filename"].update_options(self.copy_from_menu_options_dict)
 
     def update_direction_labels(self, direction: Optional[DirectionType]):
         self.across_mode_direction = direction
 
         if self.across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES:
-            copy_into_label_clarification = "in the trigger note"
             copy_from_text_clarification = "from the search"
         else:
-            copy_into_label_clarification = "a searched note"
             copy_from_text_clarification = "from the trigger note"
 
-        new_copy_into_label = f"<h3>Destination field ({copy_into_label_clarification})</h3>"
         new_copy_from_text_label = (
             f"<h4>Source fields' ({copy_from_text_clarification}) content that will replace the"
             " field</h4>"
         )
 
         for copy_field_inputs in self.copy_field_inputs:
-            target_note_field_label = cast(QLabel, copy_field_inputs["target_note_field_label"])
-            target_note_field_label.setText(new_copy_into_label)
             copy_from_text_label = cast(QLabel, copy_field_inputs["copy_from_text_label"])
             copy_from_text_label.setText(new_copy_from_text_label)
             # Copy on unfocus when adding is not allowed when source to destination, disable it
@@ -541,3 +535,28 @@ class CopyFieldToFieldEditor(QWidget):
                         add_model_options_to_dict(model.name, model.id, options_dict)
 
         self.copy_from_menu_options_dict = options_dict
+
+    def update_filename_options_dict(self):
+        """
+        Updates the raw options dict used for the "Filename to copy into" TextEdit right-click
+        menu. The raw dict is used for validating the text in the TextEdit.
+        """
+        field_names_by_model_dict = BASE_NOTE_MENU_DICT.copy()
+
+        if len(self.selected_copy_into_models) > 1:
+            # If there are multiple models, add the intersecting fields only
+            self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
+            add_intersecting_model_field_options_to_dict(
+                models=self.selected_copy_into_models,
+                target_dict=field_names_by_model_dict,
+                intersecting_fields=self.intersecting_fields,
+            )
+        elif len(self.selected_copy_into_models) == 1:
+            model = self.selected_copy_into_models[0]
+            add_model_options_to_dict(
+                model_name=model["name"],
+                model_id=model["id"],
+                target_dict=field_names_by_model_dict,
+            )
+
+        self.filename_menu_options_dict = field_names_by_model_dict

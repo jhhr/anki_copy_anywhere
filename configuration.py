@@ -5,6 +5,10 @@ from typing_extensions import TypeGuard
 from aqt import mw
 
 from .logic.kana_highlight import FuriReconstruct
+from .logic.interpolate_fields import (
+    intr_format,
+    TARGET_NOTES_COUNT,
+)
 
 tag = mw.addonManager.addonFromModule(__name__)
 
@@ -150,6 +154,16 @@ class CopyFieldToField(TypedDict):
     process_chain: Sequence[AnyProcess]
 
 
+class CopyFieldToFile(TypedDict):
+    copy_into_filename: str
+    copy_from_text: str
+    copy_if_empty: bool
+    copy_on_unfocus_when_edit: bool
+    copy_on_unfocus_when_add: bool
+    copy_on_unfocus_trigger_field: str
+    process_chain: Sequence[AnyProcess]
+
+
 def get_field_to_field_unfocus_trigger_fields(
     field_to_field: CopyFieldToField, modifies_other_notes: bool
 ) -> list[str]:
@@ -203,6 +217,7 @@ class CopyDefinition(TypedDict):
     copy_into_note_types: str
     across_mode_direction: Optional[DirectionType]
     field_to_field_defs: list[CopyFieldToField]
+    field_to_file_defs: list[CopyFieldToFile]
     field_to_variable_defs: list[CopyFieldToVariable]
     only_copy_into_decks: str
     copy_from_cards_query: Optional[str]
@@ -212,42 +227,45 @@ class CopyDefinition(TypedDict):
     select_card_separator: Optional[str]
 
 
-def mode_modifies_trigger_note(
-    copy_mode: Optional[str],
-    across_mode_direction: Optional[str],
-) -> bool:
-    return (
-        copy_mode == COPY_MODE_WITHIN_NOTE
-        or across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES
-    )
+def get_variable_names_from_copy_definition(
+    copy_definition: Optional[CopyDefinition],
+) -> dict[str, str]:
+    variable_menu_dict: dict[str, str] = {}
+    if copy_definition is None:
+        return variable_menu_dict
+    # Always include the target notes count variable as it will be generated
+    # in any across notes mode copy operation
+    if copy_definition.get("copy_mode") == COPY_MODE_ACROSS_NOTES:
+        variable_menu_dict[TARGET_NOTES_COUNT] = intr_format(TARGET_NOTES_COUNT)
+    for variable_def in copy_definition.get("field_to_variable_defs", []):
+        variable_name = variable_def["copy_into_variable"]
+        if variable_name is not None:
+            variable_menu_dict[variable_name] = intr_format(variable_name)
+    return variable_menu_dict
 
 
 def definition_modifies_trigger_note(
     copy_definition: CopyDefinition,
 ) -> bool:
-    return mode_modifies_trigger_note(
-        copy_definition.get("copy_mode", None),
-        copy_definition.get("across_mode_direction", None),
+    targets_trigger_note = (
+        copy_definition.get("copy_mode", None) == COPY_MODE_WITHIN_NOTE
+        or copy_definition.get("across_mode_direction", None) == DIRECTION_DESTINATION_TO_SOURCES
     )
-
-
-def mode_modifies_other_notes(
-    copy_mode: Optional[str],
-    across_mode_direction: Optional[str],
-) -> bool:
-    return (
-        copy_mode == COPY_MODE_ACROSS_NOTES
-        and across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS
-    )
+    # definition might only save stuff to files
+    has_field_to_field_defs = len(copy_definition.get("field_to_field_defs", [])) > 0
+    return targets_trigger_note and has_field_to_field_defs
 
 
 def definition_modifies_other_notes(
     copy_definition: CopyDefinition,
 ) -> bool:
-    return mode_modifies_other_notes(
-        copy_definition.get("copy_mode", None),
-        copy_definition.get("across_mode_direction", None),
+    targets_other_notes = (
+        copy_definition.get("copy_mode", None) == COPY_MODE_ACROSS_NOTES
+        or copy_definition.get("across_mode_direction", None) == DIRECTION_SOURCE_TO_DESTINATIONS
     )
+    # definition might only save stuff to files
+    has_field_to_field_defs = len(copy_definition.get("field_to_field_defs", [])) > 0
+    return targets_other_notes and has_field_to_field_defs
 
 
 class Config:

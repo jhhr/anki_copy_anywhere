@@ -23,6 +23,7 @@ class RequiredLineEdit(QLineEdit):
         is_required: bool = False,
         required_style: str = "border: 1px solid darkred;",
         default_style: str = "",
+        placeholder_text: str = "",
         **kwargs
     ):
         super().__init__(parent, **kwargs)
@@ -35,6 +36,8 @@ class RequiredLineEdit(QLineEdit):
         if is_required:
             self.update_required_style()
             # self.textChanged.connect(self.update_required_style)
+        if placeholder_text:
+            self.setPlaceholderText(placeholder_text)
 
     def update_required_style(self):
         if self.is_required and not self.text() and self.was_valid:

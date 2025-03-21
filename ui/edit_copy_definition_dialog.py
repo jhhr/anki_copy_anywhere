@@ -34,10 +34,8 @@ from .add_intersecting_model_field_options_to_dict import (
     add_intersecting_model_field_options_to_dict,
 )
 from .add_model_options_to_dict import add_model_options_to_dict
-from .copy_field_to_field_editor import (
-    CopyFieldToFieldEditor,
-    get_variable_names_from_copy_definition,
-)
+from .copy_field_to_field_editor import CopyFieldToFieldEditor
+from .copy_field_to_file_editor import CopyFieldToFileEditor
 from .field_to_variable_editor import CopyFieldToVariableEditor
 from .grouped_combo_box import GroupedComboBox
 from .interpolated_text_edit import InterpolatedTextEditLayout
@@ -56,6 +54,7 @@ from ..configuration import (
     DirectionType,
     SelectCardByType,
     SELECT_CARD_BY_VALUES,
+    get_variable_names_from_copy_definition,
 )
 from ..logic.interpolate_fields import (
     VARIABLES_KEY,
@@ -281,9 +280,20 @@ class BasicEditorFormLayout(QFormLayout):
 class FieldToFieldEditorVBox(QVBoxLayout):
     def __init__(self, parent, copy_definition: Optional[CopyDefinition], copy_mode: CopyModeType):
         super().__init__(parent)
-        self.addWidget(QLabel("<h2>Define copied content</h2>"))
+        self.addWidget(QLabel("<h2>Copy content to notes</h2>"))
         self.field_to_field_editor = CopyFieldToFieldEditor(parent, copy_definition, copy_mode)
         self.addWidget(self.field_to_field_editor)
+        spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
+        self.addItem(spacer)
+        set_size_policy_for_all_widgets(self, QSizePolicyPreferred, QSizePolicyFixed)
+
+
+class FieldToFileEditorVBox(QVBoxLayout):
+    def __init__(self, parent, copy_definition: Optional[CopyDefinition], copy_mode: CopyModeType):
+        super().__init__(parent)
+        self.addWidget(QLabel("<h2>Copy content to files</h2>"))
+        self.field_to_file_editor = CopyFieldToFileEditor(parent, copy_definition, copy_mode)
+        self.addWidget(self.field_to_file_editor)
         spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
         self.addItem(spacer)
         set_size_policy_for_all_widgets(self, QSizePolicyPreferred, QSizePolicyFixed)
@@ -406,6 +416,10 @@ class AcrossNotesCopyEditor(QWidget):
         self.fields_vbox = FieldToFieldEditorVBox(self, copy_definition, COPY_MODE_ACROSS_NOTES)
         self.main_layout.addLayout(self.fields_vbox)
 
+        # Add field-to-file editor
+        self.files_vbox = FieldToFileEditorVBox(self, copy_definition, COPY_MODE_ACROSS_NOTES)
+        self.main_layout.addLayout(self.files_vbox)
+
         # Set the current text in the combo boxes to what we had in memory in the configuration
         # (if we had something)
         if copy_definition:
@@ -516,6 +530,9 @@ class AcrossNotesCopyEditor(QWidget):
     def get_field_to_field_editor(self) -> CopyFieldToFieldEditor:
         return self.fields_vbox.field_to_field_editor
 
+    def get_field_to_file_editor(self) -> CopyFieldToFileEditor:
+        return self.files_vbox.field_to_file_editor
+
     def get_field_to_variable_editor(self) -> CopyFieldToVariableEditor:
         return self.variables_vbox.field_to_variable_editor
 
@@ -540,8 +557,15 @@ class WithinNoteCopyEditor(QWidget):
         self.fields_vbox = FieldToFieldEditorVBox(self, copy_definition, COPY_MODE_WITHIN_NOTE)
         self.main_layout.addLayout(self.fields_vbox)
 
+        # Add field-to-file editor
+        self.files_vbox = FieldToFileEditorVBox(self, copy_definition, COPY_MODE_WITHIN_NOTE)
+        self.main_layout.addLayout(self.files_vbox)
+
     def get_field_to_field_editor(self):
         return self.fields_vbox.field_to_field_editor
+
+    def get_field_to_file_editor(self):
+        return self.files_vbox.field_to_file_editor
 
     def update_fields_by_target_note_type(self, models):
         self.fields_vbox.field_to_field_editor.set_selected_copy_into_models(models)
@@ -749,6 +773,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
             basic_editor = self.across_notes_editor_tab.basic_editor_form_layout
             field_to_field_editor = self.across_notes_editor_tab.get_field_to_field_editor()
+            field_to_file_editor = self.across_notes_editor_tab.get_field_to_file_editor()
             field_to_variable_editor = self.across_notes_editor_tab.get_field_to_variable_editor()
             # select_card_by has been validated in check_fields()
             select_card_by = cast(
@@ -762,6 +787,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_on_add": basic_editor.copy_on_add_checkbox.isChecked(),
                 "copy_on_review": basic_editor.copy_on_review_checkbox.isChecked(),
                 "field_to_field_defs": field_to_field_editor.get_field_to_field_defs(),
+                "field_to_file_defs": field_to_file_editor.get_field_to_file_defs(),
                 "field_to_variable_defs": field_to_variable_editor.get_field_to_variable_defs(),
                 "copy_from_cards_query": (
                     self.across_notes_editor_tab.card_query_text_layout.get_text()
@@ -777,6 +803,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
             basic_editor = self.within_note_editor_tab.basic_editor_form_layout
             field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
+            field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             within_copy_definition: CopyDefinition = {
                 "definition_name": self.definition_name.text(),
                 "copy_into_note_types": basic_editor.note_type_target_cbox.currentText(),
@@ -786,6 +813,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_on_review": basic_editor.copy_on_review_checkbox.isChecked(),
                 "field_to_variable_defs": [],
                 "field_to_field_defs": field_to_field_editor.get_field_to_field_defs(),
+                "field_to_file_defs": field_to_file_editor.get_field_to_file_defs(),
                 "copy_mode": COPY_MODE_WITHIN_NOTE,
                 "across_mode_direction": None,
                 "copy_from_cards_query": None,

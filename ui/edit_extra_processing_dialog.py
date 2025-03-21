@@ -44,6 +44,7 @@ from ..configuration import (
     AnyProcess,
     CopyFieldToField,
     CopyFieldToVariable,
+    CopyFieldToFile,
     KanaHighlightProcess,
     RegexProcess,
     get_regex_process_label,
@@ -414,11 +415,12 @@ class KanaHighlightProcessDialog(QDialog):
 
 
 class EditExtraProcessingWidget(QWidget):
+
     def __init__(
         self,
         parent,
         copy_definition: Optional[CopyDefinition],
-        field_to_x_def: Union[CopyFieldToField, CopyFieldToVariable],
+        field_to_x_def: Union[CopyFieldToField, CopyFieldToVariable, CopyFieldToFile],
         allowed_process_names: list[str],
     ):
         super().__init__(parent)

@@ -32,6 +32,7 @@ from ..configuration import (
     definition_modifies_other_notes,
     CopyFieldToVariable,
     CopyFieldToField,
+    CopyFieldToFile,
     get_field_to_field_unfocus_trigger_fields,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
@@ -51,6 +52,8 @@ from ..configuration import (
 from ..ui.auto_resizing_text_edit import AutoResizingTextEdit
 from ..utils import (
     write_custom_data,
+    write_to_media_folder,
+    file_exists_in_media_folder,
 )
 
 
@@ -188,6 +191,7 @@ class ProgressUpdater:
         self.note_cnt = 0
         self.total_processed_sources = 0
         self.total_processed_destinations = 0
+        self.total_processed_files = 0
         self.last_render_update = 0.0
         if title is None:
             title = "Copying fields"
@@ -198,6 +202,7 @@ class ProgressUpdater:
         note_cnt_inc: Optional[int] = None,
         processed_sources_inc: Optional[int] = None,
         processed_destinations_inc: Optional[int] = None,
+        processed_files_inc: Optional[int] = None,
     ):
         if note_cnt_inc is not None:
             self.note_cnt += note_cnt_inc
@@ -205,23 +210,32 @@ class ProgressUpdater:
             self.total_processed_sources += processed_sources_inc
         if processed_destinations_inc is not None:
             self.total_processed_destinations += processed_destinations_inc
+        if processed_files_inc is not None:
+            self.total_processed_files += processed_files_inc
 
-    def get_counts(self) -> Tuple[int, int, int]:
-        return self.note_cnt, self.total_processed_sources, self.total_processed_destinations
+    def get_counts(self) -> Tuple[int, int, int, int]:
+        return (
+            self.note_cnt,
+            self.total_processed_sources,
+            self.total_processed_destinations,
+            self.total_processed_files,
+        )
 
     def maybe_render_update(self, force: bool = False):
         elapsed_s = time.time() - self.start_time
         elapsed_since_last_update = elapsed_s - self.last_render_update
         is_last_note = self.note_cnt == self.total_notes_count
         no_notes = not self.total_notes_count > 0
-        if (elapsed_since_last_update < 0.1 and not (force or is_last_note)) or no_notes:
+        if (elapsed_since_last_update < 0.5 and not (force or is_last_note)) or no_notes:
             return
         self.last_render_update = elapsed_s
 
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
         label = f"""<strong>{html.escape(self.definition_name)}</strong>:
         <br>Copied {self.note_cnt}/{self.total_notes_count} notes
-        <br><small>Notes processed - destinations: {self.total_processed_destinations}
+        <br><small>Processed{f'-  destinations notes: {self.total_processed_destinations}'
+                    if self.total_processed_destinations > 0 else ''}
+            {f'- files: {self.total_processed_files}' if self.total_processed_files > 0 else ''}
             {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
         <br>Time: {elapsed_time}"""
         if self.note_cnt / self.total_notes_count > 0.10 or elapsed_s > 1:
@@ -525,7 +539,7 @@ def copy_fields_in_background(
     file_cache: dict[str, Any] = {}
 
     total_processed_sources = 0
-    total_processed_destinations = 0
+    total_processed_dests = 0
     for note in notes:
         note_cnt += 1
 
@@ -556,11 +570,14 @@ def copy_fields_in_background(
     should_report_result = len(notes) > 0 if is_sync else True
     if should_report_result:
         #  Get counts from ProgressUpdater and render the final update
-        _, total_processed_sources, total_processed_destinations = progress_updater.get_counts()
+        _, total_processed_sources, total_processed_dests, total_processed_files = (
+            progress_updater.get_counts()
+        )
         results.add_result_text(f"""<br><span>
             {time.time() - start_time:.2f}s -
             <i>{html.escape(copy_definition['definition_name'])}:</i>
-            {total_processed_destinations} destinations
+            {f'{total_processed_dests} destinations' if total_processed_dests > 0 else ''}
+            {f'{total_processed_files} files' if total_processed_files > 0 else ''}
             {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
         </span>""")
         results.incr_count(1)
@@ -644,6 +661,10 @@ def apply_process_chain(
     return text
 
 
+class CopyFailedException(Exception):
+    pass
+
+
 def copy_for_single_trigger_note(
     copy_definition: CopyDefinition,
     trigger_note: Note,
@@ -678,6 +699,7 @@ def copy_for_single_trigger_note(
             print(message)
 
     field_to_field_defs = copy_definition.get("field_to_field_defs", [])
+    field_to_file_defs = copy_definition.get("field_to_file_defs", [])
     field_to_variable_defs = copy_definition.get("field_to_variable_defs", [])
     only_copy_into_decks = copy_definition.get("only_copy_into_decks", None)
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
@@ -751,25 +773,30 @@ def copy_for_single_trigger_note(
     if progress_updater is not None:
         progress_updater.update_counts(processed_sources_inc=len(source_notes))
     # Step 2: Get value for each field we are copying into
-    for i, destination_note in enumerate(destination_notes):
-        success = copy_into_single_note(
-            field_to_field_defs=field_to_field_defs,
-            destination_note=destination_note,
-            source_notes=source_notes,
-            variable_values_dict=variable_values_dict,
-            field_only=field_only,
-            modifies_other_notes=definition_modifies_other_notes(copy_definition),
-            multiple_note_types=multiple_note_types,
-            select_card_separator=select_card_separator,
-            file_cache=file_cache,
-            show_error_message=show_error_message,
-            progress_updater=progress_updater,
-        )
-        if progress_updater is not None:
-            progress_updater.update_counts(processed_destinations_inc=1)
-        if copied_into_notes is not None:
-            copied_into_notes.append(destination_note)
-        if not success:
+    for destination_note in destination_notes:
+        try:
+            copied_into_dest_note, copied_into_file = copy_into_single_note(
+                field_to_field_defs=field_to_field_defs,
+                field_to_file_defs=field_to_file_defs,
+                destination_note=destination_note,
+                source_notes=source_notes,
+                variable_values_dict=variable_values_dict,
+                field_only=field_only,
+                modifies_other_notes=definition_modifies_other_notes(copy_definition),
+                multiple_note_types=multiple_note_types,
+                select_card_separator=select_card_separator,
+                file_cache=file_cache,
+                show_error_message=show_error_message,
+                progress_updater=progress_updater,
+            )
+            if progress_updater is not None:
+                progress_updater.update_counts(
+                    processed_destinations_inc=1 if copied_into_dest_note else None,
+                    processed_files_inc=1 if copied_into_file else None,
+                )
+            if copied_into_notes is not None and copied_into_dest_note:
+                copied_into_notes.append(destination_note)
+        except CopyFailedException:
             return False
 
     return True
@@ -777,6 +804,7 @@ def copy_for_single_trigger_note(
 
 def copy_into_single_note(
     field_to_field_defs: list[CopyFieldToField],
+    field_to_file_defs: list[CopyFieldToFile],
     destination_note: Note,
     source_notes: list[Note],
     variable_values_dict: Optional[dict] = None,
@@ -787,11 +815,14 @@ def copy_into_single_note(
     file_cache: Optional[dict] = None,
     show_error_message: Optional[Callable[[str], None]] = None,
     progress_updater: Optional[ProgressUpdater] = None,
-) -> bool:
+) -> Tuple[bool, bool]:
     if not show_error_message:
 
         def show_error_message(message: str):
             print(message)
+
+    modified_dest_note = False
+    wrote_to_file = False
 
     for field_to_field_def in field_to_field_defs:
         copy_into_note_field = field_to_field_def.get("copy_into_note_field", "")
@@ -812,12 +843,12 @@ def copy_into_single_note(
             show_error_message(
                 f"Error in copy fields: Field '{copy_into_note_field}' not found in note"
             )
-            return False
+            # Rest of defs are not processed
+            raise CopyFailedException
 
         if copy_if_empty and cur_field_value != "":
             continue
 
-        # Step 2.1: Get the value from the notes, usually it's just one note
         result_val = get_field_values_from_notes(
             copy_from_text=copy_from_text,
             notes=source_notes,
@@ -828,7 +859,6 @@ def copy_into_single_note(
             variable_values_dict=variable_values_dict,
             progress_updater=progress_updater,
         )
-        # Step 2.2: If we have further processing steps, run them
         if process_chain is not None:
             processed_val = apply_process_chain(
                 process_chain=process_chain,
@@ -842,12 +872,72 @@ def copy_into_single_note(
                 show_error_message(
                     f"Error in copy fields: Process chain failed for field {copy_into_note_field}"
                 )
-                return False
+                raise CopyFailedException
             result_val = processed_val
 
         # Finally, copy the value into the note
         destination_note[copy_into_note_field] = result_val
-    return True
+        modified_dest_note = True
+
+    for field_to_file_def in field_to_file_defs:
+        copy_into_filename = field_to_file_def.get("copy_into_filename", "")
+        copy_from_text = field_to_file_def.get("copy_from_text", "")
+        process_chain = field_to_file_def.get("process_chain", None)
+        dont_overwrite = field_to_file_def.get("copy_if_empty", False)
+
+        if not copy_into_filename:
+            show_error_message("Error in copy fields: No file name provided")
+            raise CopyFailedException
+
+        # Interpolate filename with values from the note
+        copy_into_filename = get_field_values_from_notes(
+            copy_from_text=copy_into_filename,
+            notes=[destination_note],
+            dest_note=destination_note,
+            multiple_note_types=multiple_note_types,
+            select_card_separator=select_card_separator,
+            show_error_message=show_error_message,
+            variable_values_dict=variable_values_dict,
+            progress_updater=progress_updater,
+        )
+
+        if dont_overwrite and file_exists_in_media_folder(copy_into_filename):
+            continue
+
+        result_val = get_field_values_from_notes(
+            copy_from_text=copy_from_text,
+            notes=source_notes,
+            dest_note=destination_note,
+            multiple_note_types=multiple_note_types,
+            select_card_separator=select_card_separator,
+            show_error_message=show_error_message,
+            variable_values_dict=variable_values_dict,
+            progress_updater=progress_updater,
+        )
+        if process_chain is not None:
+            processed_val = apply_process_chain(
+                process_chain=process_chain,
+                text=result_val,
+                destination_note=destination_note,
+                show_error_message=show_error_message,
+                file_cache=file_cache,
+            )
+            # result_val should always be at least "", None indicates an error
+            if processed_val is None:
+                show_error_message(
+                    f"Error in copy fields: Process chain failed for file {copy_into_filename}"
+                )
+                raise CopyFailedException
+            result_val = processed_val
+
+        # Finally, copy the value into the file
+        try:
+            write_to_media_folder(copy_into_filename, result_val)
+            wrote_to_file = True
+        except Exception as e:
+            show_error_message(f"Error in writing to file: {e}")
+            raise CopyFailedException
+    return (modified_dest_note, wrote_to_file)
 
 
 def get_variable_values_for_note(
