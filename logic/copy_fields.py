@@ -397,17 +397,22 @@ def copy_fields(
                 field_only=field_only,
                 progress_title=progress_title,
             )
+            # Update each modified note after every operation, so that if multiple ops are updating
+            # the same note, all changes are saved
+            # Because of this, if multiple ops use the same note data as a source, the final result
+            # depends on the order of the ops
+            mw.col.update_notes(copied_into_notes)
+            # undo_entry has to be updated after every undoable op or the last_step will
+            # increment causing an "target undo op not found" error!
+            results.changes = mw.col.merge_undo_entries(undo_entry)
             if mw.progress.want_cancel():
                 break
         if is_sync:
+            # Update card custom-data after all ops are complete
             for card in copied_into_cards:
                 write_custom_data(card, key="fc", value=1)
             mw.col.update_cards(copied_into_cards)
             results.changes = mw.col.merge_undo_entries(undo_entry)
-        # undo_entry has to be updated after every undoable op or the last_step will
-        # increment causing an "target undo op not found" error!
-        mw.col.update_notes(copied_into_notes)
-        results.changes = mw.col.merge_undo_entries(undo_entry)
         return results
 
     return (
