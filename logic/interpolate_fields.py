@@ -485,6 +485,8 @@ def interpolate_from_text(
     """
     Interpolates a text that uses curly brace syntax.
     Also returns a list of all invalid fields in the text for debugging.
+    The destination note should not be modified in this function, only its values should be
+    used.
 
     :param text: The text to interpolate
     :param source_note: The note to get the values from for non-prefixed note fields

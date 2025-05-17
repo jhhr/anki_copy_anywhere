@@ -736,7 +736,11 @@ def copy_for_single_trigger_note(
     source_notes = []
     if copy_mode == COPY_MODE_WITHIN_NOTE:
         destination_notes = [trigger_note]
-        source_notes = [trigger_note]
+        # Duplicate the trigger note so that the source and destination note are not the same object
+        # otherwise, as field-to-field defs are processed, the source note will be modified
+        # resulting in final result depending on the order of the defs. In particular swapping
+        # two fields would not work as expected
+        source_notes = [Note(id=trigger_note.id, col=mw.col)]
     elif copy_mode == COPY_MODE_ACROSS_NOTES:
         if across_mode_direction not in [
             DIRECTION_DESTINATION_TO_SOURCES,
@@ -829,6 +833,11 @@ def copy_into_single_note(
     modified_dest_note = False
     wrote_to_file = False
 
+    # Duplicate the destination note so field-to-field defs that use the destination note's fields
+    # as source values all use the same initial values, instead of the source values being modified
+    # as the field-to-field defs are processed
+    destination_note_copy = Note(id=destination_note.id, col=mw.col)
+
     for field_to_field_def in field_to_field_defs:
         copy_into_note_field = field_to_field_def.get("copy_into_note_field", "")
         trigger_fields = get_field_to_field_unfocus_trigger_fields(
@@ -857,7 +866,7 @@ def copy_into_single_note(
         result_val = get_field_values_from_notes(
             copy_from_text=copy_from_text,
             notes=source_notes,
-            dest_note=destination_note,
+            dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
@@ -898,7 +907,7 @@ def copy_into_single_note(
         copy_into_filename = get_field_values_from_notes(
             copy_from_text=copy_into_filename,
             notes=[destination_note],
-            dest_note=destination_note,
+            dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
@@ -912,7 +921,7 @@ def copy_into_single_note(
         result_val = get_field_values_from_notes(
             copy_from_text=copy_from_text,
             notes=source_notes,
-            dest_note=destination_note,
+            dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
             show_error_message=show_error_message,
@@ -923,7 +932,7 @@ def copy_into_single_note(
             processed_val = apply_process_chain(
                 process_chain=process_chain,
                 text=result_val,
-                destination_note=destination_note,
+                destination_note=destination_note_copy,
                 show_error_message=show_error_message,
                 file_cache=file_cache,
             )
