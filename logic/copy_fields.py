@@ -54,6 +54,7 @@ from ..utils import (
     write_custom_data,
     write_to_media_folder,
     file_exists_in_media_folder,
+    duplicate_note,
 )
 
 
@@ -738,9 +739,9 @@ def copy_for_single_trigger_note(
         destination_notes = [trigger_note]
         # Duplicate the trigger note so that the source and destination note are not the same object
         # otherwise, as field-to-field defs are processed, the source note will be modified
-        # resulting in final result depending on the order of the defs. In particular swapping
+        # resulting in the final result depending on the order of the defs. In particular swapping
         # two fields would not work as expected
-        source_notes = [Note(id=trigger_note.id, col=mw.col)]
+        source_notes = [duplicate_note(trigger_note)]
     elif copy_mode == COPY_MODE_ACROSS_NOTES:
         if across_mode_direction not in [
             DIRECTION_DESTINATION_TO_SOURCES,
@@ -836,7 +837,7 @@ def copy_into_single_note(
     # Duplicate the destination note so field-to-field defs that use the destination note's fields
     # as source values all use the same initial values, instead of the source values being modified
     # as the field-to-field defs are processed
-    destination_note_copy = Note(id=destination_note.id, col=mw.col)
+    destination_note_copy = duplicate_note(destination_note)
 
     for field_to_field_def in field_to_field_defs:
         copy_into_note_field = field_to_field_def.get("copy_into_note_field", "")
