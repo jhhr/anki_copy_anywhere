@@ -256,7 +256,7 @@ class ProgressUpdater:
         )
 
     def set_title(self, title: str):
-        mw.progress.set_title(title)
+        mw.taskman.run_on_main(lambda: mw.progress.set_title(title))
 
 
 def make_copy_fields_undo_text(
