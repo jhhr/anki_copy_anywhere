@@ -3,7 +3,6 @@ from typing import Optional, Callable
 from anki.notes import Note
 
 from .kana_highlight import (
-    furigana_reverser,
     FuriReconstruct,
     WithTagsDef,
     kana_filter,
@@ -28,9 +27,6 @@ def kana_highlight_process(
         def show_error_message(message: str):
             print(message)
 
-    if not kanji_field:
-        show_error_message("Error in kana_highlight: Missing 'kanji_field'")
-        return kana_filter(text)
     if not return_type:
         show_error_message("Error in kana_highlight: Missing 'return_type'")
         return kana_filter(text)
@@ -42,13 +38,5 @@ def kana_highlight_process(
             kanji_to_highlight = field_text
             if kanji_to_highlight:
                 break
-
-    if kanji_to_highlight is None:
-        if return_type == "kana_only":
-            return kana_filter(text)
-        if return_type == "furikanji":
-            return furigana_reverser(text)
-        else:
-            return text
 
     return kana_highlight(kanji_to_highlight, text, return_type, with_tags_def, show_error_message)

@@ -471,7 +471,7 @@ class HighlightArgs(TypedDict):
     onyomi: str
     kunyomi: str
     kanji_to_match: str
-    kanji_to_highlight: str
+    kanji_to_highlight: str | None
     add_highlight: bool
     edge: Edge
 
@@ -742,7 +742,7 @@ def reconstruct_furigana(
     return f"{result}{rest_kana}"
 
 
-LOG = False
+LOG = True
 
 
 def log(*args):
@@ -1490,7 +1490,7 @@ def handle_jukujikun_case(
         kanji_count > 0
     ), f"handle_jukujikun_case[]: incorrect kanji_count: {word_data.get('kanji_count')}"
     word = word_data.get("word", "")
-    kanji_pos = word.find(kanji_to_highlight)
+    kanji_pos = word.find(kanji_to_highlight) if kanji_to_highlight else -1
     # kanji_pos can be -1, in which case no highlighting happens
     assert kanji_pos < kanji_count, (
         f"handle_jukujikun_case[]: incorrect kanji_pos: {kanji_pos}, kanji_to_highlight:"
@@ -1763,7 +1763,7 @@ def handle_partial_word_case(
 
 
 def kana_highlight(
-    kanji_to_highlight: str,
+    kanji_to_highlight: str | None,
     text: str,
     return_type: FuriReconstruct = "kana_only",
     with_tags_def: Optional[WithTagsDef] = None,
@@ -1806,14 +1806,14 @@ def kana_highlight(
             # (what is it doing there next to a sound tag?) so we'll just leave it out anyway
             return furigana + okurigana
 
-        highlight_kanji_is_whole_word = (
+        highlight_kanji_is_whole_word = kanji_to_highlight is not None and (
             word == kanji_to_highlight
             or f"{kanji_to_highlight}々" == word
             or kanji_to_highlight * 2 == word
         )
 
         # Whole word case is easy, just highlight the whole furigana
-        if highlight_kanji_is_whole_word:
+        if highlight_kanji_is_whole_word and kanji_to_highlight is not None:
             kanji_data = all_kanji_data.get(kanji_to_highlight)
             if not kanji_data:
                 show_error_message(
@@ -2137,7 +2137,7 @@ def kana_highlight(
                 f"\nreversed handle_jukujikun_case - juku_word: {juku_word}, juku_furigana:"
                 f" {juku_furigana}"
             )
-            kanji_pos = juku_word.find(kanji_to_highlight)
+            kanji_pos = juku_word.find(kanji_to_highlight) if kanji_to_highlight else -1
             word_data: WordData = {
                 "kanji_pos": kanji_pos,
                 "kanji_count": len(juku_word),
@@ -2148,7 +2148,8 @@ def kana_highlight(
             }
             juku_highlight_args: HighlightArgs = {
                 "kanji_to_highlight": kanji_to_highlight,
-                "kanji_to_match": kanji_to_highlight,
+                # kanji_to_match not used in jukujikun processing
+                "kanji_to_match": "",
                 # Jukujikun processing doesn't need readings, just pass empty strings
                 "onyomi": "",
                 "kunyomi": "",
@@ -2167,7 +2168,7 @@ def kana_highlight(
                 reverse_final_left_word = juku_word + reverse_final_left_word
             elif juku_word_pos_to_highlight == "right":
                 reverse_final_right_word = juku_word + reverse_final_right_word
-            elif kanji_pos != -1:
+            elif kanji_pos != -1 and kanji_to_highlight is not None:
                 # Kanji to highlight is in the juku word
                 kanji_to_left = juku_word[:kanji_pos]
                 kanji_to_right = juku_word[kanji_pos + 1 :]
@@ -2238,6 +2239,7 @@ def kana_highlight(
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
+    log(f"\nprocessed_text: {processed_text}")
     # Clean any double spaces that might have been created by the furigana reconstruction
     # Including those right before a <b> tag as the space is added with those
     processed_text = re.sub(r" {2}", " ", processed_text)
@@ -2246,7 +2248,7 @@ def kana_highlight(
 
 def test(
     test_name: str,
-    kanji: str,
+    kanji: str | None,
     sentence: str,
     ignore_fail: bool = False,
     assume_dictionary_form: bool = False,
@@ -2331,6 +2333,38 @@ Return type: {return_type}
 
 
 def main():
+    test(
+        test_name="Should not crash with no kanji_to_highlight",
+        kanji=None,
+        sentence="漢字[かんじ]の読[よ]み方[かた]を学[まな]ぶ。",
+        expected_furigana=" 漢字[カンジ]の 読[よ]み 方[かた]を 学[まな]ぶ。",
+        expected_furikanji=" カンジ[漢字]の よ[読]み かた[方]を まな[学]ぶ。",
+        expected_kana_only="カンジのよみかたをまなぶ。",
+        expected_furigana_with_tags_split=(
+            "<on> 漢[カン]</on><on> 字[ジ]</on>の<kun> 読[よ]</kun><oku>み</oku><kun>"
+            " 方[かた]</kun>を<kun> 学[まな]</kun><oku>ぶ</oku>。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 漢字[カンジ]</on>の<kun> 読[よ]</kun><oku>み</oku><kun> 方[かた]</kun>を"
+            "<kun> 学[まな]</kun><oku>ぶ</oku>。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> カン[漢]</on><on> ジ[字]</on>の<kun> よ[読]</kun><oku>み</oku><kun>"
+            " かた[方]</kun>を<kun> まな[学]</kun><oku>ぶ</oku>。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> カンジ[漢字]</on>の<kun> よ[読]</kun><oku>み</oku><kun> かた[方]</kun>を"
+            "<kun> まな[学]</kun><oku>ぶ</oku>。"
+        ),
+        expected_kana_only_with_tags_split=(
+            "<on>カン</on><on>ジ</on>の<kun>よ</kun><oku>み</oku><kun>かた</kun>を"
+            "<kun>まな</kun><oku>ぶ</oku>。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>カンジ</on>の<kun>よ</kun><oku>み</oku><kun>かた</kun>を"
+            "<kun>まな</kun><oku>ぶ</oku>。"
+        ),
+    )
     test(
         test_name="Should not crash with kanji that has empty onyomi or kunyomi",
         kanji="匂",

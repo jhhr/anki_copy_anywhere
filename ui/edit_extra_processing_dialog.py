@@ -339,10 +339,12 @@ class KanaHighlightProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.kanji_field_cbox = RequiredCombobox(placeholder_text="Select field (required)")
+        self.kanji_field_cbox = RequiredCombobox(placeholder_text="Select field (optional)")
         self.form.addRow("Kanji field", self.kanji_field_cbox)
 
-        self.return_type_cbox = RequiredCombobox(placeholder_text="Select return type (required")
+        self.return_type_cbox = RequiredCombobox(
+            placeholder_text="Select return type (required)", is_required=True
+        )
         self.return_type_cbox.addItems(["furigana", "furikanji", "kana_only"])
         self.return_type_cbox.setCurrentText("kana_only")
         self.form.addRow("Return type", self.return_type_cbox)
