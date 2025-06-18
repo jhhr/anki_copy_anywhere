@@ -61,7 +61,7 @@ KATAKANA_CONVERSION_DICT = {
     to_katakana(k): [to_katakana(v) for v in vs] for k, vs in RENDAKU_CONVERSION_DICT.items()
 }
 
-SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん"]
+SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
 
 HIRAGANA_RE = "([ぁ-ん])"
 
@@ -280,6 +280,10 @@ NUMBER_TO_KANJI = {
     "7": "七",
     "8": "八",
     "9": "九",
+    "10": "十",
+    "100": "百",
+    "1000": "千",
+    "10000": "万",
     # jpn number characters
     "１": "一",
     "２": "二",
@@ -290,6 +294,10 @@ NUMBER_TO_KANJI = {
     "７": "七",
     "８": "八",
     "９": "九",
+    "１０": "十",
+    "１００": "百",
+    "１０００": "千",
+    "１００００": "万",
 }
 
 # Exceptions for words where the first kanji has a kunyomi reading that is the same as the
@@ -675,7 +683,7 @@ def reconstruct_furigana(
                         wrapped_whole_word += wrapped_word
 
             log(
-                f"\nreconstruct_furigana - whole_word: {right_word}{middle_word}{left_word},"
+                f"\nreconstruct_furigana - whole_word: {left_word}{middle_word}{right_word},"
                 f" furigana: {furigana}, wrapped_whole_word: {wrapped_whole_word}"
             )
             okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
@@ -742,7 +750,7 @@ def reconstruct_furigana(
     return f"{result}{rest_kana}"
 
 
-LOG = True
+LOG = False
 
 
 def log(*args):
@@ -1073,6 +1081,10 @@ def is_reading_in_furigana_section(
         + [(r, "vowel_change") for r in vowel_change_readings]
     )
     if edge == "left":
+        log(
+            f"\ncheck_reading_in_furigana_section - left edge, furigana_section: {furigana_section}"
+            f", all_readings: {all_readings}"
+        )
         for r, t in all_readings:
             if furigana_section.startswith(r):
                 return r, cast(ReadingType, t)
@@ -1138,7 +1150,7 @@ def check_onyomi_readings(
     for onyomi_reading in onyomi_readings:
         # remove text in () in the reading
         onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
-        log(f"\ncheck_onyomi_readings - onyomi_reading: {onyomi_reading}")
+        log(f"\ncheck_onyomi_readings 1 - onyomi_reading: {onyomi_reading}")
         if not onyomi_reading:
             continue
         # Convert the onyomi to hiragana since the furigana is in hiragana
@@ -1150,7 +1162,7 @@ def check_onyomi_readings(
             edge,
         )
         log(
-            f"\ncheck_onyomi_readings - onyomi_reading: {onyomi_reading}, in_section:"
+            f"\ncheck_onyomi_readings 2 - onyomi_reading: {onyomi_reading}, in_section:"
             f" {match_in_section}, type: {match_type}"
         )
         if match_in_section:
@@ -1860,11 +1872,19 @@ def kana_highlight(
         juku_furigana = None
         juku_word_start_edge = None
         juku_word_pos_to_highlight: Union[Literal["left", "middle", "right"], None] = None
+
+        replace_ten_kanji = None
+        replaced_ten = False
         # For the partial case, we need to split the furigana for each kanji using the kanji_data
         # for each one, highlight the kanji_to_match and reconstruct the furigana
         for index, kanji in enumerate(word):
             if kanji == "々":
                 # Skip repeater as this will have been handled in the previous iteration
+                continue
+            if replaced_ten:
+                # If we replaced the 10 or １０ with 十, we should skip this kanji (which is 0 or ０)
+                # as it was already processed
+                replaced_ten = False
                 continue
             is_first_kanji = index == 0
             is_last_kanji = index == len(word) - 1
@@ -1873,11 +1893,24 @@ def kana_highlight(
                 cur_edge = "middle"
             elif is_last_kanji:
                 cur_edge = "right"
+
+            next_kanji = word[index + 1] if not is_last_kanji else ""
+            next_next_kanji = word[index + 2] if index + 2 < len(word) else ""
+            # Handle the case where 10 and １０ have furigana, these should be read as 十
+            cur_and_next_kanji = kanji + next_kanji
+            if cur_and_next_kanji in ["10", "１０"] and next_next_kanji not in ["0", "０"]:
+                # skip this kanji and process on the next zero
+                kanji = "十"
+                replace_ten_kanji = cur_and_next_kanji
+                # replace the 10 or １０ with 十 in cur_word, then we can process it as usual
+                cur_word = cur_word.replace(replace_ten_kanji, "十", 1)
+                replaced_ten = True
             kanji_data_key = NUMBER_TO_KANJI.get(kanji, kanji)
             kanji_data = all_kanji_data.get(kanji_data_key)
             if not kanji_data:
                 show_error_message(
-                    f"Error in kana_highlight[]: kanji '{kanji}' not found in all_kanji_data"
+                    f"Error in kana_highlight[]: main word loop, kanji '{kanji}' not found in"
+                    " all_kanji_data"
                 )
                 return furigana + okurigana
             is_kanji_to_highlight = kanji == kanji_to_highlight
@@ -1916,7 +1949,6 @@ def kana_highlight(
             matched_furigana = partial_result["matched_furigana"]
             wrapped_furigana = matched_furigana
 
-            next_kanji = word[index + 1] if not is_last_kanji else ""
             if next_kanji == "々":
                 log(f"\nrepeater kanji: {next_kanji}")
                 rep_kanji = next_kanji
@@ -1957,7 +1989,6 @@ def kana_highlight(
             if is_kanji_to_highlight:
                 final_edge = cur_edge
                 kanji_to_highlight_passed = True
-
             # The complex part is putting the furigana back together
             # Left word: every kanji before the kanji to highlight or the first kanji, if
             #   the kanji to highlight is the first one
@@ -2032,7 +2063,8 @@ def kana_highlight(
             kanji_data = all_kanji_data.get(kanji_data_key)
             if not kanji_data:
                 show_error_message(
-                    f"Error in kana_highlight[]: kanji '{kanji}' not found in all_kanji_data"
+                    f"Error in kana_highlight[]: reversing, kanji '{kanji}' not found in"
+                    " all_kanji_data"
                 )
                 return furigana + okurigana
             is_kanji_to_highlight = kanji == kanji_to_highlight
@@ -2230,11 +2262,16 @@ def kana_highlight(
             "right_word": final_right_word + reverse_final_right_word,
             "edge": final_edge,
         }
-        return reconstruct_furigana(
+        reconstructed_result = reconstruct_furigana(
             final_result,
             with_tags_def=with_tags_def,
             reconstruct_type=return_type,
         )
+        if replace_ten_kanji is not None:
+            # If we replaced the 10 or １０ with 十, we should revert the replacement,
+            # so that the final result uses the original characters
+            reconstructed_result = reconstructed_result.replace("十", replace_ten_kanji, 1)
+        return reconstructed_result
 
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)
@@ -4479,6 +4516,64 @@ def main():
         expected_kana_only="<b>あい</b>にく",
         expected_kana_only_with_tags_split="<b><kun>あい</kun></b><kun>にく</kun>",
         expected_kana_only_with_tags_merged="<b><kun>あい</kun></b><kun>にく</kun>",
+    )
+    test(
+        test_name="10 and １０ read as じっ or じゅっ no highlight",
+        kanji=None,
+        sentence="１０分[じゅっぷん]と10分[じっぷん]と10冊[じゅっさつ]",
+        expected_kana_only="ジュップンとジップンとジュッサツ",
+        expected_furigana=" １０分[ジュップン]と 10分[ジップン]と 10冊[ジュッサツ]",
+        expected_furikanji=" ジュップン[１０分]と ジップン[10分]と ジュッサツ[10冊]",
+        expected_kana_only_with_tags_split=(
+            "<on>ジュッ</on><on>プン</on>と<on>ジッ</on><on>プン</on>と<on>ジュッ</on><on>サツ</on>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> １０[ジュッ]</on><on> 分[プン]</on>と<on> 10[ジッ]</on><on> 分[プン]</on>と<on>"
+            " 10[ジュッ]</on><on> 冊[サツ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> ジュッ[１０]</on><on> プン[分]</on>と<on> ジッ[10]</on><on> プン[分]</on>と<on>"
+            " ジュッ[10]</on><on> サツ[冊]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<on>ジュップン</on>と<on>ジップン</on>と<on>ジュッサツ</on>",
+        expected_furigana_with_tags_merged=(
+            "<on> １０分[ジュップン]</on>と<on> 10分[ジップン]</on>と<on> 10冊[ジュッサツ]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> ジュップン[１０分]</on>と<on> ジップン[10分]</on>と<on> ジュッサツ[10冊]</on>"
+        ),
+    )
+    test(
+        test_name="10 and １０ read as じっ or じゅっ highlight",
+        kanji="分",
+        sentence="１０分[じゅっぷん]と10分[じっぷん]と１０冊[じゅっさつ]",
+        expected_kana_only="ジュッ<b>プン</b>とジッ<b>プン</b>とジュッサツ",
+        expected_furigana=" １０[ジュッ]<b> 分[プン]</b>と 10[ジッ]<b> 分[プン]</b>と １０冊[ジュッサツ]",
+        expected_furikanji=" ジュッ[１０]<b> プン[分]</b>と ジッ[10]<b> プン[分]</b>と ジュッサツ[１０冊]",
+        expected_kana_only_with_tags_split=(
+            "<on>ジュッ</on><b><on>プン</on></b>と<on>ジッ</on><b><on>プン</on></b>と<on>ジュッ</on>"
+            "<on>サツ</on>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> １０[ジュッ]</on><b><on> 分[プン]</on></b>と<on> 10[ジッ]</on><b><on>"
+            " 分[プン]</on></b>と<on> １０[ジュッ]</on><on> 冊[サツ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> ジュッ[１０]</on><b><on> プン[分]</on></b>と<on> ジッ[10]</on><b><on>"
+            " プン[分]</on></b>と<on> ジュッ[１０]</on><on> サツ[冊]</on>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>ジュッ</on><b><on>プン</on></b>と<on>ジッ</on><b><on>プン</on></b>と<on>"
+            "ジュッサツ</on>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> １０[ジュッ]</on><b><on> 分[プン]</on></b>と<on> 10[ジッ]</on><b><on>"
+            " 分[プン]</on></b>と<on> １０冊[ジュッサツ]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> ジュッ[１０]</on><b><on> プン[分]</on></b>と<on> ジッ[10]</on><b><on>"
+            " プン[分]</on></b>と<on> ジュッサツ[１０冊]</on>"
+        ),
     )
     print("\n\033[92mTests passed\033[0m")
 
