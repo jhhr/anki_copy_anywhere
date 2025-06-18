@@ -652,7 +652,7 @@ def reconstruct_furigana(
 
     if not has_highlight:
         log("\nreconstruct_furigana - no highlight")
-        # There was no match found during onyomi and kunyomi processing, so no <b> tags
+        # There was no match found during onyomi and kunyomi processing, so no<b> tags
         # we can just construct the furigana without splitting it
         if reconstruct_type == "kana_only" and not with_tags_def.merge_consecutive:
             # kana are already wrapped, if they are, and were not merging so
@@ -693,8 +693,8 @@ def reconstruct_furigana(
         return f" {left_word}{middle_word}{right_word}[{furigana}]{okurigana}{rest_kana}"
 
     if edge == "whole":
-        # Same as above except we add the <b> tags around the whole thing
-        # First remove <b> tags from the furigana
+        # Same as above except we add the<b> tags around the whole thing
+        # First remove<b> tags from the furigana
         furigana = re.sub(r"<b>|</b>", "", furigana)
         whole_word = f"{left_word}{middle_word}{right_word}"
         if with_tags_def.with_tags:
@@ -781,7 +781,7 @@ def process_readings(
     """
     Function that processes furigana by checking all possible onyomi and kunyomi readings on it
     Either returns the furigana as-is when there is no match or modifies the furigana by
-    adding <b> tags around the part that matches the reading
+    adding<b> tags around the part that matches the reading
 
     :return: string, the modified furigana
         or (True, False) / (False, True) if return_on_or_kun_match_only
@@ -1787,7 +1787,7 @@ def kana_highlight(
         )
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
-    onyomi or kunyomi reading. The furigana is then highlighted with <b> tags.
+    onyomi or kunyomi reading. The furigana is then highlighted with<b> tags.
     Text received could be a sentence or a single word with furigana.
     :param kanji_to_highlight: should be a single kanji character
     :param text: The text to process
@@ -1796,7 +1796,7 @@ def kana_highlight(
     :param with_tags_def: tuple, with_tags and merge_consecutive keys. Whether to wrap the readings
         with tags and whether to merge consecutive tags
     :param show_error_message: Callable, function to call when an error message is needed
-    :return: The text cleaned from any previous <b> tags and <b> added around the furigana
+    :return: The text cleaned from any previous<b> tags and<b> added around the furigana
         when the furigana corresponds to the kanji_to_highlight
     """
 
@@ -2278,9 +2278,10 @@ def kana_highlight(
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
     log(f"\nprocessed_text: {processed_text}")
     # Clean any double spaces that might have been created by the furigana reconstruction
-    # Including those right before a <b> tag as the space is added with those
+    # Including those right before a<b> tag as the space is added with those
     processed_text = re.sub(r" {2}", " ", processed_text)
-    return re.sub(r" <b> ", "<b> ", processed_text)
+    processed_text = re.sub(r" <(b|on|kun|juk)> ", r"<\1> ", processed_text)
+    return re.sub(r" <b><(on|kun|juk)> ", r"<b><\1> ", processed_text)
 
 
 def test(
@@ -2414,19 +2415,19 @@ def main():
             "この <on>ク</on><on>イキ</on>は <b><kun>にお</kun><oku>い</oku></b>がする。"
         ),
         expected_furigana_with_tags_split=(
-            "この <on> 区[ク]</on><on> 域[イキ]</on>は <b><kun> 匂[にお]</kun><oku>い</oku></b>がする。"
+            "この<on> 区[ク]</on><on> 域[イキ]</on>は<b><kun> 匂[にお]</kun><oku>い</oku></b>がする。"
         ),
         expected_furikanji_with_tags_split=(
-            "この <on> ク[区]</on><on> イキ[域]</on>は <b><kun> にお[匂]</kun><oku>い</oku></b>がする。"
+            "この<on> ク[区]</on><on> イキ[域]</on>は<b><kun> にお[匂]</kun><oku>い</oku></b>がする。"
         ),
         expected_kana_only_with_tags_merged=(
             "この <on>クイキ</on>は <b><kun>にお</kun><oku>い</oku></b>がする。"
         ),
         expected_furigana_with_tags_merged=(
-            "この <on> 区域[クイキ]</on>は <b><kun> 匂[にお]</kun><oku>い</oku></b>がする。"
+            "この<on> 区域[クイキ]</on>は<b><kun> 匂[にお]</kun><oku>い</oku></b>がする。"
         ),
         expected_furikanji_with_tags_merged=(
-            "この <on> クイキ[区域]</on>は <b><kun> にお[匂]</kun><oku>い</oku></b>がする。"
+            "この<on> クイキ[区域]</on>は<b><kun> にお[匂]</kun><oku>い</oku></b>がする。"
         ),
     )
     test(
@@ -2505,11 +2506,11 @@ def main():
             " <kun>き</kun><oku>え</oku><b><kun>さ</kun><oku>った</oku></b>。"
         ),
         expected_furigana_with_tags_split=(
-            "<on> 団[ダン]</on><kun> 子[ご]</kun>が <kun> 消[き]</kun><oku>え</oku><b><kun>"
+            "<on> 団[ダン]</on><kun> 子[ご]</kun>が<kun> 消[き]</kun><oku>え</oku><b><kun>"
             " 去[さ]</kun><oku>った</oku></b>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> ダン[団]</on><kun> ご[子]</kun>が <kun> き[消]</kun><oku>え</oku><b><kun>"
+            "<on> ダン[団]</on><kun> ご[子]</kun>が<kun> き[消]</kun><oku>え</oku><b><kun>"
             " さ[去]</kun><oku>った</oku></b>。"
         ),
         expected_kana_only_with_tags_merged=(
@@ -2517,11 +2518,11 @@ def main():
             " <kun>き</kun><oku>え</oku><b><kun>さ</kun><oku>った</oku></b>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<on> 団[ダン]</on><kun> 子[ご]</kun>が <kun> 消[き]</kun><oku>え</oku><b><kun>"
+            "<on> 団[ダン]</on><kun> 子[ご]</kun>が<kun> 消[き]</kun><oku>え</oku><b><kun>"
             " 去[さ]</kun><oku>った</oku></b>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<on> ダン[団]</on><kun> ご[子]</kun>が <kun> き[消]</kun><oku>え</oku><b><kun>"
+            "<on> ダン[団]</on><kun> ご[子]</kun>が<kun> き[消]</kun><oku>え</oku><b><kun>"
             " さ[去]</kun><oku>った</oku></b>。"
         ),
     )
@@ -2567,22 +2568,22 @@ def main():
             "<b><kun>くにぐに</kun></b>の <on>カン</on><on>ケイ</on>が <kun>ふか</kun><oku>い</oku>。"
         ),
         expected_furigana_with_tags_split=(
-            "<b><kun> 国々[くにぐに]</kun></b>の <on> 関[カン]</on><on>"
-            " 係[ケイ]</on>が <kun> 深[ふか]</kun><oku>い</oku>。"
+            "<b><kun> 国々[くにぐに]</kun></b>の<on> 関[カン]</on><on>"
+            " 係[ケイ]</on>が<kun> 深[ふか]</kun><oku>い</oku>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<b><kun> くにぐに[国々]</kun></b>の <on> カン[関]</on><on>"
-            " ケイ[係]</on>が <kun> ふか[深]</kun><oku>い</oku>。"
+            "<b><kun> くにぐに[国々]</kun></b>の<on> カン[関]</on><on>"
+            " ケイ[係]</on>が<kun> ふか[深]</kun><oku>い</oku>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<b><kun>くにぐに</kun></b>の <on>カンケイ</on>が <kun>ふか</kun><oku>い</oku>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<b><kun> 国々[くにぐに]</kun></b>の <on> 関係[カンケイ]</on>が <kun>"
+            "<b><kun> 国々[くにぐに]</kun></b>の<on> 関係[カンケイ]</on>が<kun>"
             " 深[ふか]</kun><oku>い</oku>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<b><kun> くにぐに[国々]</kun></b>の <on> カンケイ[関係]</on>が <kun>"
+            "<b><kun> くにぐに[国々]</kun></b>の<on> カンケイ[関係]</on>が<kun>"
             " ふか[深]</kun><oku>い</oku>。"
         ),
     )
@@ -2597,23 +2598,19 @@ def main():
             "<b><kun>ときどき</kun></b> <kun>あめ</kun>が <kun>ふ</kun><oku>る</oku>。"
         ),
         expected_furigana_with_tags_split=(
-            "<b><kun> 時々[ときどき]</kun></b> <kun> 雨[あめ]</kun>が <kun>"
-            " 降[ふ]</kun><oku>る</oku>。"
+            "<b><kun> 時々[ときどき]</kun></b><kun> 雨[あめ]</kun>が<kun> 降[ふ]</kun><oku>る</oku>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<b><kun> ときどき[時々]</kun></b> <kun> あめ[雨]</kun>が <kun>"
-            " ふ[降]</kun><oku>る</oku>。"
+            "<b><kun> ときどき[時々]</kun></b><kun> あめ[雨]</kun>が<kun> ふ[降]</kun><oku>る</oku>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<b><kun>ときどき</kun></b> <kun>あめ</kun>が <kun>ふ</kun><oku>る</oku>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<b><kun> 時々[ときどき]</kun></b> <kun> 雨[あめ]</kun>が <kun>"
-            " 降[ふ]</kun><oku>る</oku>。"
+            "<b><kun> 時々[ときどき]</kun></b><kun> 雨[あめ]</kun>が<kun> 降[ふ]</kun><oku>る</oku>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<b><kun> ときどき[時々]</kun></b> <kun> あめ[雨]</kun>が <kun>"
-            " ふ[降]</kun><oku>る</oku>。"
+            "<b><kun> ときどき[時々]</kun></b><kun> あめ[雨]</kun>が<kun> ふ[降]</kun><oku>る</oku>。"
         ),
     )
     test(
@@ -2669,13 +2666,13 @@ def main():
         expected_furikanji="<b> コッコク[刻々]</b>と ヘンカ[変化]する。",
         expected_kana_only_with_tags_split="<b><on>コッコク</on></b>と <on>ヘン</on><on>カ</on>する。",
         expected_furigana_with_tags_split=(
-            "<b><on> 刻々[コッコク]</on></b>と <on> 変[ヘン]</on><on> 化[カ]</on>する。"
+            "<b><on> 刻々[コッコク]</on></b>と<on> 変[ヘン]</on><on> 化[カ]</on>する。"
         ),
         expected_furikanji_with_tags_split=(
-            "<b><on> コッコク[刻々]</on></b>と <on> ヘン[変]</on><on> カ[化]</on>する。"
+            "<b><on> コッコク[刻々]</on></b>と<on> ヘン[変]</on><on> カ[化]</on>する。"
         ),
         expected_kana_only_with_tags_merged="<b><on>コッコク</on></b>と <on>ヘンカ</on>する。",
-        expected_furigana_with_tags_merged="<b><on> 刻々[コッコク]</on></b>と <on> 変化[ヘンカ]</on>する。",
+        expected_furigana_with_tags_merged="<b><on> 刻々[コッコク]</on></b>と<on> 変化[ヘンカ]</on>する。",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 3/",
@@ -2716,22 +2713,22 @@ def main():
             " <on>ダン</on><on>ゼツ</on>した。"
         ),
         expected_furigana_with_tags_split=(
-            "その2 <b><on> 国[コク]</on></b>は <b><on> 国[コッ]</on></b><on> 交[コウ]</on>を <on>"
+            "その2<b><on> 国[コク]</on></b>は<b><on> 国[コッ]</on></b><on> 交[コウ]</on>を<on>"
             " 断[ダン]</on><on> 絶[ゼツ]</on>した。"
         ),
         expected_furikanji_with_tags_split=(
-            "その2 <b><on> コク[国]</on></b>は <b><on> コッ[国]</on></b><on> コウ[交]</on>を <on>"
+            "その2<b><on> コク[国]</on></b>は<b><on> コッ[国]</on></b><on> コウ[交]</on>を<on>"
             " ダン[断]</on><on> ゼツ[絶]</on>した。"
         ),
         expected_kana_only_with_tags_merged=(
             "その2 <b><on>コク</on></b>は <b><on>コッ</on></b><on>コウ</on>を <on>ダンゼツ</on>した。"
         ),
         expected_furigana_with_tags_merged=(
-            "その2 <b><on> 国[コク]</on></b>は <b><on> 国[コッ]</on></b><on> 交[コウ]</on>を <on>"
+            "その2<b><on> 国[コク]</on></b>は<b><on> 国[コッ]</on></b><on> 交[コウ]</on>を<on>"
             " 断絶[ダンゼツ]</on>した。"
         ),
         expected_furikanji_with_tags_merged=(
-            "その2 <b><on> コク[国]</on></b>は <b><on> コッ[国]</on></b><on> コウ[交]</on>を <on>"
+            "その2<b><on> コク[国]</on></b>は<b><on> コッ[国]</on></b><on> コウ[交]</on>を<on>"
             " ダンゼツ[断絶]</on>した。"
         ),
     )
@@ -2748,24 +2745,24 @@ def main():
             " <kun>かさ</kun>さしてキメーんだよ！！"
         ),
         expected_furigana_with_tags_split=(
-            "お <kun> 前[まえ]</kun>いつも <kun> 長[なが]</kun><b><kun> 靴[ぐつ]</kun></b>に"
-            " <kun> 傘[かさ]</kun>さしてキメーんだよ！！"
+            "お<kun> 前[まえ]</kun>いつも<kun> 長[なが]</kun><b><kun> 靴[ぐつ]</kun></b>に"
+            "<kun> 傘[かさ]</kun>さしてキメーんだよ！！"
         ),
         expected_furikanji_with_tags_split=(
-            "お <kun> まえ[前]</kun>いつも <kun> なが[長]</kun><b><kun> ぐつ[靴]</kun></b>に"
-            " <kun> かさ[傘]</kun>さしてキメーんだよ！！"
+            "お<kun> まえ[前]</kun>いつも<kun> なが[長]</kun><b><kun> ぐつ[靴]</kun></b>に"
+            "<kun> かさ[傘]</kun>さしてキメーんだよ！！"
         ),
         expected_kana_only_with_tags_merged=(
             "お <kun>まえ</kun>いつも <kun>なが</kun><b><kun>ぐつ</kun></b>に"
             " <kun>かさ</kun>さしてキメーんだよ！！"
         ),
         expected_furigana_with_tags_merged=(
-            "お <kun> 前[まえ]</kun>いつも <kun> 長[なが]</kun><b><kun> 靴[ぐつ]</kun></b>に"
-            " <kun> 傘[かさ]</kun>さしてキメーんだよ！！"
+            "お<kun> 前[まえ]</kun>いつも<kun> 長[なが]</kun><b><kun> 靴[ぐつ]</kun></b>に"
+            "<kun> 傘[かさ]</kun>さしてキメーんだよ！！"
         ),
         expected_furikanji_with_tags_merged=(
-            "お <kun> まえ[前]</kun>いつも <kun> なが[長]</kun><b><kun> ぐつ[靴]</kun></b>に"
-            " <kun> かさ[傘]</kun>さしてキメーんだよ！！"
+            "お<kun> まえ[前]</kun>いつも<kun> なが[長]</kun><b><kun> ぐつ[靴]</kun></b>に"
+            "<kun> かさ[傘]</kun>さしてキメーんだよ！！"
         ),
     )
     test(
@@ -2811,13 +2808,13 @@ def main():
         ),
         expected_furigana_with_tags_split=(
             "<on> 見[ケン]</on><on> 敵[テキ]</on><b><on> 必[ヒッ]</on></b><on> 殺[サツ]</on>の"
-            " <on> 指[シ]</on><on> 示[ジ]</on>もないのに <on> 戦[セン]</on><on> 闘[トウ]</on>は"
-            " <on> 不[フ]</on><on> 自[シ]</on><on> 然[ゼン]</on>。"
+            "<on> 指[シ]</on><on> 示[ジ]</on>もないのに<on> 戦[セン]</on><on> 闘[トウ]</on>は"
+            "<on> 不[フ]</on><on> 自[シ]</on><on> 然[ゼン]</on>。"
         ),
         expected_furikanji_with_tags_split=(
             "<on> ケン[見]</on><on> テキ[敵]</on><b><on> ヒッ[必]</on></b><on> サツ[殺]</on>の"
-            " <on> シ[指]</on><on> ジ[示]</on>もないのに <on> セン[戦]</on><on> トウ[闘]</on>は"
-            " <on> フ[不]</on><on> シ[自]</on><on> ゼン[然]</on>。"
+            "<on> シ[指]</on><on> ジ[示]</on>もないのに<on> セン[戦]</on><on> トウ[闘]</on>は"
+            "<on> フ[不]</on><on> シ[自]</on><on> ゼン[然]</on>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<on>ケンテキ</on><b><on>ヒッ</on></b><on>サツ</on>の <on>シジ</on>もないのに"
@@ -2825,11 +2822,11 @@ def main():
         ),
         expected_furigana_with_tags_merged=(
             "<on> 見敵[ケンテキ]</on><b><on> 必[ヒッ]</on></b><on> 殺[サツ]</on>の"
-            " <on> 指示[シジ]</on>もないのに <on> 戦闘[セントウ]</on>は <on> 不自然[フシゼン]</on>。"
+            "<on> 指示[シジ]</on>もないのに<on> 戦闘[セントウ]</on>は<on> 不自然[フシゼン]</on>。"
         ),
         expected_furikanji_with_tags_merged=(
             "<on> ケンテキ[見敵]</on><b><on> ヒッ[必]</on></b><on> サツ[殺]</on>の"
-            " <on> シジ[指示]</on>もないのに <on> セントウ[戦闘]</on>は <on> フシゼン[不自然]</on>。"
+            "<on> シジ[指示]</on>もないのに<on> セントウ[戦闘]</on>は<on> フシゼン[不自然]</on>。"
         ),
     )
     test(
@@ -2844,24 +2841,24 @@ def main():
             " <kun>ひさ</kun><oku>し</oku>ぶりに <kun>あ</kun><oku>った</oku>。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 幼[おさな]</kun><b><kun> 馴[な]</kun></b><kun> 染[じ]</kun><oku>み</oku>と <kun>"
-            " 久[ひさ]</kun><oku>し</oku>ぶりに <kun> 会[あ]</kun><oku>った</oku>。"
+            "<kun> 幼[おさな]</kun><b><kun> 馴[な]</kun></b><kun> 染[じ]</kun><oku>み</oku>と<kun>"
+            " 久[ひさ]</kun><oku>し</oku>ぶりに<kun> 会[あ]</kun><oku>った</oku>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> おさな[幼]</kun><b><kun> な[馴]</kun></b><kun> じ[染]</kun><oku>み</oku>と <kun>"
-            " ひさ[久]</kun><oku>し</oku>ぶりに <kun> あ[会]</kun><oku>った</oku>。"
+            "<kun> おさな[幼]</kun><b><kun> な[馴]</kun></b><kun> じ[染]</kun><oku>み</oku>と<kun>"
+            " ひさ[久]</kun><oku>し</oku>ぶりに<kun> あ[会]</kun><oku>った</oku>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>おさな</kun><b><kun>な</kun></b><kun>じ</kun><oku>み</oku>と"
             " <kun>ひさ</kun><oku>し</oku>ぶりに <kun>あ</kun><oku>った</oku>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 幼[おさな]</kun><b><kun> 馴[な]</kun></b><kun> 染[じ]</kun><oku>み</oku>と <kun>"
-            " 久[ひさ]</kun><oku>し</oku>ぶりに <kun> 会[あ]</kun><oku>った</oku>。"
+            "<kun> 幼[おさな]</kun><b><kun> 馴[な]</kun></b><kun> 染[じ]</kun><oku>み</oku>と<kun>"
+            " 久[ひさ]</kun><oku>し</oku>ぶりに<kun> 会[あ]</kun><oku>った</oku>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> おさな[幼]</kun><b><kun> な[馴]</kun></b><kun> じ[染]</kun><oku>み</oku>と <kun>"
-            " ひさ[久]</kun><oku>し</oku>ぶりに <kun> あ[会]</kun><oku>った</oku>。"
+            "<kun> おさな[幼]</kun><b><kun> な[馴]</kun></b><kun> じ[染]</kun><oku>み</oku>と<kun>"
+            " ひさ[久]</kun><oku>し</oku>ぶりに<kun> あ[会]</kun><oku>った</oku>。"
         ),
     )
     test(
@@ -2877,28 +2874,28 @@ def main():
             " <on>コウ</on><on>カイ</on>した。"
         ),
         expected_furigana_with_tags_split=(
-            "<on> 海[カイ]</on><b><on> 賊[ゾク]</on></b>たちは <kun> ７[なな]</kun><oku>つ</oku>の"
-            " <kun>"
-            " 海[うみ]</kun>を <on> 航[コウ]</on><on> 海[カイ]</on>した。"
+            "<on> 海[カイ]</on><b><on> 賊[ゾク]</on></b>たちは<kun> ７[なな]</kun><oku>つ</oku>の"
+            "<kun>"
+            " 海[うみ]</kun>を<on> 航[コウ]</on><on> 海[カイ]</on>した。"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> カイ[海]</on><b><on> ゾク[賊]</on></b>たちは <kun> なな[７]</kun><oku>つ</oku>の"
-            " <kun>"
-            " うみ[海]</kun>を <on> コウ[航]</on><on> カイ[海]</on>した。"
+            "<on> カイ[海]</on><b><on> ゾク[賊]</on></b>たちは<kun> なな[７]</kun><oku>つ</oku>の"
+            "<kun>"
+            " うみ[海]</kun>を<on> コウ[航]</on><on> カイ[海]</on>した。"
         ),
         expected_kana_only_with_tags_merged=(
             "<on>カイ</on><b><on>ゾク</on></b>たちは <kun>なな</kun><oku>つ</oku>の <kun>うみ</kun>を"
             " <on>コウカイ</on>した。"
         ),
         expected_furigana_with_tags_merged=(
-            "<on> 海[カイ]</on><b><on> 賊[ゾク]</on></b>たちは <kun> ７[なな]</kun><oku>つ</oku>の"
-            " <kun>"
-            " 海[うみ]</kun>を <on> 航海[コウカイ]</on>した。"
+            "<on> 海[カイ]</on><b><on> 賊[ゾク]</on></b>たちは<kun> ７[なな]</kun><oku>つ</oku>の"
+            "<kun>"
+            " 海[うみ]</kun>を<on> 航海[コウカイ]</on>した。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<on> カイ[海]</on><b><on> ゾク[賊]</on></b>たちは <kun> なな[７]</kun><oku>つ</oku>の"
-            " <kun>"
-            " うみ[海]</kun>を <on> コウカイ[航海]</on>した。"
+            "<on> カイ[海]</on><b><on> ゾク[賊]</on></b>たちは<kun> なな[７]</kun><oku>つ</oku>の"
+            "<kun>"
+            " うみ[海]</kun>を<on> コウカイ[航海]</on>した。"
         ),
     )
     test(
@@ -2914,13 +2911,13 @@ def main():
             " <kun>いえ</kun><kun>がら</kun>の <kun>で</kun>だ。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 彼[かの]</kun><on> 女[ジョ]</on>は <b><on> 由[ユイ]</on></b><on>"
-            " 緒[ショ]</on>ある <kun> 家[いえ]</kun><kun> 柄[がら]</kun>の <kun>"
+            "<kun> 彼[かの]</kun><on> 女[ジョ]</on>は<b><on> 由[ユイ]</on></b><on>"
+            " 緒[ショ]</on>ある<kun> 家[いえ]</kun><kun> 柄[がら]</kun>の<kun>"
             " 出[で]</kun>だ。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> かの[彼]</kun><on> ジョ[女]</on>は <b><on> ユイ[由]</on></b><on>"
-            " ショ[緒]</on>ある <kun> いえ[家]</kun><kun> がら[柄]</kun>の <kun>"
+            "<kun> かの[彼]</kun><on> ジョ[女]</on>は<b><on> ユイ[由]</on></b><on>"
+            " ショ[緒]</on>ある<kun> いえ[家]</kun><kun> がら[柄]</kun>の<kun>"
             " で[出]</kun>だ。"
         ),
         expected_kana_only_with_tags_merged=(
@@ -2928,12 +2925,12 @@ def main():
             " <kun>いえがら</kun>の <kun>で</kun>だ。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 彼[かの]</kun><on> 女[ジョ]</on>は <b><on> 由[ユイ]</on></b><on>"
-            " 緒[ショ]</on>ある <kun> 家柄[いえがら]</kun>の <kun> 出[で]</kun>だ。"
+            "<kun> 彼[かの]</kun><on> 女[ジョ]</on>は<b><on> 由[ユイ]</on></b><on>"
+            " 緒[ショ]</on>ある<kun> 家柄[いえがら]</kun>の<kun> 出[で]</kun>だ。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> かの[彼]</kun><on> ジョ[女]</on>は <b><on> ユイ[由]</on></b><on>"
-            " ショ[緒]</on>ある <kun> いえがら[家柄]</kun>の <kun> で[出]</kun>だ。"
+            "<kun> かの[彼]</kun><on> ジョ[女]</on>は<b><on> ユイ[由]</on></b><on>"
+            " ショ[緒]</on>ある<kun> いえがら[家柄]</kun>の<kun> で[出]</kun>だ。"
         ),
     )
     test(
@@ -3049,23 +3046,23 @@ def main():
             " <on>シ</on><on>チャク</on>をお <kun>ねが</kun><oku>い</oku>します｡"
         ),
         expected_furigana_with_tags_split=(
-            "<b><on> 甲[カッ]</on></b><on> 冑[チュウ]</on>の <on> 試[シ]</on><on>"
-            " 着[チャク]</on>をお <kun> 願[ねが]</kun><oku>い</oku>します｡"
+            "<b><on> 甲[カッ]</on></b><on> 冑[チュウ]</on>の<on> 試[シ]</on><on>"
+            " 着[チャク]</on>をお<kun> 願[ねが]</kun><oku>い</oku>します｡"
         ),
         expected_furikanji_with_tags_split=(
-            "<b><on> カッ[甲]</on></b><on> チュウ[冑]</on>の <on> シ[試]</on><on>"
-            " チャク[着]</on>をお <kun> ねが[願]</kun><oku>い</oku>します｡"
+            "<b><on> カッ[甲]</on></b><on> チュウ[冑]</on>の<on> シ[試]</on><on>"
+            " チャク[着]</on>をお<kun> ねが[願]</kun><oku>い</oku>します｡"
         ),
         expected_kana_only_with_tags_merged=(
             "<b><on>カッ</on></b><on>チュウ</on>の"
             " <on>シチャク</on>をお <kun>ねが</kun><oku>い</oku>します｡"
         ),
         expected_furigana_with_tags_merged=(
-            "<b><on> 甲[カッ]</on></b><on> 冑[チュウ]</on>の <on> 試着[シチャク]</on>をお <kun>"
+            "<b><on> 甲[カッ]</on></b><on> 冑[チュウ]</on>の<on> 試着[シチャク]</on>をお<kun>"
             " 願[ねが]</kun><oku>い</oku>します｡"
         ),
         expected_furikanji_with_tags_merged=(
-            "<b><on> カッ[甲]</on></b><on> チュウ[冑]</on>の <on> シチャク[試着]</on>をお <kun>"
+            "<b><on> カッ[甲]</on></b><on> チュウ[冑]</on>の<on> シチャク[試着]</on>をお<kun>"
             " ねが[願]</kun><oku>い</oku>します｡"
         ),
     )
@@ -3388,16 +3385,16 @@ def main():
             "<on>シ</on><b><kun>き</kun><oku>たり</oku></b>の <kun>ひと</kun><oku>つ</oku>だ。"
         ),
         expected_furigana_with_tags_split=(
-            "それは <kun> 私[わたし]</kun>たちの <on> 日[ニチ]</on><on> 常[ジョウ]</on><on>"
+            "それは<kun> 私[わたし]</kun>たちの<on> 日[ニチ]</on><on> 常[ジョウ]</on><on>"
             " 生[セイ]</on>"
-            "<on> 活[カツ]</on>の <on> 仕[シ]</on><b><kun> 来[き]</kun><oku>たり</oku></b>の <kun>"
+            "<on> 活[カツ]</on>の<on> 仕[シ]</on><b><kun> 来[き]</kun><oku>たり</oku></b>の<kun>"
             " １[ひと]</kun>"
             "<oku>つ</oku>だ。"
         ),
         expected_furikanji_with_tags_split=(
-            "それは <kun> わたし[私]</kun>たちの <on> ニチ[日]</on><on> ジョウ[常]</on><on>"
+            "それは<kun> わたし[私]</kun>たちの<on> ニチ[日]</on><on> ジョウ[常]</on><on>"
             " セイ[生]</on>"
-            "<on> カツ[活]</on>の <on> シ[仕]</on><b><kun> き[来]</kun><oku>たり</oku></b>の <kun>"
+            "<on> カツ[活]</on>の<on> シ[仕]</on><b><kun> き[来]</kun><oku>たり</oku></b>の<kun>"
             " ひと[１]</kun>"
             "<oku>つ</oku>だ。"
         ),
@@ -3407,13 +3404,13 @@ def main():
             "<kun>ひと</kun><oku>つ</oku>だ。"
         ),
         expected_furigana_with_tags_merged=(
-            "それは <kun> 私[わたし]</kun>たちの <on> 日常生活[ニチジョウセイカツ]</on>の"
-            " <on> 仕[シ]</on><b><kun> 来[き]</kun><oku>たり</oku></b>の <kun> １[ひと]</kun>"
+            "それは<kun> 私[わたし]</kun>たちの<on> 日常生活[ニチジョウセイカツ]</on>の"
+            "<on> 仕[シ]</on><b><kun> 来[き]</kun><oku>たり</oku></b>の<kun> １[ひと]</kun>"
             "<oku>つ</oku>だ。"
         ),
         expected_furikanji_with_tags_merged=(
-            "それは <kun> わたし[私]</kun>たちの <on> ニチジョウセイカツ[日常生活]</on>の"
-            " <on> シ[仕]</on><b><kun> き[来]</kun><oku>たり</oku></b>の <kun> ひと[１]</kun>"
+            "それは<kun> わたし[私]</kun>たちの<on> ニチジョウセイカツ[日常生活]</on>の"
+            "<on> シ[仕]</on><b><kun> き[来]</kun><oku>たり</oku></b>の<kun> ひと[１]</kun>"
             "<oku>つ</oku>だ。"
         ),
     )
@@ -3439,11 +3436,11 @@ def main():
             " <b><kun>おお</kun><oku>きい</oku></b>ですね"
         ),
         expected_furigana_with_tags_split=(
-            "<b><juk> 大[おと]</juk></b><juk> 人[な]</juk> <on> 達[タチ]</on>は <b><kun>"
+            "<b><juk> 大[おと]</juk></b><juk> 人[な]</juk><on> 達[タチ]</on>は<b><kun>"
             " 大[おお]</kun><oku>きい</oku></b>ですね"
         ),
         expected_furikanji_with_tags_split=(
-            "<b><juk> おと[大]</juk></b><juk> な[人]</juk> <on> タチ[達]</on>は <b><kun>"
+            "<b><juk> おと[大]</juk></b><juk> な[人]</juk><on> タチ[達]</on>は<b><kun>"
             " おお[大]</kun><oku>きい</oku></b>ですね"
         ),
         expected_kana_only_with_tags_merged=(
@@ -3451,11 +3448,11 @@ def main():
             " <b><kun>おお</kun><oku>きい</oku></b>ですね"
         ),
         expected_furigana_with_tags_merged=(
-            "<b><juk> 大[おと]</juk></b><juk> 人[な]</juk> <on> 達[タチ]</on>は <b><kun>"
+            "<b><juk> 大[おと]</juk></b><juk> 人[な]</juk><on> 達[タチ]</on>は<b><kun>"
             " 大[おお]</kun><oku>きい</oku></b>ですね"
         ),
         expected_furikanji_with_tags_merged=(
-            "<b><juk> おと[大]</juk></b><juk> な[人]</juk> <on> タチ[達]</on>は <b><kun>"
+            "<b><juk> おと[大]</juk></b><juk> な[人]</juk><on> タチ[達]</on>は<b><kun>"
             " おお[大]</kun><oku>きい</oku></b>ですね"
         ),
     )
@@ -3471,28 +3468,28 @@ def main():
             " <kun>なか</kun>に いる。"
         ),
         expected_furigana_with_tags_split=(
-            "<juk> 大[おと]</juk><b><juk> 人[な]</juk></b> <on> 達[タチ]</on>は <b><kun>"
+            "<juk> 大[おと]</juk><b><juk> 人[な]</juk></b><on> 達[タチ]</on>は<b><kun>"
             " 人々[ひとびと]</kun></b>"
-            "の <kun> 中[なか]</kun>に いる。"
+            "の<kun> 中[なか]</kun>に いる。"
         ),
         expected_furikanji_with_tags_split=(
-            "<juk> おと[大]</juk><b><juk> な[人]</juk></b> <on> タチ[達]</on>は <b><kun>"
+            "<juk> おと[大]</juk><b><juk> な[人]</juk></b><on> タチ[達]</on>は<b><kun>"
             " ひとびと[人々]</kun></b>"
-            "の <kun> なか[中]</kun>に いる。"
+            "の<kun> なか[中]</kun>に いる。"
         ),
         expected_kana_only_with_tags_merged=(
             "<juk>おと</juk><b><juk>な</juk></b> <on>タチ</on>は <b><kun>ひとびと</kun></b>の"
             " <kun>なか</kun>に いる。"
         ),
         expected_furigana_with_tags_merged=(
-            "<juk> 大[おと]</juk><b><juk> 人[な]</juk></b> <on> 達[タチ]</on>は <b><kun>"
+            "<juk> 大[おと]</juk><b><juk> 人[な]</juk></b><on> 達[タチ]</on>は<b><kun>"
             " 人々[ひとびと]</kun></b>"
-            "の <kun> 中[なか]</kun>に いる。"
+            "の<kun> 中[なか]</kun>に いる。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<juk> おと[大]</juk><b><juk> な[人]</juk></b> <on> タチ[達]</on>は <b><kun>"
+            "<juk> おと[大]</juk><b><juk> な[人]</juk></b><on> タチ[達]</on>は<b><kun>"
             " ひとびと[人々]</kun></b>"
-            "の <kun> なか[中]</kun>に いる。"
+            "の<kun> なか[中]</kun>に いる。"
         ),
     )
     test(
@@ -3507,24 +3504,24 @@ def main():
             " <on>カイ</on>に <kun>い</kun><oku>って</oku>きました。"
         ),
         expected_furigana_with_tags_split=(
-            "<juk> 昨[きの]</juk><juk> 日[う]</juk>、 <on> 絵[エ]</on>の <b><on> 展[テン]</on></b>"
-            "<on> 覧[ラン]</on> <on> 会[カイ]</on>に <kun> 行[い]</kun><oku>って</oku>きました。"
+            "<juk> 昨[きの]</juk><juk> 日[う]</juk>、<on> 絵[エ]</on>の<b><on> 展[テン]</on></b>"
+            "<on> 覧[ラン]</on><on> 会[カイ]</on>に<kun> 行[い]</kun><oku>って</oku>きました。"
         ),
         expected_furikanji_with_tags_split=(
-            "<juk> きの[昨]</juk><juk> う[日]</juk>、 <on> エ[絵]</on>の <b><on> テン[展]</on></b>"
-            "<on> ラン[覧]</on> <on> カイ[会]</on>に <kun> い[行]</kun><oku>って</oku>きました。"
+            "<juk> きの[昨]</juk><juk> う[日]</juk>、<on> エ[絵]</on>の<b><on> テン[展]</on></b>"
+            "<on> ラン[覧]</on><on> カイ[会]</on>に<kun> い[行]</kun><oku>って</oku>きました。"
         ),
         expected_kana_only_with_tags_merged=(
             "<juk>きのう</juk>、 <on>エ</on>の <b><on>テン</on></b><on>ラン</on>"
             " <on>カイ</on>に <kun>い</kun><oku>って</oku>きました。"
         ),
         expected_furigana_with_tags_merged=(
-            "<juk> 昨日[きのう]</juk>、 <on> 絵[エ]</on>の <b><on> 展[テン]</on></b>"
-            "<on> 覧[ラン]</on> <on> 会[カイ]</on>に <kun> 行[い]</kun><oku>って</oku>きました。"
+            "<juk> 昨日[きのう]</juk>、<on> 絵[エ]</on>の<b><on> 展[テン]</on></b>"
+            "<on> 覧[ラン]</on><on> 会[カイ]</on>に<kun> 行[い]</kun><oku>って</oku>きました。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<juk> きのう[昨日]</juk>、 <on> エ[絵]</on>の <b><on> テン[展]</on></b>"
-            "<on> ラン[覧]</on> <on> カイ[会]</on>に <kun> い[行]</kun><oku>って</oku>きました。"
+            "<juk> きのう[昨日]</juk>、<on> エ[絵]</on>の<b><on> テン[展]</on></b>"
+            "<on> ラン[覧]</on><on> カイ[会]</on>に<kun> い[行]</kun><oku>って</oku>きました。"
         ),
     )
     test(
@@ -3858,21 +3855,19 @@ def main():
             " <kun>かざ</kun><kun>かみ</kun>にも <b><kun>お</kun><oku>けない</oku></b>"
         ),
         expected_furigana_with_tags_split=(
-            " <kun> 風[かざ]</kun><kun> 上[かみ]</kun>にも <b><kun>"
-            " 置[お]</kun><oku>けない</oku></b>"
+            "<kun> 風[かざ]</kun><kun> 上[かみ]</kun>にも<b><kun> 置[お]</kun><oku>けない</oku></b>"
         ),
         expected_furikanji_with_tags_split=(
-            " <kun> かざ[風]</kun><kun> かみ[上]</kun>にも <b><kun>"
-            " お[置]</kun><oku>けない</oku></b>"
+            "<kun> かざ[風]</kun><kun> かみ[上]</kun>にも<b><kun> お[置]</kun><oku>けない</oku></b>"
         ),
         expected_kana_only_with_tags_merged=(
             " <kun>かざかみ</kun>にも <b><kun>お</kun><oku>けない</oku></b>"
         ),
         expected_furigana_with_tags_merged=(
-            " <kun> 風上[かざかみ]</kun>にも <b><kun> 置[お]</kun><oku>けない</oku></b>"
+            "<kun> 風上[かざかみ]</kun>にも<b><kun> 置[お]</kun><oku>けない</oku></b>"
         ),
         expected_furikanji_with_tags_merged=(
-            " <kun> かざかみ[風上]</kun>にも <b><kun> お[置]</kun><oku>けない</oku></b>"
+            "<kun> かざかみ[風上]</kun>にも<b><kun> お[置]</kun><oku>けない</oku></b>"
         ),
     )
     test(
@@ -3884,17 +3879,17 @@ def main():
         expected_furikanji=" いま[今]に<b> きた[来]る</b>べし",
         expected_kana_only_with_tags_split="<kun>いま</kun>に <b><kun>きた</kun><oku>る</oku></b>べし",
         expected_furigana_with_tags_split=(
-            "<kun> 今[いま]</kun>に <b><kun> 来[きた]</kun><oku>る</oku></b>べし"
+            "<kun> 今[いま]</kun>に<b><kun> 来[きた]</kun><oku>る</oku></b>べし"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> いま[今]</kun>に <b><kun> きた[来]</kun><oku>る</oku></b>べし"
+            "<kun> いま[今]</kun>に<b><kun> きた[来]</kun><oku>る</oku></b>べし"
         ),
         expected_kana_only_with_tags_merged="<kun>いま</kun>に <b><kun>きた</kun><oku>る</oku></b>べし",
         expected_furigana_with_tags_merged=(
-            "<kun> 今[いま]</kun>に <b><kun> 来[きた]</kun><oku>る</oku></b>べし"
+            "<kun> 今[いま]</kun>に<b><kun> 来[きた]</kun><oku>る</oku></b>べし"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> いま[今]</kun>に <b><kun> きた[来]</kun><oku>る</oku></b>べし"
+            "<kun> いま[今]</kun>に<b><kun> きた[来]</kun><oku>る</oku></b>べし"
         ),
     )
     test(
@@ -3908,17 +3903,17 @@ def main():
             "<on>ニッ</on><on>キ</on>を <b><kun>か</kun><oku>いた</oku></b>。"
         ),
         expected_furigana_with_tags_split=(
-            "<on> 日[ニッ]</on><on> 記[キ]</on>を <b><kun> 書[か]</kun><oku>いた</oku></b>。"
+            "<on> 日[ニッ]</on><on> 記[キ]</on>を<b><kun> 書[か]</kun><oku>いた</oku></b>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> ニッ[日]</on><on> キ[記]</on>を <b><kun> か[書]</kun><oku>いた</oku></b>。"
+            "<on> ニッ[日]</on><on> キ[記]</on>を<b><kun> か[書]</kun><oku>いた</oku></b>。"
         ),
         expected_kana_only_with_tags_merged="<on>ニッキ</on>を <b><kun>か</kun><oku>いた</oku></b>。",
         expected_furigana_with_tags_merged=(
-            "<on> 日記[ニッキ]</on>を <b><kun> 書[か]</kun><oku>いた</oku></b>。"
+            "<on> 日記[ニッキ]</on>を<b><kun> 書[か]</kun><oku>いた</oku></b>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<on> ニッキ[日記]</on>を <b><kun> か[書]</kun><oku>いた</oku></b>。"
+            "<on> ニッキ[日記]</on>を<b><kun> か[書]</kun><oku>いた</oku></b>。"
         ),
     )
     test(
@@ -3932,19 +3927,19 @@ def main():
             "<kun>とも</kun><on>ダチ</on>と <b><kun>はな</kun><oku>して</oku></b>いる。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 友[とも]</kun><on> 達[ダチ]</on>と <b><kun> 話[はな]</kun><oku>して</oku></b>いる。"
+            "<kun> 友[とも]</kun><on> 達[ダチ]</on>と<b><kun> 話[はな]</kun><oku>して</oku></b>いる。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> とも[友]</kun><on> ダチ[達]</on>と <b><kun> はな[話]</kun><oku>して</oku></b>いる。"
+            "<kun> とも[友]</kun><on> ダチ[達]</on>と<b><kun> はな[話]</kun><oku>して</oku></b>いる。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>とも</kun><on>ダチ</on>と <b><kun>はな</kun><oku>して</oku></b>いる。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 友[とも]</kun><on> 達[ダチ]</on>と <b><kun> 話[はな]</kun><oku>して</oku></b>いる。"
+            "<kun> 友[とも]</kun><on> 達[ダチ]</on>と<b><kun> 話[はな]</kun><oku>して</oku></b>いる。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> とも[友]</kun><on> ダチ[達]</on>と <b><kun> はな[話]</kun><oku>して</oku></b>いる。"
+            "<kun> とも[友]</kun><on> ダチ[達]</on>と<b><kun> はな[話]</kun><oku>して</oku></b>いる。"
         ),
     )
     test(
@@ -3955,11 +3950,11 @@ def main():
         expected_furigana="ニュースを<b> 聞[き]きました</b>。",
         expected_furikanji="ニュースを<b> き[聞]きました</b>。",
         expected_kana_only_with_tags_split="ニュースを <b><kun>き</kun><oku>きました</oku></b>。",
-        expected_furigana_with_tags_split="ニュースを <b><kun> 聞[き]</kun><oku>きました</oku></b>。",
-        expected_furikanji_with_tags_split="ニュースを <b><kun> き[聞]</kun><oku>きました</oku></b>。",
+        expected_furigana_with_tags_split="ニュースを<b><kun> 聞[き]</kun><oku>きました</oku></b>。",
+        expected_furikanji_with_tags_split="ニュースを<b><kun> き[聞]</kun><oku>きました</oku></b>。",
         expected_kana_only_with_tags_merged="ニュースを <b><kun>き</kun><oku>きました</oku></b>。",
-        expected_furigana_with_tags_merged="ニュースを <b><kun> 聞[き]</kun><oku>きました</oku></b>。",
-        expected_furikanji_with_tags_merged="ニュースを <b><kun> き[聞]</kun><oku>きました</oku></b>。",
+        expected_furigana_with_tags_merged="ニュースを<b><kun> 聞[き]</kun><oku>きました</oku></b>。",
+        expected_furikanji_with_tags_merged="ニュースを<b><kun> き[聞]</kun><oku>きました</oku></b>。",
     )
     test(
         test_name="Verb okurigana test 5/",
@@ -3972,17 +3967,17 @@ def main():
             "<on>コウ</on><on>エン</on>で <b><kun>はし</kun><oku>ろう</oku></b>。"
         ),
         expected_furigana_with_tags_split=(
-            "<on> 公[コウ]</on><on> 園[エン]</on>で <b><kun> 走[はし]</kun><oku>ろう</oku></b>。"
+            "<on> 公[コウ]</on><on> 園[エン]</on>で<b><kun> 走[はし]</kun><oku>ろう</oku></b>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> コウ[公]</on><on> エン[園]</on>で <b><kun> はし[走]</kun><oku>ろう</oku></b>。"
+            "<on> コウ[公]</on><on> エン[園]</on>で<b><kun> はし[走]</kun><oku>ろう</oku></b>。"
         ),
         expected_kana_only_with_tags_merged="<on>コウエン</on>で <b><kun>はし</kun><oku>ろう</oku></b>。",
         expected_furigana_with_tags_merged=(
-            "<on> 公園[コウエン]</on>で <b><kun> 走[はし]</kun><oku>ろう</oku></b>。"
+            "<on> 公園[コウエン]</on>で<b><kun> 走[はし]</kun><oku>ろう</oku></b>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<on> コウエン[公園]</on>で <b><kun> はし[走]</kun><oku>ろう</oku></b>。"
+            "<on> コウエン[公園]</on>で<b><kun> はし[走]</kun><oku>ろう</oku></b>。"
         ),
     )
     test(
@@ -3996,19 +3991,19 @@ def main():
             "<kun>とも</kun><on>ダチ</on>を <b><kun>ま</kun><oku>つ</oku></b>。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 友[とも]</kun><on> 達[ダチ]</on>を <b><kun> 待[ま]</kun><oku>つ</oku></b>。"
+            "<kun> 友[とも]</kun><on> 達[ダチ]</on>を<b><kun> 待[ま]</kun><oku>つ</oku></b>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> とも[友]</kun><on> ダチ[達]</on>を <b><kun> ま[待]</kun><oku>つ</oku></b>。"
+            "<kun> とも[友]</kun><on> ダチ[達]</on>を<b><kun> ま[待]</kun><oku>つ</oku></b>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>とも</kun><on>ダチ</on>を <b><kun>ま</kun><oku>つ</oku></b>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 友[とも]</kun><on> 達[ダチ]</on>を <b><kun> 待[ま]</kun><oku>つ</oku></b>。"
+            "<kun> 友[とも]</kun><on> 達[ダチ]</on>を<b><kun> 待[ま]</kun><oku>つ</oku></b>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> とも[友]</kun><on> ダチ[達]</on>を <b><kun> ま[待]</kun><oku>つ</oku></b>。"
+            "<kun> とも[友]</kun><on> ダチ[達]</on>を<b><kun> ま[待]</kun><oku>つ</oku></b>。"
         ),
     )
     test(
@@ -4020,17 +4015,17 @@ def main():
         expected_furikanji=" うみ[海]で<b> およ[泳]ぐ</b>。",
         expected_kana_only_with_tags_split="<kun>うみ</kun>で <b><kun>およ</kun><oku>ぐ</oku></b>。",
         expected_furigana_with_tags_split=(
-            "<kun> 海[うみ]</kun>で <b><kun> 泳[およ]</kun><oku>ぐ</oku></b>。"
+            "<kun> 海[うみ]</kun>で<b><kun> 泳[およ]</kun><oku>ぐ</oku></b>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> うみ[海]</kun>で <b><kun> およ[泳]</kun><oku>ぐ</oku></b>。"
+            "<kun> うみ[海]</kun>で<b><kun> およ[泳]</kun><oku>ぐ</oku></b>。"
         ),
         expected_kana_only_with_tags_merged="<kun>うみ</kun>で <b><kun>およ</kun><oku>ぐ</oku></b>。",
         expected_furigana_with_tags_merged=(
-            "<kun> 海[うみ]</kun>で <b><kun> 泳[およ]</kun><oku>ぐ</oku></b>。"
+            "<kun> 海[うみ]</kun>で<b><kun> 泳[およ]</kun><oku>ぐ</oku></b>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> うみ[海]</kun>で <b><kun> およ[泳]</kun><oku>ぐ</oku></b>。"
+            "<kun> うみ[海]</kun>で<b><kun> およ[泳]</kun><oku>ぐ</oku></b>。"
         ),
     )
     test(
@@ -4044,17 +4039,17 @@ def main():
             "<on>リョウ</on><on>リ</on>を <b><kun>つく</kun><oku>る</oku></b>。"
         ),
         expected_furigana_with_tags_split=(
-            "<on> 料[リョウ]</on><on> 理[リ]</on>を <b><kun> 作[つく]</kun><oku>る</oku></b>。"
+            "<on> 料[リョウ]</on><on> 理[リ]</on>を<b><kun> 作[つく]</kun><oku>る</oku></b>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> リョウ[料]</on><on> リ[理]</on>を <b><kun> つく[作]</kun><oku>る</oku></b>。"
+            "<on> リョウ[料]</on><on> リ[理]</on>を<b><kun> つく[作]</kun><oku>る</oku></b>。"
         ),
         expected_kana_only_with_tags_merged="<on>リョウリ</on>を <b><kun>つく</kun><oku>る</oku></b>。",
         expected_furigana_with_tags_merged=(
-            "<on> 料理[リョウリ]</on>を <b><kun> 作[つく]</kun><oku>る</oku></b>。"
+            "<on> 料理[リョウリ]</on>を<b><kun> 作[つく]</kun><oku>る</oku></b>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<on> リョウリ[料理]</on>を <b><kun> つく[作]</kun><oku>る</oku></b>。"
+            "<on> リョウリ[料理]</on>を<b><kun> つく[作]</kun><oku>る</oku></b>。"
         ),
     )
     test(
@@ -4068,21 +4063,19 @@ def main():
             "<kun>こ</kun><kun>ども</kun>と <b><kun>あそ</kun><oku>んで</oku></b>いるぞ。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 子[こ]</kun><kun> 供[ども]</kun>と <b><kun>"
-            " 遊[あそ]</kun><oku>んで</oku></b>いるぞ。"
+            "<kun> 子[こ]</kun><kun> 供[ども]</kun>と<b><kun> 遊[あそ]</kun><oku>んで</oku></b>いるぞ。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> こ[子]</kun><kun> ども[供]</kun>と <b><kun>"
-            " あそ[遊]</kun><oku>んで</oku></b>いるぞ。"
+            "<kun> こ[子]</kun><kun> ども[供]</kun>と<b><kun> あそ[遊]</kun><oku>んで</oku></b>いるぞ。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>こども</kun>と <b><kun>あそ</kun><oku>んで</oku></b>いるぞ。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 子供[こども]</kun>と <b><kun> 遊[あそ]</kun><oku>んで</oku></b>いるぞ。"
+            "<kun> 子供[こども]</kun>と<b><kun> 遊[あそ]</kun><oku>んで</oku></b>いるぞ。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> こども[子供]</kun>と <b><kun> あそ[遊]</kun><oku>んで</oku></b>いるぞ。"
+            "<kun> こども[子供]</kun>と<b><kun> あそ[遊]</kun><oku>んで</oku></b>いるぞ。"
         ),
     )
     test(
@@ -4098,28 +4091,28 @@ def main():
             " <b><kun>き</kun><oku>いて</oku></b>いないよ"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 音[おと]</kun>を <b><kun> 聞[き]</kun><oku>こえた</oku></b>か？<kun>"
+            "<kun> 音[おと]</kun>を<b><kun> 聞[き]</kun><oku>こえた</oku></b>か？<kun>"
             " 何[なに]</kun>も"
-            " <b><kun> 聞[き]</kun><oku>いて</oku></b>いないよ"
+            "<b><kun> 聞[き]</kun><oku>いて</oku></b>いないよ"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> おと[音]</kun>を <b><kun> き[聞]</kun><oku>こえた</oku></b>か？<kun>"
+            "<kun> おと[音]</kun>を<b><kun> き[聞]</kun><oku>こえた</oku></b>か？<kun>"
             " なに[何]</kun>も"
-            " <b><kun> き[聞]</kun><oku>いて</oku></b>いないよ"
+            "<b><kun> き[聞]</kun><oku>いて</oku></b>いないよ"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>おと</kun>を <b><kun>き</kun><oku>こえた</oku></b>か？<kun>なに</kun>も"
             " <b><kun>き</kun><oku>いて</oku></b>いないよ"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 音[おと]</kun>を <b><kun> 聞[き]</kun><oku>こえた</oku></b>か？<kun>"
+            "<kun> 音[おと]</kun>を<b><kun> 聞[き]</kun><oku>こえた</oku></b>か？<kun>"
             " 何[なに]</kun>も"
-            " <b><kun> 聞[き]</kun><oku>いて</oku></b>いないよ"
+            "<b><kun> 聞[き]</kun><oku>いて</oku></b>いないよ"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> おと[音]</kun>を <b><kun> き[聞]</kun><oku>こえた</oku></b>か？<kun>"
+            "<kun> おと[音]</kun>を<b><kun> き[聞]</kun><oku>こえた</oku></b>か？<kun>"
             " なに[何]</kun>も"
-            " <b><kun> き[聞]</kun><oku>いて</oku></b>いないよ"
+            "<b><kun> き[聞]</kun><oku>いて</oku></b>いないよ"
         ),
     )
     test(
@@ -4138,26 +4131,26 @@ def main():
             "<on>ゲン</on>に <b><kun>おさ</kun><oku>えられて</oku></b>いる。"
         ),
         expected_furigana_with_tags_split=(
-            "<on> 俳[ハイ]</on><on> 句[ク]</on>は <kun> 言[こと]</kun><kun> 葉[ば]</kun>が <on>"
+            "<on> 俳[ハイ]</on><on> 句[ク]</on>は<kun> 言[こと]</kun><kun> 葉[ば]</kun>が<on>"
             " 最[サイ]</on><on>"
-            " 小[ショウ]</on><on> 限[ゲン]</on>に <b><kun> 抑[おさ]</kun><oku>えられて</oku></b>いる。"
+            " 小[ショウ]</on><on> 限[ゲン]</on>に<b><kun> 抑[おさ]</kun><oku>えられて</oku></b>いる。"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> ハイ[俳]</on><on> ク[句]</on>は <kun> こと[言]</kun><kun> ば[葉]</kun>が <on>"
+            "<on> ハイ[俳]</on><on> ク[句]</on>は<kun> こと[言]</kun><kun> ば[葉]</kun>が<on>"
             " サイ[最]</on><on>"
-            " ショウ[小]</on><on> ゲン[限]</on>に <b><kun> おさ[抑]</kun><oku>えられて</oku></b>いる。"
+            " ショウ[小]</on><on> ゲン[限]</on>に<b><kun> おさ[抑]</kun><oku>えられて</oku></b>いる。"
         ),
         expected_kana_only_with_tags_merged=(
             "<on>ハイク</on>は <kun>ことば</kun>が <on>サイショウゲン</on>に"
             " <b><kun>おさ</kun><oku>えられて</oku></b>いる。"
         ),
         expected_furigana_with_tags_merged=(
-            "<on> 俳句[ハイク]</on>は <kun> 言葉[ことば]</kun>が <on> 最小限[サイショウゲン]</on>に"
-            " <b><kun> 抑[おさ]</kun><oku>えられて</oku></b>いる。"
+            "<on> 俳句[ハイク]</on>は<kun> 言葉[ことば]</kun>が<on> 最小限[サイショウゲン]</on>に"
+            "<b><kun> 抑[おさ]</kun><oku>えられて</oku></b>いる。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<on> ハイク[俳句]</on>は <kun> ことば[言葉]</kun>が <on> サイショウゲン[最小限]</on>に"
-            " <b><kun> おさ[抑]</kun><oku>えられて</oku></b>いる。"
+            "<on> ハイク[俳句]</on>は<kun> ことば[言葉]</kun>が<on> サイショウゲン[最小限]</on>に"
+            "<b><kun> おさ[抑]</kun><oku>えられて</oku></b>いる。"
         ),
     )
     test(
@@ -4172,24 +4165,24 @@ def main():
             " <kun>ひさ</kun><oku>し</oku>ぶりに <kun>あ</kun><oku>った</oku>。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 幼[おさな]</kun><kun> 馴[な]</kun><b><kun> 染[じ]</kun><oku>み</oku></b>と <kun>"
-            " 久[ひさ]</kun><oku>し</oku>ぶりに <kun> 会[あ]</kun><oku>った</oku>。"
+            "<kun> 幼[おさな]</kun><kun> 馴[な]</kun><b><kun> 染[じ]</kun><oku>み</oku></b>と<kun>"
+            " 久[ひさ]</kun><oku>し</oku>ぶりに<kun> 会[あ]</kun><oku>った</oku>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> おさな[幼]</kun><kun> な[馴]</kun><b><kun> じ[染]</kun><oku>み</oku></b>と <kun>"
-            " ひさ[久]</kun><oku>し</oku>ぶりに <kun> あ[会]</kun><oku>った</oku>。"
+            "<kun> おさな[幼]</kun><kun> な[馴]</kun><b><kun> じ[染]</kun><oku>み</oku></b>と<kun>"
+            " ひさ[久]</kun><oku>し</oku>ぶりに<kun> あ[会]</kun><oku>った</oku>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>おさなな</kun><b><kun>じ</kun><oku>み</oku></b>と <kun>ひさ</kun><oku>し</oku>ぶりに"
             " <kun>あ</kun><oku>った</oku>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 幼馴[おさなな]</kun><b><kun> 染[じ]</kun><oku>み</oku></b>と <kun>"
-            " 久[ひさ]</kun><oku>し</oku>ぶりに <kun> 会[あ]</kun><oku>った</oku>。"
+            "<kun> 幼馴[おさなな]</kun><b><kun> 染[じ]</kun><oku>み</oku></b>と<kun>"
+            " 久[ひさ]</kun><oku>し</oku>ぶりに<kun> 会[あ]</kun><oku>った</oku>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> おさなな[幼馴]</kun><b><kun> じ[染]</kun><oku>み</oku></b>と <kun>"
-            " ひさ[久]</kun><oku>し</oku>ぶりに <kun> あ[会]</kun><oku>った</oku>。"
+            "<kun> おさなな[幼馴]</kun><b><kun> じ[染]</kun><oku>み</oku></b>と<kun>"
+            " ひさ[久]</kun><oku>し</oku>ぶりに<kun> あ[会]</kun><oku>った</oku>。"
         ),
     )
     test(
@@ -4226,14 +4219,14 @@ def main():
             " <b><kun>かな</kun><oku>しんで</oku></b>いる。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 彼[かれ]</kun>は <b><kun> 悲[かな]</kun><oku>しく</oku></b>すぎるので、 <b><kun>"
-            " 悲[かな]</kun><oku>しみ</oku></b>の <b><kun> 悲[かな]</kun><oku>しさ</oku></b>を"
-            " <b><kun> 悲[かな]</kun><oku>しんで</oku></b>いる。"
+            "<kun> 彼[かれ]</kun>は<b><kun> 悲[かな]</kun><oku>しく</oku></b>すぎるので、<b><kun>"
+            " 悲[かな]</kun><oku>しみ</oku></b>の<b><kun> 悲[かな]</kun><oku>しさ</oku></b>を"
+            "<b><kun> 悲[かな]</kun><oku>しんで</oku></b>いる。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> かれ[彼]</kun>は <b><kun> かな[悲]</kun><oku>しく</oku></b>すぎるので、 <b><kun>"
-            " かな[悲]</kun><oku>しみ</oku></b>の <b><kun> かな[悲]</kun><oku>しさ</oku></b>を"
-            " <b><kun> かな[悲]</kun><oku>しんで</oku></b>いる。"
+            "<kun> かれ[彼]</kun>は<b><kun> かな[悲]</kun><oku>しく</oku></b>すぎるので、<b><kun>"
+            " かな[悲]</kun><oku>しみ</oku></b>の<b><kun> かな[悲]</kun><oku>しさ</oku></b>を"
+            "<b><kun> かな[悲]</kun><oku>しんで</oku></b>いる。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>かれ</kun>は <b><kun>かな</kun><oku>しく</oku></b>すぎるので、"
@@ -4241,14 +4234,14 @@ def main():
             " <b><kun>かな</kun><oku>しんで</oku></b>いる。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 彼[かれ]</kun>は <b><kun> 悲[かな]</kun><oku>しく</oku></b>すぎるので、 <b><kun>"
-            " 悲[かな]</kun><oku>しみ</oku></b>の <b><kun> 悲[かな]</kun><oku>しさ</oku></b>を"
-            " <b><kun> 悲[かな]</kun><oku>しんで</oku></b>いる。"
+            "<kun> 彼[かれ]</kun>は<b><kun> 悲[かな]</kun><oku>しく</oku></b>すぎるので、<b><kun>"
+            " 悲[かな]</kun><oku>しみ</oku></b>の<b><kun> 悲[かな]</kun><oku>しさ</oku></b>を"
+            "<b><kun> 悲[かな]</kun><oku>しんで</oku></b>いる。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> かれ[彼]</kun>は <b><kun> かな[悲]</kun><oku>しく</oku></b>すぎるので、 <b><kun>"
-            " かな[悲]</kun><oku>しみ</oku></b>の <b><kun> かな[悲]</kun><oku>しさ</oku></b>を"
-            " <b><kun> かな[悲]</kun><oku>しんで</oku></b>いる。"
+            "<kun> かれ[彼]</kun>は<b><kun> かな[悲]</kun><oku>しく</oku></b>すぎるので、<b><kun>"
+            " かな[悲]</kun><oku>しみ</oku></b>の<b><kun> かな[悲]</kun><oku>しさ</oku></b>を"
+            "<b><kun> かな[悲]</kun><oku>しんで</oku></b>いる。"
         ),
     )
     test(
@@ -4263,13 +4256,13 @@ def main():
             " <b><kun>あお</kun><oku>くない</oku></b> <kun>うみ</kun>に <kun>い</kun><oku>こう</oku>"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 空[そら]</kun>が <b><kun> 青[あお]</kun><oku>かったら</oku></b>、 <b><kun>"
-            " 青[あお]</kun><oku>くない</oku></b> <kun> 海[うみ]</kun>に <kun>"
+            "<kun> 空[そら]</kun>が<b><kun> 青[あお]</kun><oku>かったら</oku></b>、<b><kun>"
+            " 青[あお]</kun><oku>くない</oku></b><kun> 海[うみ]</kun>に<kun>"
             " 行[い]</kun><oku>こう</oku>"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> そら[空]</kun>が <b><kun> あお[青]</kun><oku>かったら</oku></b>、 <b><kun>"
-            " あお[青]</kun><oku>くない</oku></b> <kun> うみ[海]</kun>に <kun>"
+            "<kun> そら[空]</kun>が<b><kun> あお[青]</kun><oku>かったら</oku></b>、<b><kun>"
+            " あお[青]</kun><oku>くない</oku></b><kun> うみ[海]</kun>に<kun>"
             " い[行]</kun><oku>こう</oku>"
         ),
         expected_kana_only_with_tags_merged=(
@@ -4277,13 +4270,13 @@ def main():
             " <b><kun>あお</kun><oku>くない</oku></b> <kun>うみ</kun>に <kun>い</kun><oku>こう</oku>"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 空[そら]</kun>が <b><kun> 青[あお]</kun><oku>かったら</oku></b>、 <b><kun>"
-            " 青[あお]</kun><oku>くない</oku></b> <kun> 海[うみ]</kun>に <kun>"
+            "<kun> 空[そら]</kun>が<b><kun> 青[あお]</kun><oku>かったら</oku></b>、<b><kun>"
+            " 青[あお]</kun><oku>くない</oku></b><kun> 海[うみ]</kun>に<kun>"
             " 行[い]</kun><oku>こう</oku>"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> そら[空]</kun>が <b><kun> あお[青]</kun><oku>かったら</oku></b>、 <b><kun>"
-            " あお[青]</kun><oku>くない</oku></b> <kun> うみ[海]</kun>に <kun>"
+            "<kun> そら[空]</kun>が<b><kun> あお[青]</kun><oku>かったら</oku></b>、<b><kun>"
+            " あお[青]</kun><oku>くない</oku></b><kun> うみ[海]</kun>に<kun>"
             " い[行]</kun><oku>こう</oku>"
         ),
     )
@@ -4308,16 +4301,16 @@ def main():
             " <b><kun>たか</kun><oku>ぶり</oku></b>"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 山[やま]</kun>が <b><kun> 高[たか]</kun><oku>ければ</oku></b>、"
-            " <b><on> 高[コウ]</on></b><on> 層[ソウ]</on>ビルが <b><kun>"
+            "<kun> 山[やま]</kun>が<b><kun> 高[たか]</kun><oku>ければ</oku></b>、"
+            "<b><on> 高[コウ]</on></b><on> 層[ソウ]</on>ビルが<b><kun>"
             " 高[たか]</kun><oku>めて</oku></b>と"
-            " <b><kun> 高[たか]</kun><oku>ぶり</oku></b>"
+            "<b><kun> 高[たか]</kun><oku>ぶり</oku></b>"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> やま[山]</kun>が <b><kun> たか[高]</kun><oku>ければ</oku></b>、"
-            " <b><on> コウ[高]</on></b><on> ソウ[層]</on>ビルが <b><kun>"
+            "<kun> やま[山]</kun>が<b><kun> たか[高]</kun><oku>ければ</oku></b>、"
+            "<b><on> コウ[高]</on></b><on> ソウ[層]</on>ビルが<b><kun>"
             " たか[高]</kun><oku>めて</oku></b>と"
-            " <b><kun> たか[高]</kun><oku>ぶり</oku></b>"
+            "<b><kun> たか[高]</kun><oku>ぶり</oku></b>"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>やま</kun>が <b><kun>たか</kun><oku>ければ</oku></b>、"
@@ -4325,16 +4318,16 @@ def main():
             " <b><kun>たか</kun><oku>ぶり</oku></b>"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 山[やま]</kun>が <b><kun> 高[たか]</kun><oku>ければ</oku></b>、"
-            " <b><on> 高[コウ]</on></b><on> 層[ソウ]</on>ビルが <b><kun>"
+            "<kun> 山[やま]</kun>が<b><kun> 高[たか]</kun><oku>ければ</oku></b>、"
+            "<b><on> 高[コウ]</on></b><on> 層[ソウ]</on>ビルが<b><kun>"
             " 高[たか]</kun><oku>めて</oku></b>と"
-            " <b><kun> 高[たか]</kun><oku>ぶり</oku></b>"
+            "<b><kun> 高[たか]</kun><oku>ぶり</oku></b>"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> やま[山]</kun>が <b><kun> たか[高]</kun><oku>ければ</oku></b>、"
-            " <b><on> コウ[高]</on></b><on> ソウ[層]</on>ビルが <b><kun>"
+            "<kun> やま[山]</kun>が<b><kun> たか[高]</kun><oku>ければ</oku></b>、"
+            "<b><on> コウ[高]</on></b><on> ソウ[層]</on>ビルが<b><kun>"
             " たか[高]</kun><oku>めて</oku></b>と"
-            " <b><kun> たか[高]</kun><oku>ぶり</oku></b>"
+            "<b><kun> たか[高]</kun><oku>ぶり</oku></b>"
         ),
     )
     test(
@@ -4346,19 +4339,19 @@ def main():
         expected_furikanji=" かれ[彼]は<b> あつ[厚]かましい</b>。",
         expected_kana_only_with_tags_split="<kun>かれ</kun>は <b><kun>あつ</kun><oku>かましい</oku></b>。",
         expected_furigana_with_tags_split=(
-            "<kun> 彼[かれ]</kun>は <b><kun> 厚[あつ]</kun><oku>かましい</oku></b>。"
+            "<kun> 彼[かれ]</kun>は<b><kun> 厚[あつ]</kun><oku>かましい</oku></b>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> かれ[彼]</kun>は <b><kun> あつ[厚]</kun><oku>かましい</oku></b>。"
+            "<kun> かれ[彼]</kun>は<b><kun> あつ[厚]</kun><oku>かましい</oku></b>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>かれ</kun>は <b><kun>あつ</kun><oku>かましい</oku></b>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 彼[かれ]</kun>は <b><kun> 厚[あつ]</kun><oku>かましい</oku></b>。"
+            "<kun> 彼[かれ]</kun>は<b><kun> 厚[あつ]</kun><oku>かましい</oku></b>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> かれ[彼]</kun>は <b><kun> あつ[厚]</kun><oku>かましい</oku></b>。"
+            "<kun> かれ[彼]</kun>は<b><kun> あつ[厚]</kun><oku>かましい</oku></b>。"
         ),
     )
     test(
@@ -4380,14 +4373,14 @@ def main():
             " <kun>ふ</kun><oku>り</oku>で <b><kun>は</kun><oku>じらって</oku></b>ください。"
         ),
         expected_furigana_with_tags_split=(
-            "<b><kun> 恥[は]</kun><oku>ずかし</oku></b>げな <kun> 顔[かお]</kun>で <b><kun>"
-            " 恥[はじ]</kun></b>を <kun> 知[し]</kun><oku>らない</oku> <kun>"
-            " 振[ふ]</kun><oku>り</oku>で <b><kun> 恥[は]</kun><oku>じらって</oku></b>ください。"
+            "<b><kun> 恥[は]</kun><oku>ずかし</oku></b>げな<kun> 顔[かお]</kun>で<b><kun>"
+            " 恥[はじ]</kun></b>を<kun> 知[し]</kun><oku>らない</oku><kun>"
+            " 振[ふ]</kun><oku>り</oku>で<b><kun> 恥[は]</kun><oku>じらって</oku></b>ください。"
         ),
         expected_furikanji_with_tags_split=(
-            "<b><kun> は[恥]</kun><oku>ずかし</oku></b>げな <kun> かお[顔]</kun>で <b><kun>"
-            " はじ[恥]</kun></b>を <kun> し[知]</kun><oku>らない</oku> <kun>"
-            " ふ[振]</kun><oku>り</oku>で <b><kun> は[恥]</kun><oku>じらって</oku></b>"
+            "<b><kun> は[恥]</kun><oku>ずかし</oku></b>げな<kun> かお[顔]</kun>で<b><kun>"
+            " はじ[恥]</kun></b>を<kun> し[知]</kun><oku>らない</oku><kun>"
+            " ふ[振]</kun><oku>り</oku>で<b><kun> は[恥]</kun><oku>じらって</oku></b>"
             "ください。"
         ),
         expected_kana_only_with_tags_merged=(
@@ -4396,14 +4389,14 @@ def main():
             " <kun>ふ</kun><oku>り</oku>で <b><kun>は</kun><oku>じらって</oku></b>ください。"
         ),
         expected_furigana_with_tags_merged=(
-            "<b><kun> 恥[は]</kun><oku>ずかし</oku></b>げな <kun> 顔[かお]</kun>で <b><kun>"
-            " 恥[はじ]</kun></b>を <kun> 知[し]</kun><oku>らない</oku> <kun>"
-            " 振[ふ]</kun><oku>り</oku>で <b><kun> 恥[は]</kun><oku>じらって</oku></b>ください。"
+            "<b><kun> 恥[は]</kun><oku>ずかし</oku></b>げな<kun> 顔[かお]</kun>で<b><kun>"
+            " 恥[はじ]</kun></b>を<kun> 知[し]</kun><oku>らない</oku><kun>"
+            " 振[ふ]</kun><oku>り</oku>で<b><kun> 恥[は]</kun><oku>じらって</oku></b>ください。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<b><kun> は[恥]</kun><oku>ずかし</oku></b>げな <kun> かお[顔]</kun>で <b><kun>"
-            " はじ[恥]</kun></b>を <kun> し[知]</kun><oku>らない</oku> <kun>"
-            " ふ[振]</kun><oku>り</oku>で <b><kun> は[恥]</kun><oku>じらって</oku></b>ください。"
+            "<b><kun> は[恥]</kun><oku>ずかし</oku></b>げな<kun> かお[顔]</kun>で<b><kun>"
+            " はじ[恥]</kun></b>を<kun> し[知]</kun><oku>らない</oku><kun>"
+            " ふ[振]</kun><oku>り</oku>で<b><kun> は[恥]</kun><oku>じらって</oku></b>ください。"
         ),
     )
     test(
@@ -4432,22 +4425,22 @@ def main():
             " <kun>かた</kun><oku>り</oku><kun>あ</kun><oku>った</oku>。"
         ),
         expected_furigana_with_tags_split=(
-            "<kun> 二[ふた]</kun><kun> 人[り]</kun>でしみじみと <kun>"
+            "<kun> 二[ふた]</kun><kun> 人[り]</kun>でしみじみと<kun>"
             " 語[かた]</kun><oku>り</oku><kun> 合[あ]</kun><oku>った</oku>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<kun> ふた[二]</kun><kun> り[人]</kun>でしみじみと <kun>"
+            "<kun> ふた[二]</kun><kun> り[人]</kun>でしみじみと<kun>"
             " かた[語]</kun><oku>り</oku><kun> あ[合]</kun><oku>った</oku>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<kun>ふたり</kun>でしみじみと <kun>かた</kun><oku>り</oku><kun>あ</kun><oku>った</oku>。"
         ),
         expected_furigana_with_tags_merged=(
-            "<kun> 二人[ふたり]</kun>でしみじみと <kun> 語[かた]</kun><oku>り</oku><kun>"
+            "<kun> 二人[ふたり]</kun>でしみじみと<kun> 語[かた]</kun><oku>り</oku><kun>"
             " 合[あ]</kun><oku>った</oku>。"
         ),
         expected_furikanji_with_tags_merged=(
-            "<kun> ふたり[二人]</kun>でしみじみと <kun> かた[語]</kun><oku>り</oku><kun>"
+            "<kun> ふたり[二人]</kun>でしみじみと<kun> かた[語]</kun><oku>り</oku><kun>"
             " あ[合]</kun><oku>った</oku>。"
         ),
     )
