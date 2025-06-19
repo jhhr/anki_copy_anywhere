@@ -11,7 +11,7 @@ except ImportError:
 
 def test(
     test_name: str,
-    kanji: str | None,
+    kanji: Optional[str],
     sentence: str,
     ignore_fail: bool = False,
     assume_dictionary_form: bool = False,

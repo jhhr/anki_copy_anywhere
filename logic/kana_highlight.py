@@ -483,7 +483,7 @@ class HighlightArgs(TypedDict):
     onyomi: str
     kunyomi: str
     kanji_to_match: str
-    kanji_to_highlight: str | None
+    kanji_to_highlight: Optional[str]
     add_highlight: bool
     edge: Edge
 
@@ -1780,7 +1780,7 @@ def handle_partial_word_case(
 
 
 def kana_highlight(
-    kanji_to_highlight: str | None,
+    kanji_to_highlight: Optional[str],
     text: str,
     return_type: FuriReconstruct = "kana_only",
     with_tags_def: Optional[WithTagsDef] = None,
