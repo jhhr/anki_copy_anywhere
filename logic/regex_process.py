@@ -1,7 +1,11 @@
 import re
 import sys
 from typing import Optional
-from ..utils.logger import Logger
+
+try:
+    from ..utils.logger import Logger
+except ImportError:
+    from utils.logger import Logger
 
 
 def regex_process(
