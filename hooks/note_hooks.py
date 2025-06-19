@@ -14,6 +14,7 @@ from aqt.gui_hooks import (
 )
 
 from ..utils.write_custom_data import write_custom_data
+from ..utils.logger import Logger
 from ..configuration import (
     Config,
     CopyDefinition,
@@ -63,6 +64,7 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
     """
     config = Config()
     config.load()
+    logger = Logger(config.log_level)
 
     note_type = note.note_type()
     if not note_type:
@@ -93,6 +95,7 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
             copy_definition=copy_definition,
             trigger_note=note,
             deck_id=deck_id,
+            logger=logger,
         )
 
     if not editing_other_notes_definitions:
@@ -111,6 +114,7 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
             trigger_note=note,
             copied_into_notes=copied_into_notes,
             deck_id=deck_id,
+            logger=logger,
         )
     undo_text = make_copy_fields_undo_text(
         copy_definitions=editing_other_notes_definitions,
@@ -136,6 +140,7 @@ def run_copy_fields_on_review(card: Card):
     """
     config = Config()
     config.load()
+    logger = Logger(config.log_level)
     note = card.note()
     note_type = note.note_type()
     if not note_type:
@@ -175,6 +180,7 @@ def run_copy_fields_on_review(card: Card):
             copy_definition=copy_definition,
             trigger_note=note,
             copied_into_notes=copied_into_notes,
+            logger=logger,
         )
     if has_definitions_to_process_on_sync:
         # In order to not have on_sync definitions run twice, we'll set a different fc value

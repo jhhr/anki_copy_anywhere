@@ -2,6 +2,7 @@ import base64
 import random
 import time
 import html
+import re
 from typing import Callable, Union, Optional, Tuple, Sequence, Any
 
 from anki.collection import OpChanges
@@ -33,6 +34,7 @@ from .kana_highlight_process import WithTagsDef
 from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
 from ..configuration import (
+    Config,
     CopyDefinition,
     definition_modifies_other_notes,
     CopyFieldToVariable,
@@ -59,6 +61,8 @@ from ..utils.duplicate_note import (
     duplicate_note,
 )
 
+CONSOLE_COLOR_RE = r"\x1b\[[0-9;]*m"
+
 
 class ScrollMessageBox(QDialog):
     """
@@ -78,6 +82,11 @@ class ScrollMessageBox(QDialog):
         scroll.setWidget(self.content)
         lay = QVBoxLayout(self.content)
         textbox = AutoResizingTextEdit(self, readOnly=True)
+        # remove console colors as they can't be displayed in the text box
+        message_list = [
+            re.sub(CONSOLE_COLOR_RE, "", line) if isinstance(line, str) else str(line)
+            for line in message_list
+        ]
         textbox.setPlainText("\n".join(message_list))
         lay.addWidget(textbox)
         self.main_layout = QVBoxLayout(self)
@@ -318,13 +327,16 @@ def copy_fields(
     start_time = time.time()
     debug_texts = []
     is_sync = update_sync_result is not None
+    config = Config()
+    config.load()
+    logger = Logger()
 
     def log(message: str):
         nonlocal debug_texts
         debug_texts.append(message)
         print(message)
 
-    logger = Logger("error", log=log)
+    logger = Logger(config.log_level, log=log)
 
     def on_success(copy_results: CacheResults):
         mw.progress.finish()

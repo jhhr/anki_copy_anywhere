@@ -9,6 +9,7 @@ from .logic.interpolate_fields import (
     intr_format,
     TARGET_NOTES_COUNT,
 )
+from .utils.logger import LogLevel
 
 tag = mw.addonManager.addonFromModule(__name__)
 
@@ -274,6 +275,10 @@ class Config:
 
     def save(self):
         save_config(self.data)
+
+    @property
+    def log_level(self) -> LogLevel:
+        return self.data.get("log_level", "error")
 
     @property
     def copy_fields_shortcut(self):

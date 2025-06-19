@@ -1,4 +1,5 @@
 {
+    "log_level": "error",
     "copy_fields_shortcut": "Ctrl+Shift+C",
     "copy_definitions": []
 }
