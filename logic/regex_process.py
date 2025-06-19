@@ -47,10 +47,12 @@ def test(
     flags: Optional[str],
     expected: str,
 ):
-    result = regex_process(text, regex, replacement, flags, None)
+    result = regex_process(text, regex, replacement, flags)
     try:
         assert result == expected
     except AssertionError:
+        # Re-run with logging enabled to see what went wrong
+        regex_process(text, regex, replacement, flags, logger=Logger("debug"))
         print(f"""\033[91m{test_name}
 \033[93mExpected: {expected}
 \033[92mGot:      {result}
