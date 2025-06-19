@@ -1,11 +1,12 @@
 import json
 import re
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from aqt import mw
 
 from .FatalProcessError import FatalProcessError
+from ..utils.logger import Logger
 
 
 def fonts_check_process(
@@ -13,7 +14,7 @@ def fonts_check_process(
     fonts_dict_file: str,
     limit_to_fonts: Optional[list[str]],
     character_limit_regex: Optional[str],
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
     file_cache: Optional[dict] = None,
 ) -> str:
     """
@@ -27,7 +28,7 @@ def fonts_check_process(
     :param fonts_dict_file: The path to the json file with the fonts dictionary
     :param limit_to_fonts: A list of font file names to limit the output to
     :param character_limit_regex: A regex to limit the characters to check
-    :param show_error_message: A function that takes a string and shows an error message
+    :param logger: A logger instance to log errors and debug messages
     :param file_cache: A dictionary to cache the open JSON file contents, to avoid opening the file
         multiple times
 
@@ -36,13 +37,8 @@ def fonts_check_process(
     :raises FatalProcessError: If the file is not found, empty, or has invalid JSON content
     """
 
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
-
     if not fonts_dict_file:
-        show_error_message("Error in fonts_check_process: Missing 'fonts_dict_file'")
+        logger.error("Error in fonts_check_process: Missing 'fonts_dict_file'")
         return ""
 
     char_regex = None
@@ -77,7 +73,7 @@ def fonts_check_process(
                 raise FatalProcessError(f"Error parsing JSON in file '{fonts_dict_file_full}': {e}")
 
     if text is None or text == "":
-        show_error_message("Text was empty")
+        logger.error("Text was empty")
         return ""
 
     encountered_fonts = set()
@@ -108,9 +104,9 @@ def fonts_check_process(
 
     if not some_chars_found:
         if all_chars_excluded_by_regex:
-            show_error_message(f"{text} - All characters excluded by regex")
+            logger.error(f"{text} - All characters excluded by regex")
         else:
-            show_error_message(
+            logger.error(
                 f"{text} - No characters had a match in the fonts dictionary, check that your "
                 + " dictionary has entries for the expected characters"
             )
@@ -126,7 +122,7 @@ def fonts_check_process(
         if all_fonts is not None:
             return f'["{join_str.join(all_fonts)}"]'
 
-        show_error_message(f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key")
+        logger.error(f"Dictionary '{fonts_dict_file}' does not contain an 'all_fonts' key")
         return ""
 
     if valid_fonts is None:
@@ -134,9 +130,9 @@ def fonts_check_process(
 
     if len(valid_fonts) == 0:
         if (len(text)) == 1:
-            show_error_message(f"{text} - No fonts were valid for this character")
+            logger.error(f"{text} - No fonts were valid for this character")
         else:
-            show_error_message(
+            logger.error(
                 f"{text} - Some characters had valid fonts but no fonts were valid for every"
                 " character"
             )

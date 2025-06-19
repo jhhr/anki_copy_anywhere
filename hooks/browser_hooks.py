@@ -10,7 +10,7 @@ from aqt.qt import QAction, qconnect, QMenu
 
 from ..configuration import Config
 from ..logic.copy_fields import copy_fields
-from ..replace_custom_field_values import replace_custom_field_values
+from ..utils.replace_custom_field_values import replace_custom_field_values
 from ..ui.pick_copy_definition_dialog import show_copy_dialog
 
 config = Config()

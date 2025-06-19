@@ -20,6 +20,11 @@ from aqt.qt import (
 )
 from aqt.utils import tooltip
 
+from ..utils.file_exists_in_media_folder import file_exists_in_media_folder
+from ..utils.write_to_media_folder import write_to_media_folder
+from ..utils.write_custom_data import write_custom_data
+from ..utils.logger import Logger
+
 from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
 from .interpolate_fields import interpolate_from_text, TARGET_NOTES_COUNT
@@ -50,10 +55,7 @@ from ..configuration import (
     SELECT_CARD_BY_VALUES,
 )
 from ..ui.auto_resizing_text_edit import AutoResizingTextEdit
-from ..utils import (
-    write_custom_data,
-    write_to_media_folder,
-    file_exists_in_media_folder,
+from ..utils.duplicate_note import (
     duplicate_note,
 )
 
@@ -317,10 +319,12 @@ def copy_fields(
     debug_texts = []
     is_sync = update_sync_result is not None
 
-    def show_error_message(message: str):
+    def log(message: str):
         nonlocal debug_texts
         debug_texts.append(message)
         print(message)
+
+    logger = Logger("error", log=log)
 
     def on_success(copy_results: CacheResults):
         mw.progress.finish()
@@ -350,7 +354,7 @@ def copy_fields(
 
     def on_failure(exception):
         mw.progress.finish()
-        show_error_message(f"Copying failed: {exception}")
+        logger.error(f"Copying failed: {exception}")
         if not is_sync and len(debug_texts) > 0:
             ScrollMessageBox(debug_texts, title="Copy Fields debug Messages", parent=parent)
         if on_done is not None:
@@ -360,7 +364,7 @@ def copy_fields(
 
     def op(_) -> CacheResults:
         if not copy_definitions:
-            show_error_message("Error in copy fields: No definitions given")
+            logger.error("Error in copy fields: No definitions given")
             return CacheResults(result_text="", changes=None)
 
         copied_into_cards: list[Card] = []
@@ -390,7 +394,7 @@ def copy_fields(
                 note_ids=(
                     note_ids_per_definition[i] if note_ids_per_definition is not None else note_ids
                 ),
-                show_message=show_error_message,
+                logger=logger,
                 is_sync=is_sync,
                 copied_into_cards=copied_into_cards,
                 copied_into_notes=copied_into_notes,
@@ -435,7 +439,7 @@ def copy_fields_in_background(
     is_sync: Optional[bool] = False,
     note_ids: Optional[Sequence[int]] = None,
     field_only: Optional[str] = None,
-    show_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
     progress_title: Optional[str] = None,
 ) -> CacheResults:
     """
@@ -450,7 +454,7 @@ def copy_fields_in_background(
     :param note_ids: The note ids to copy into, if None, all notes of the note type are copied into
     :param field_only: Optional field to limit copying to. Used when copying is applied
       in the note editor
-    :param show_message: Function to show error messages
+    :param logger: Logger to use for errors and debug messages
     :param is_sync: Whether this is a sync operation or not
     :param progress_title: Optional title for the progress dialog
     :return: the CacheResults object passed as results
@@ -461,21 +465,9 @@ def copy_fields_in_background(
     start_time = time.time()
 
     note_cnt = 0
-    debug_text = ""
-    if not show_message:
-
-        def show_error_message(message: str):
-            nonlocal debug_text
-            debug_text += f"<br/>{note_cnt}--{message}"
-            print(message)
-
-    else:
-
-        def show_error_message(message: str):
-            show_message(f"\n{note_cnt}--{message}")
 
     if copy_into_note_types is None:
-        show_error_message(
+        logger.error(
             f"""Error in copy fields: Note type for copy_into_note_types '{copy_into_note_types}'
             not found, check your spelling""",
         )
@@ -523,7 +515,7 @@ def copy_fields_in_background(
 
     if not is_sync and len(notes) == 0:
         # When syncing, it's normal to get zero results if no cards have been reviewed
-        show_error_message(
+        logger.error(
             f"Error in copy fields: Did not find any notes of note type(s) {copy_into_note_types}"
         )
         return results
@@ -554,7 +546,7 @@ def copy_fields_in_background(
             trigger_note=note,
             copied_into_notes=copied_into_notes,
             field_only=field_only,
-            show_error_message=show_error_message,
+            logger=logger,
             file_cache=file_cache,
             progress_updater=progress_updater,
         )
@@ -601,7 +593,7 @@ def apply_process_chain(
     ],
     text: str,
     destination_note: Note,
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
     file_cache: Optional[dict] = None,
 ) -> Union[str, None]:
     """
@@ -609,14 +601,10 @@ def apply_process_chain(
     :param process_chain: The list of processes to apply
     :param text: The text to apply the processes to
     :param destination_note: The note to use for the processes
-    :param show_error_message: A function to show error messages
+    :param logger: Logger to use for errors and debug messages
     :param file_cache: A dictionary to cache opened files' content
     :return: The text after the processes have been applied or None if there was an error
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
 
     for process in process_chain:
         try:
@@ -631,7 +619,7 @@ def apply_process_chain(
                         process.get("assume_dictionary_form", False),
                     ),
                     note=destination_note,
-                    show_error_message=show_error_message,
+                    logger=logger,
                 )
 
             elif is_regex_process(process):
@@ -640,7 +628,7 @@ def apply_process_chain(
                     regex=process.get("regex", None),
                     replacement=process.get("replacement", None),
                     flags=process.get("flags", None),
-                    show_error_message=show_error_message,
+                    logger=logger,
                 )
 
             elif is_fonts_check_process(process):
@@ -649,7 +637,7 @@ def apply_process_chain(
                     fonts_dict_file=process.get("fonts_dict_file", ""),
                     limit_to_fonts=process.get("limit_to_fonts", None),
                     character_limit_regex=process.get("character_limit_regex", None),
-                    show_error_message=show_error_message,
+                    logger=logger,
                     file_cache=file_cache,
                 )
 
@@ -657,12 +645,12 @@ def apply_process_chain(
                 text = kanjium_to_javdejong_process(
                     text=text,
                     delimiter=process.get("delimiter", ""),
-                    show_error_message=show_error_message,
+                    logger=logger,
                 )
         except FatalProcessError as e:
             # If some process fails in a way that will always fail, we stop the whole op
             # so the user can fix the issue without needing to wait for the whole op to finish
-            show_error_message(f"Error in {process['name']} process: {e}")
+            logger.error(f"Error in {process['name']} process: {e}")
             return None
     return text
 
@@ -677,7 +665,7 @@ def copy_for_single_trigger_note(
     copied_into_notes: Optional[list[Note]] = None,
     field_only: Optional[str] = None,
     deck_id: Optional[int] = None,
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
     file_cache: Optional[dict] = None,
     progress_updater: Optional[ProgressUpdater] = None,
 ) -> bool:
@@ -694,15 +682,11 @@ def copy_for_single_trigger_note(
       a note since cards don't exist yet. Otherwise, the deck_ids are checked from the cards
       of the note
     :param is_note_editor: Whether copy fields is being triggered in the note editor
-    :param show_error_message: Optional function to show error messages
+    :param logger: Logger to use for errors and debug messages
     :param file_cache: A dictionary to cache opened files' content
     :param progress_updater: Optional object to update the progress bar
     :return: bool indicating success
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
 
     field_to_field_defs = copy_definition.get("field_to_field_defs", [])
     field_to_file_defs = copy_definition.get("field_to_file_defs", [])
@@ -728,7 +712,7 @@ def copy_for_single_trigger_note(
         variable_values_dict = get_variable_values_for_note(
             field_to_variable_defs=field_to_variable_defs,
             note=trigger_note,
-            show_error_message=show_error_message,
+            logger=logger,
             file_cache=file_cache,
         )
 
@@ -747,7 +731,7 @@ def copy_for_single_trigger_note(
             DIRECTION_DESTINATION_TO_SOURCES,
             DIRECTION_SOURCE_TO_DESTINATIONS,
         ]:
-            show_error_message("Error in copy fields: missing across mode direction value")
+            logger.error("Error in copy fields: missing across mode direction value")
             return False
         target_notes = get_across_target_notes(
             copy_from_cards_query=copy_from_cards_query or "",
@@ -758,7 +742,7 @@ def copy_for_single_trigger_note(
             only_copy_into_decks=only_copy_into_decks,
             select_card_by=select_card_by,
             select_card_count=select_card_count,
-            show_error_message=show_error_message,
+            logger=logger,
             variable_values_dict=variable_values_dict,
         )
         variable_values_dict[TARGET_NOTES_COUNT] = len(target_notes)
@@ -769,7 +753,7 @@ def copy_for_single_trigger_note(
             destination_notes = target_notes
             source_notes = [trigger_note]
     else:
-        show_error_message("Error in copy fields: missing copy mode value")
+        logger.error("Error in copy fields: missing copy mode value")
         return False
 
     if len(source_notes) == 0:
@@ -796,7 +780,7 @@ def copy_for_single_trigger_note(
                 multiple_note_types=multiple_note_types,
                 select_card_separator=select_card_separator,
                 file_cache=file_cache,
-                show_error_message=show_error_message,
+                logger=logger,
                 progress_updater=progress_updater,
             )
             if progress_updater is not None:
@@ -823,13 +807,9 @@ def copy_into_single_note(
     multiple_note_types: bool = False,
     select_card_separator: Optional[str] = None,
     file_cache: Optional[dict] = None,
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
     progress_updater: Optional[ProgressUpdater] = None,
 ) -> Tuple[bool, bool]:
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
 
     modified_dest_note = False
     wrote_to_file = False
@@ -855,9 +835,7 @@ def copy_into_single_note(
         try:
             cur_field_value = destination_note[copy_into_note_field]
         except KeyError:
-            show_error_message(
-                f"Error in copy fields: Field '{copy_into_note_field}' not found in note"
-            )
+            logger.error(f"Error in copy fields: Field '{copy_into_note_field}' not found in note")
             # Rest of defs are not processed
             raise CopyFailedException
 
@@ -870,7 +848,7 @@ def copy_into_single_note(
             dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
-            show_error_message=show_error_message,
+            logger=logger,
             variable_values_dict=variable_values_dict,
             progress_updater=progress_updater,
         )
@@ -879,12 +857,12 @@ def copy_into_single_note(
                 process_chain=process_chain,
                 text=result_val,
                 destination_note=destination_note,
-                show_error_message=show_error_message,
+                logger=logger,
                 file_cache=file_cache,
             )
             # result_val should always be at least "", None indicates an error
             if processed_val is None:
-                show_error_message(
+                logger.error(
                     f"Error in copy fields: Process chain failed for field {copy_into_note_field}"
                 )
                 raise CopyFailedException
@@ -901,7 +879,7 @@ def copy_into_single_note(
         dont_overwrite = field_to_file_def.get("copy_if_empty", False)
 
         if not copy_into_filename:
-            show_error_message("Error in copy fields: No file name provided")
+            logger.error("Error in copy fields: No file name provided")
             raise CopyFailedException
 
         # Interpolate filename with values from the note
@@ -911,7 +889,7 @@ def copy_into_single_note(
             dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
-            show_error_message=show_error_message,
+            logger=logger,
             variable_values_dict=variable_values_dict,
             progress_updater=progress_updater,
         )
@@ -925,7 +903,7 @@ def copy_into_single_note(
             dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
-            show_error_message=show_error_message,
+            logger=logger,
             variable_values_dict=variable_values_dict,
             progress_updater=progress_updater,
         )
@@ -934,12 +912,12 @@ def copy_into_single_note(
                 process_chain=process_chain,
                 text=result_val,
                 destination_note=destination_note_copy,
-                show_error_message=show_error_message,
+                logger=logger,
                 file_cache=file_cache,
             )
             # result_val should always be at least "", None indicates an error
             if processed_val is None:
-                show_error_message(
+                logger.error(
                     f"Error in copy fields: Process chain failed for file {copy_into_filename}"
                 )
                 raise CopyFailedException
@@ -950,7 +928,7 @@ def copy_into_single_note(
             write_to_media_folder(copy_into_filename, result_val)
             wrote_to_file = True
         except Exception as e:
-            show_error_message(f"Error in writing to file: {e}")
+            logger.error(f"Error in writing to file: {e}")
             raise CopyFailedException
     return (modified_dest_note, wrote_to_file)
 
@@ -959,20 +937,16 @@ def get_variable_values_for_note(
     field_to_variable_defs: list[CopyFieldToVariable],
     note: Note,
     file_cache: Optional[dict] = None,
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
 ) -> dict:
     """
     Get the values for the variables from the note
     :param field_to_variable_defs: The definitions of the variables to get
     :param note: The note to get the values from
     :param file_cache: A dictionary to cache opened files' content for process chains
-    :param show_error_message: A function to show error messages
+    :param logger: Logger to use for errors and debug messages
     :return: A dictionary of the values for the variables or None if there was an error
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
 
     variable_values_dict = {}
     for field_to_variable_def in field_to_variable_defs:
@@ -986,7 +960,7 @@ def get_variable_values_for_note(
             source_note=note,
         )
         if len(invalid_fields) > 0:
-            show_error_message(
+            logger.error(
                 "Error getting variable values: Invalid fields in copy_from_text:"
                 f" {', '.join(invalid_fields)}"
             )
@@ -997,7 +971,7 @@ def get_variable_values_for_note(
                 process_chain=process_chain,
                 text=interpolated_value,
                 destination_note=note,
-                show_error_message=show_error_message,
+                logger=logger,
                 file_cache=file_cache,
             )
             if interpolated_value is None:
@@ -1032,7 +1006,7 @@ def get_across_target_notes(
     variable_values_dict: Optional[dict] = None,
     only_copy_into_decks: Optional[str] = None,
     select_card_count: Optional[str] = "1",
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
 ) -> list[Note]:
     """
     Get the target notes based on the search value and the query. These will either be
@@ -1049,21 +1023,16 @@ def get_across_target_notes(
     :param only_copy_into_decks: A comma separated whitelist of deck names. Limits the cards to copy
         from to only those in the decks in the whitelist
     :param select_card_count: How many cards to select from the query. Default is 1
-    :param show_error_message: A function to show error messages, used for storing all messages
-        until the end of the whole operation to show them in a GUI element at the end
+    :param logger: Logger to use for errors and debug messages.
     :return: A list of notes to copy from
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
 
     if not select_card_by:
-        show_error_message("Error in copy fields: Required value 'select_card_by' was missing.")
+        logger.error("Error in copy fields: Required value 'select_card_by' was missing.")
         return []
 
     if select_card_by not in SELECT_CARD_BY_VALUES:
-        show_error_message(
+        logger.error(
             f"""Error in copy fields: incorrect 'select_card_by' value '{select_card_by}'.
             It must be one of {SELECT_CARD_BY_VALUES}""",
         )
@@ -1075,7 +1044,7 @@ def get_across_target_notes(
             if select_card_count_int < 0:
                 raise ValueError
         except ValueError:
-            show_error_message(
+            logger.error(
                 "Error in copy fields: Incorrect 'select_card_count' value"
                 f" '{select_card_count_int}'. Value must be a positive integer or 0"
             )
@@ -1108,7 +1077,7 @@ def get_across_target_notes(
         variable_values_dict=variable_values_dict,
     )
     if not interpolated_cards_query:
-        show_error_message("Error in copy fields: Could not interpolate copy_from_cards_query")
+        logger.error("Error in copy fields: Could not interpolate copy_from_cards_query")
         return []
     cards_query_id = base64.b64encode(f"cards{interpolated_cards_query}".encode()).decode()
     try:
@@ -1118,13 +1087,13 @@ def get_across_target_notes(
         extra_state[cards_query_id] = card_ids
 
     if len(invalid_fields) > 0:
-        show_error_message(
+        logger.error(
             "Error in copy fields: Invalid fields in copy_from_cards_query:"
             f" {', '.join(invalid_fields)}"
         )
 
     if len(card_ids) == 0:
-        show_error_message(
+        logger.error(
             "Error in copy fields: Did not find any cards with"
             f" copy_from_cards_query='{interpolated_cards_query}'"
         )
@@ -1181,7 +1150,7 @@ def get_across_target_notes(
                 )
                 extra_state = {card_select_key: selected_card_id}
         if selected_card_id is None:
-            show_error_message("Error in copy fields: could not select card")
+            logger.error("Error in copy fields: could not select card")
             break
 
         # Remove selected card so it can't be picked again
@@ -1205,7 +1174,7 @@ def get_field_values_from_notes(
     multiple_note_types: bool = False,
     variable_values_dict: Optional[dict] = None,
     select_card_separator: Optional[str] = ", ",
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
     progress_updater: Optional[ProgressUpdater] = None,
 ) -> str:
     """
@@ -1220,18 +1189,14 @@ def get_field_values_from_notes(
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param select_card_separator: The separator to use when joining the values from the notes.
         Irrelevant if there is only one note
-    :param show_error_message: A function to show error messages, used for storing all messages
+    :param logger: Logger to use for errors and debug messages, used for storing all messages
         until the end of the whole operation to show them in a GUI element at the end
     :param progress_updater: An object to update the progress bar with
     :return: String with the values from the field in the notes
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
 
     if copy_from_text is None:
-        show_error_message(
+        logger.error(
             "Error in copy fields: Required value 'copy_from_text' was missing.",
         )
         return ""
@@ -1252,11 +1217,11 @@ def get_field_values_from_notes(
                 multiple_note_types=multiple_note_types,
             )
         except ValueError as e:
-            show_error_message(f"Error in text interpolation: {e}")
+            logger.error(f"Error in text interpolation: {e}")
             break
 
         if len(invalid_fields) > 0:
-            show_error_message(
+            logger.error(
                 "Error in copy fields: Invalid fields in copy_from_text:"
                 f" {', '.join(invalid_fields)}"
             )

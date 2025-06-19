@@ -2,16 +2,15 @@ import re
 import sys
 from typing import NamedTuple, Tuple, Union, Optional, Literal
 
+try:
+    from ...utils.logger import Logger
+except ImportError:
+    from utils.logger import Logger  # type: ignore[no-redef]
+
 TAG_WRAPPED_FURIGANA_RE = re.compile(r"(?:<(b)>)?<(on|kun|juk)>(.*?)<\/\2>(?:<\/\1>)?")
 
-LOG = False
 
 FuriReconstruct = Literal["furigana", "furikanji", "kana_only"]
-
-
-def log(*args):
-    if LOG:
-        print(*args)
 
 
 class TagOrder(NamedTuple):
@@ -21,14 +20,14 @@ class TagOrder(NamedTuple):
     position: int
 
 
-def get_tag_order(furigana: str) -> list[TagOrder]:
+def get_tag_order(furigana: str, logger=Logger("error")) -> list[TagOrder]:
     """
     Get the order of <on>, <kun>, and <juk> tags in the furigana string.
 
     :param furigana: The furigana string containing the tags.
     :return: A list of tuples containing the tag name and its position.
     """
-    log(f"get_tag_order furigana: {furigana}")
+    logger.debug(f"get_tag_order furigana: {furigana}")
     tag_order = []
     for match in TAG_WRAPPED_FURIGANA_RE.finditer(furigana):
         highlight = match.group(1)
@@ -45,7 +44,9 @@ class WrapMatchResult(NamedTuple):
     furigana: str
 
 
-def match_tags_with_kanji(word: str, furigana: str) -> list[WrapMatchResult]:
+def match_tags_with_kanji(
+    word: str, furigana: str, logger=Logger("error")
+) -> list[WrapMatchResult]:
     """
     Match the tags with each kanji in the word.
 
@@ -54,7 +55,7 @@ def match_tags_with_kanji(word: str, furigana: str) -> list[WrapMatchResult]:
     :return: A list of tuples containing the kanji and its corresponding tag.
     """
     tag_order = get_tag_order(furigana)
-    log(f"match_tags_with_kanji - word: {word}, tag_order: {tag_order}")
+    logger.debug(f"match_tags_with_kanji - word: {word}, tag_order: {tag_order}")
     kanji_tags = []
     kanji_index = 0
 
@@ -79,16 +80,17 @@ def construct_wrapped_furi_word(
     furigana: str,
     return_type: FuriReconstruct,
     merge_consecutive: bool = True,
+    logger=Logger("error"),
 ) -> str:
     """
     Construct the word with furigana wrapped in the appropriate tags
     """
-    log(
+    logger.debug(
         f"construct_wrapped_furi_word word: {word}, furigana: {furigana}, return_type:"
         f" {return_type}, merge_consecutive: {merge_consecutive}"
     )
     kanji_tags = match_tags_with_kanji(word, furigana)
-    log(f"kanji_tags: {kanji_tags}")
+    logger.debug(f"kanji_tags: {kanji_tags}")
     wrapped_furi_word = ""
     index = 0
     while index < len(kanji_tags):
@@ -110,7 +112,7 @@ def construct_wrapped_furi_word(
                 )
                 index += 1
         kanji, tag, highlight, kana = cur_tag_res
-        log(f"kanji: {kanji}, tag: {tag}, highlight: {highlight}, kana: {kana}")
+        logger.debug(f"kanji: {kanji}, tag: {tag}, highlight: {highlight}, kana: {kana}")
         if return_type == "furikanji":
             with_furi = f"<{tag}> {kana}[{kanji}]</{tag}>"
             if highlight:
@@ -126,7 +128,7 @@ def construct_wrapped_furi_word(
                 with_furi = f"<{highlight}>{with_furi}</{highlight}>"
         wrapped_furi_word += with_furi
         index += 1
-    log(f"construct_wrapped_furi_word wrapped_furi_word: {wrapped_furi_word}")
+    logger.debug(f"construct_wrapped_furi_word wrapped_furi_word: {wrapped_furi_word}")
     return wrapped_furi_word
 
 
@@ -162,9 +164,9 @@ def test(
             assert result == expected
         except AssertionError:
             # Re-run with logging enabled to see what went wrong
-            global LOG
-            LOG = True
-            construct_wrapped_furi_word(word, furigana, return_type, merge_consecutive)
+            construct_wrapped_furi_word(
+                word, furigana, return_type, merge_consecutive, logger=Logger("debug")
+            )
             print(f"""\033[91mTest failed
 type: {return_type}, merge: {merge_consecutive}
 word: {word}, furigana: {furigana}
@@ -173,8 +175,6 @@ word: {word}, furigana: {furigana}
 \033[0m""")
             # Stop testing here
             sys.exit(0)
-        finally:
-            LOG = False
 
 
 def main():

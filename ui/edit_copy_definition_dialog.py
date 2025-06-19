@@ -61,7 +61,7 @@ from ..logic.interpolate_fields import (
     BASE_NOTE_MENU_DICT,
     intr_format,
 )
-from ..utils import block_signals
+from ..utils.block_signals import block_signals
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal

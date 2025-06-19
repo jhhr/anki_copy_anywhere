@@ -1,6 +1,7 @@
 import re
 import sys
-from typing import Callable, Optional
+from typing import Optional
+from ..utils.logger import Logger
 
 
 def regex_process(
@@ -8,24 +9,20 @@ def regex_process(
     regex: Optional[str],
     replacement: Optional[str],
     flags: Optional[str],
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
 ) -> str:
     """
     Basic regex processing step that replaces the text that matches the regex with the replacement.
     If no replacement is provided, instead only the match is returned.
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
 
     if not regex:
-        show_error_message("Error in basic_regex_process: Missing 'regex'")
+        logger.error("Error in basic_regex_process: Missing 'regex'")
         return text
 
     if replacement is None:
         # Replace can be "" but not None
-        show_error_message("Error in basic_regex_process: Missing 'replacement'")
+        logger.error("Error in basic_regex_process: Missing 'replacement'")
         return text
 
     if not flags:

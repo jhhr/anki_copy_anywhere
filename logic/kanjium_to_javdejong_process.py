@@ -1,5 +1,6 @@
 import re
-from typing import Optional, Callable
+from typing import Optional
+from ..utils.logger import Logger
 
 DEBUG = False
 
@@ -7,7 +8,7 @@ DEBUG = False
 def kanjium_to_javdejong_process(
     text: str,
     delimiter: Optional[str],
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
 ):
     """
     Convert a pitch accent html string that is in Kanjium format to Javdejong format.
@@ -15,14 +16,9 @@ def kanjium_to_javdejong_process(
         it will be returned as is.
     :param delimiter: The delimiter to use when joining the converted pitch accent descriptions.
         Default is '・'.
-    :param show_error_message: A function to call to show an error message. Default is None.
+    :param logger: A logger instance to log errors and debug messages.
     :return: The converted pitch accent html string in Javdejong format.
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
-
     is_kanjium_pitch = re.search(r"currentColor", text)
     if not is_kanjium_pitch:
         return text
@@ -38,8 +34,7 @@ def kanjium_to_javdejong_process(
 
     # Iterate through each pitch accent description
     for pitch_accent_description in pitch_accent_descriptions:
-        if DEBUG:
-            show_error_message(f"pitch_accent_description: {pitch_accent_description}")
+        logger.debug(f"pitch_accent_description: {pitch_accent_description}")
         all_kana = []
 
         # Find all kana characters
@@ -48,8 +43,7 @@ def kanjium_to_javdejong_process(
             for i, kana_match in enumerate(all_kana_matches):
                 all_kana.append({"kana": kana_match, "index": i, "overline": False, "down": False})
 
-        if DEBUG:
-            show_error_message(f"all_kana: {all_kana}")
+        logger.debug(f"all_kana: {all_kana}")
 
         kana_iter = iter(all_kana)
 
@@ -66,8 +60,7 @@ style="border-color:currentColor;display:block;user-select:none;pointer-events:n
         )
         if overline_kana_matches:
             for overline_match in overline_kana_matches:
-                if DEBUG:
-                    show_error_message(f"overline_match: {overline_match}")
+                logger.debug(f"overline_match: {overline_match}")
 
                 # Get the first or second match group
                 overline_kana = overline_match[0] or overline_match[1]
@@ -87,8 +80,7 @@ style="border-color:currentColor;display:block;user-select:none;pointer-events:n
         )
         if downpitch_matches:
             for downpitch_kana in downpitch_matches:
-                if DEBUG:
-                    show_error_message(f"downpitch_kana: {downpitch_kana}")
+                logger.debug(f"downpitch_kana: {downpitch_kana}")
 
                 kana_def = next(kana_iter)
                 while kana_def["kana"] != downpitch_kana:
@@ -116,7 +108,7 @@ style="border-color:currentColor;display:block;user-select:none;pointer-events:n
             result += "</span>"
 
         if DEBUG:
-            show_error_message(f"result: {result}")
+            logger.error(f"result: {result}")
 
         javdejong_descriptions.append(result)
 

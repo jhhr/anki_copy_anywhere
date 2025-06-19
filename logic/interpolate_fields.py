@@ -16,7 +16,7 @@ from anki.notes import Note
 
 from aqt import mw
 
-from ..utils import to_lowercase_dict
+from ..utils.to_lowercase_dict import to_lowercase_dict
 
 # PREFIX_SEPARATOR = ">>"
 # Arg usage: {{__Card_Last_Reps==5}} or {{__Note_Has_Tag==some_tag}}

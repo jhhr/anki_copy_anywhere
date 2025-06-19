@@ -1,4 +1,4 @@
-from typing import Optional, Callable
+from typing import Optional
 
 from anki.notes import Note
 
@@ -8,6 +8,7 @@ from .kana_highlight import (
     kana_filter,
     kana_highlight,
 )
+from ..utils.logger import Logger
 
 
 def kana_highlight_process(
@@ -16,19 +17,14 @@ def kana_highlight_process(
     return_type: FuriReconstruct,
     note: Note,
     with_tags_def: Optional[WithTagsDef] = None,
-    show_error_message: Optional[Callable[[str], None]] = None,
+    logger: Logger = Logger("error"),
 ) -> str:
     """
     Wraps the kana_highlight function to be used as an extra processing step in the copy fields
     chain.
     """
-    if not show_error_message:
-
-        def show_error_message(message: str):
-            print(message)
-
     if not return_type:
-        show_error_message("Error in kana_highlight: Missing 'return_type'")
+        logger.error("Error in kana_highlight: Missing 'return_type'")
         return kana_filter(text)
 
     # Get the kanji to highlight and initial kanji data
@@ -40,8 +36,5 @@ def kana_highlight_process(
                 if kanji_to_highlight:
                     break
         if not kanji_to_highlight:
-            show_error_message(
-                f"Error in kana_highlight: kanji_field '{kanji_field}' not found in note."
-            )
-
-    return kana_highlight(kanji_to_highlight, text, return_type, with_tags_def, show_error_message)
+            logger.error(f"Error in kana_highlight: kanji_field '{kanji_field}' not found in note.")
+    return kana_highlight(kanji_to_highlight, text, return_type, with_tags_def, logger)

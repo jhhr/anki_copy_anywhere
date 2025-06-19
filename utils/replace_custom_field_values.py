@@ -7,7 +7,7 @@ from aqt.operations import CollectionOp
 from aqt.qt import QWidget
 from aqt.utils import tooltip
 
-from .utils import write_custom_data
+from .write_custom_data import write_custom_data
 
 
 def replace_custom_field_values(

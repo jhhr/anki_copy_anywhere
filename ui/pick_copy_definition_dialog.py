@@ -22,7 +22,7 @@ from ..configuration import (
 from ..logic.copy_fields import (
     copy_fields,
 )
-from ..utils import make_query_string
+from ..utils.make_query_string import make_query_string
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal

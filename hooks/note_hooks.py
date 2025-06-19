@@ -13,7 +13,7 @@ from aqt.gui_hooks import (
     editor_did_load_note,
 )
 
-from ..utils import write_custom_data
+from ..utils.write_custom_data import write_custom_data
 from ..configuration import (
     Config,
     CopyDefinition,
