@@ -2281,6 +2281,141 @@ def main():
             " プン[分]</on></b>と<on> ジュッサツ[１０冊]</on>"
         ),
     )
+    test(
+        test_name="More numbers with furigana /1",
+        kanji="",
+        sentence="１[いち] ２[に] ３[さん] ４[よん] ０[ぜろ]",
+        expected_kana_only="イチ ニ サン よん ぜろ",
+        expected_furigana=" １[イチ] ２[ニ] ３[サン] ４[よん] ０[ぜろ]",
+        expected_furikanji=" イチ[１] ニ[２] サン[３] よん[４] ぜろ[０]",
+        expected_kana_only_with_tags_split=(
+            "<on>イチ</on> <on>ニ</on> <on>サン</on> <kun>よん</kun> <kun>ぜろ</kun>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> １[イチ]</on><on> ２[ニ]</on><on> ３[サン]</on><kun> ４[よん]</kun><kun>"
+            " ０[ぜろ]</kun>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> イチ[１]</on><on> ニ[２]</on><on> サン[３]</on><kun> よん[４]</kun><kun>"
+            " ぜろ[０]</kun>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>イチ</on> <on>ニ</on> <on>サン</on> <kun>よん</kun> <kun>ぜろ</kun>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> １[イチ]</on><on> ２[ニ]</on><on> ３[サン]</on><kun> ４[よん]</kun><kun>"
+            " ０[ぜろ]</kun>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> イチ[１]</on><on> ニ[２]</on><on> サン[３]</on><kun> よん[４]</kun><kun>"
+            " ぜろ[０]</kun>"
+        ),
+    )
+    test(
+        test_name="Small tens",
+        kanji="",
+        sentence="３０分[さんじゅっぷん] 40分[よんじゅっぷん] １０時間[じゅうじかん] ５冊[ごさつ]",
+        expected_kana_only="サンジュップン よんジュップン ジュウジカン ゴサツ",
+        expected_furigana=" ３０分[サンジュップン] 40分[よんジュップン] １０時間[ジュウジカン] ５冊[ゴサツ]",
+        expected_furikanji=" サンジュップン[３０分] よんジュップン[40分] ジュウジカン[１０時間] ゴサツ[５冊]",
+        expected_kana_only_with_tags_split=(
+            "<on>サン</on><on>ジュッ</on><on>プン</on> <kun>よん</kun><on>ジュッ</on><on>プン</on>"
+            " <on>"
+            "ジュウ</on><on>ジ</on><on>カン</on> <on>ゴ</on><on>サツ</on>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> ３０[サンジュッ]</on><on> 分[プン]</on><mix> 40[よんジュッ]</mix><on>"
+            " 分[プン]</on><on> １０[ジュウ]</on><on> 時[ジ]</on><on> 間[カン]</on><on>"
+            " ５[ゴ]</on><on>"
+            " 冊[サツ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> サンジュッ[３０]</on><on> プン[分]</on><mix> よんジュッ[40]</mix><on>"
+            " プン[分]</on><on> ジュウ[１０]</on><on> ジ[時]</on><on> カン[間]</on><on>"
+            " ゴ[５]</on><on> サツ[冊]</on>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>サンジュップン</on> <kun>よん</kun><on>ジュップン</on> <on>ジュウジカン</on>"
+            " <on>ゴサツ</on>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> ３０分[サンジュップン]</on><mix> 40[よんジュッ]</mix><on> 分[プン]</on><on>"
+            " １０時間[ジュウジカン]</on><on> ５冊[ゴサツ]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> サンジュップン[３０分]</on><mix> よんジュッ[40]</mix><on> プン[分]</on><on>"
+            " ジュウジカン[１０時間]</on><on> ゴサツ[５冊]</on>"
+        ),
+    )
+    test(
+        test_name="Small teens",
+        kanji="",
+        sentence="15歳[じゅうごさい]に １１個[じゅういっこ]の ７番目[ななばんめ]をもらった。",
+        expected_kana_only="ジュウゴサイに ジュウイッコの ななバンめをもらった。",
+        expected_furigana=" 15歳[ジュウゴサイ]に １１個[ジュウイッコ]の ７番目[ななバンめ]をもらった。",
+        expected_furikanji=" ジュウゴサイ[15歳]に ジュウイッコ[１１個]の ななバンめ[７番目]をもらった。",
+        expected_kana_only_with_tags_split=(
+            "<on>ジュウ</on><on>ゴ</on><on>サイ</on>に <on>ジュウ</on><on>イッ</on><on>コ</on>の"
+            " <kun>なな</kun><on>バン</on><kun>め</kun>をもらった。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> 15[ジュウゴ]</on><on> 歳[サイ]</on>に<on> １１[ジュウイッ]</on><on>"
+            " 個[コ]</on>の<kun> ７[なな]</kun><on> 番[バン]</on><kun> 目[め]</kun>をもらった。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> ジュウゴ[15]</on><on> サイ[歳]</on>に<on> ジュウイッ[１１]</on><on>"
+            " コ[個]</on>の<kun> なな[７]</kun><on> バン[番]</on><kun> め[目]</kun>をもらった。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>ジュウゴサイ</on>に <on>ジュウイッコ</on>の"
+            " <kun>なな</kun><on>バン</on><kun>め</kun>をもらった。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 15歳[ジュウゴサイ]</on>に<on> １１個[ジュウイッコ]</on>の"
+            "<kun> ７[なな]</kun><on> 番[バン]</on><kun> 目[め]</kun>をもらった。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> ジュウゴサイ[15歳]</on>に<on> ジュウイッコ[１１個]</on>の"
+            "<kun> なな[７]</kun><on> バン[番]</on><kun> め[目]</kun>をもらった。"
+        ),
+    )
+    test(
+        test_name="Three digit numbers",
+        kanji="",
+        sentence=(
+            "123[ひゃくにじゅうさん] 402[よんひゃくに] ３２０[さんびゃくにじゅう]"
+            " 888[はっぴゃくはちじゅうはち]"
+            " ４６６０[よんせんろっぴゃくろくじゅう]"
+        ),
+        expected_kana_only=(
+            "ヒャクニジュウサン よんヒャクニ サンビャクニジュウ ハッピャクハチジュウハチ"
+            " よんセンロッピャクロクジュウ"
+        ),
+        expected_furigana=(
+            " 123[ヒャクニジュウサン] 402[よんヒャクニ] ３２０[サンビャクニジュウ]"
+            " 888[ハッピャクハチジュウハチ] ４６６０[よんセンロッピャクロクジュウ]"
+        ),
+        expected_furikanji=(
+            " ヒャクニジュウサン[123] よんヒャクニ[402] サンビャクニジュウ[３２０]"
+            " ハッピャクハチジュウハチ[888] よんセンロッピャクロクジュウ[４６６０]"
+        ),
+        expected_kana_only_with_tags_split=(
+            "<on>ヒャク</on><on>ニ</on><on>ジュウ</on><on>サン</on> <kun>よん</kun><on>ヒャク</on>"
+            "<on>ニ</on> <on>サン</on><on>ビャク</on><on>ニ</on><on>ジュウ</on> <on>ハッ</on>"
+            "<on>ピャク</on><on>ハチ</on><on>ジュウ</on><on>ハチ</on> <kun>よん</kun><on>"
+            "セン</on><on>ロッ</on><on>ピャク</on><on>ロク</on><on>ジュウ</on>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<mix> 123[ヒャクニジュウサン]</mix><mix> 402[よんヒャクニ]</mix><mix>"
+            " ３２０[サンビャクニジュウ]</mix><mix> 888[ハッピャクハチジュウハチ]</mix>"
+            "<mix> ４６６０[よんセンロッピャクロクジュウ]</mix>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<mix> ヒャクニジュウサン[123]</mix><mix> よんヒャクニ[402]</mix><mix>"
+            " サンビャクニジュウ[３２０]</mix><mix> ハッピャクハチジュウハチ[888]</mix>"
+            "<mix> よんセンロッピャクロクジュウ[４６６０]</mix>"
+        ),
+    )
     print("\n\033[92mTests passed\033[0m")
 
 

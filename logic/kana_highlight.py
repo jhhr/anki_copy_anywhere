@@ -4,6 +4,7 @@ import json
 import os
 from typing import TypedDict, Literal, Optional, Tuple, NamedTuple, cast, Union
 
+from .jpn_text_processing.number_to_kanji import NUMBER_TO_KANJI, number_to_kanji
 from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
 from .jpn_text_processing.get_conjugatable_okurigana_stem import (
     get_conjugatable_okurigana_stem,
@@ -272,37 +273,6 @@ FURIGANA_REC = re.compile(FURIGANA_RE)
 # Regex matching any kanji and furigana + hiragana after the furigana
 KANJI_AND_FURIGANA_AND_OKURIGANA_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]([ぁ-ん]*)"
 KANJI_AND_FURIGANA_AND_OKURIGANA_REC = re.compile(KANJI_AND_FURIGANA_AND_OKURIGANA_RE)
-
-NUMBER_TO_KANJI = {
-    # normal number characters
-    "1": "一",
-    "2": "二",
-    "3": "三",
-    "4": "四",
-    "5": "五",
-    "6": "六",
-    "7": "七",
-    "8": "八",
-    "9": "九",
-    "10": "十",
-    "100": "百",
-    "1000": "千",
-    "10000": "万",
-    # jpn number characters
-    "１": "一",
-    "２": "二",
-    "３": "三",
-    "４": "四",
-    "５": "五",
-    "６": "六",
-    "７": "七",
-    "８": "八",
-    "９": "九",
-    "１０": "十",
-    "１００": "百",
-    "１０００": "千",
-    "１００００": "万",
-}
 
 # Exceptions for words where the first kanji has a kunyomi reading that is the same as the
 # the whole reading for the jukujikun compound. This is used to avoid matching the kunyomi
@@ -624,6 +594,7 @@ def reconstruct_furigana(
     furi_okuri_result: FinalResult,
     with_tags_def: WithTagsDef,
     reconstruct_type: FuriReconstruct = "furigana",
+    force_merge: bool = False,
     logger: Logger = Logger("error"),
 ) -> str:
     """
@@ -646,7 +617,7 @@ def reconstruct_furigana(
     if not edge:
         raise ValueError("reconstruct_furigana: edge missing in final_result")
 
-    furigana_parts = get_furigana_parts(furigana, edge)
+    furigana_parts = get_furigana_parts(furigana, edge, logger=logger)
     logger.debug(f"reconstruct_furigana edge: {edge}, furigana_parts: {furigana_parts}")
 
     has_highlight = furigana_parts.get("has_highlight")
@@ -674,6 +645,30 @@ def reconstruct_furigana(
                 wrapped_whole_word = construct_wrapped_furi_word(
                     whole_word, furigana, reconstruct_type, with_tags_def.merge_consecutive
                 )
+            elif force_merge:
+                if with_tags_def.with_tags:
+                    okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
+                if reconstruct_type == "kana_only":
+                    if not with_tags_def.with_tags:
+                        furigana = re.sub(r"<\w+>|</\w+>", "", furigana)
+                    # If we're in kana_only mode, we just return the furigana
+                    wrapped_whole_word = f"{furigana}{okurigana}{rest_kana}"
+                else:
+                    # Just merge the whole word with the furigana
+                    # remove all tags from furigana and wrap everything with <mix> tags
+                    furigana = re.sub(r"<\w+>|</\w+>", "", furigana)
+                    whole_word = f"{left_word}{middle_word}{right_word}"
+                    if with_tags_def.with_tags:
+                        if reconstruct_type == "furigana":
+                            wrapped_whole_word = f"<mix> {whole_word}[{furigana}]</mix>"
+                        elif reconstruct_type == "furikanji":
+                            wrapped_whole_word = f"<mix> {furigana}[{whole_word}]</mix>"
+                    else:
+                        if reconstruct_type == "furigana":
+                            wrapped_whole_word = f" {whole_word}[{furigana}]"
+                        elif reconstruct_type == "furikanji":
+                            wrapped_whole_word = f" {furigana}[{whole_word}]"
+                    wrapped_whole_word += okurigana + rest_kana
             else:
                 wrapped_whole_word = ""
                 for word, word_furigana in [
@@ -792,6 +787,11 @@ def process_readings(
         word_data.get("edge"),
         logger,
     )
+    logger.debug(
+        f"process_readings - highlight_args: {highlight_args}, word_data: {word_data},"
+        f" target_furigana_section: {target_furigana_section}, furigana: {furigana}, edge: {edge},"
+        f" process_type: {process_type}, with_tags_def: {with_tags_def}"
+    )
     # Check both onyomi and kunyomi readings and use the longest match we get
     onyomi_match = check_onyomi_readings(
         highlight_args.get("onyomi", ""),
@@ -806,6 +806,10 @@ def process_readings(
     if onyomi_match["type"] == "onyomi":
         onyomi_process_result = ReadingProcessResult(onyomi_match, "", maybe_okuri)
 
+    logger.debug(
+        f"onyomi_process_result: {onyomi_process_result}, word_data: {word_data},"
+        f" kana_highlight: {highlight_args}"
+    )
     kunyomi_results = check_kunyomi_readings(
         highlight_args,
         word_data,
@@ -1324,6 +1328,7 @@ def check_kunyomi_readings(
     for kunyomi_reading in kunyomi_readings:
         if not kunyomi_reading:
             continue
+        kunyomi_reading = to_hiragana(kunyomi_reading)
         logger.debug(f"check_kunyomi_readings - kunyomi_reading: {kunyomi_reading}")
         # Split the reading into the stem and the okurigana
         kunyomi_stem = kunyomi_reading
@@ -1503,10 +1508,21 @@ def handle_jukujikun_case(
     """
     kanji_to_highlight = highlightArgs.get("kanji_to_highlight", "")
     kanji_count = word_data.get("kanji_count", 0)
-    assert (
-        kanji_count > 0
-    ), f"handle_jukujikun_case[]: incorrect kanji_count: {word_data.get('kanji_count')}"
     word = word_data.get("word", "")
+    try:
+        assert kanji_count > 0, (
+            f"handle_jukujikun_case[]: incorrect kanji_count: {word_data.get('kanji_count')}, word:"
+            f" {word}, kanji_to_highlight: {kanji_to_highlight}"
+        )
+    except AssertionError as e:
+        logger.error(e)
+        return {
+            "text": word_data.get("furigana", ""),
+            "type": "none",
+            "match_edge": word_data.get("edge", "none"),
+            "actual_match": "",
+            "matched_reading": "",
+        }
     kanji_pos = word.find(kanji_to_highlight) if kanji_to_highlight else -1
     # kanji_pos can be -1, in which case no highlighting happens
     assert kanji_pos < kanji_count, (
@@ -1688,6 +1704,10 @@ def handle_partial_word_case(
     :return: string, the modified furigana with the kanji to highlight highlighted
     """
     kanji_to_match = highlight_args.get("kanji_to_match", "")
+    logger.debug(
+        f"handle_partial_word_case - kanji_to_match: {kanji_to_match}, word: {word},"
+        f" furigana: {furigana}, okurigana: {okurigana}"
+    )
 
     kanji_pos = word.find(kanji_to_match)
     if kanji_pos == -1:
@@ -1715,6 +1735,15 @@ def handle_partial_word_case(
             "rest_kana": "",
             "edge": "whole",
         }
+
+    if edge == "whole" and len(word) > 1 and "々" not in word:
+        # If the edge is whole but the word is longer than 1 kanji, treat it as a partial match
+        if kanji_pos == 0:
+            edge = "left"
+        elif kanji_pos == len(word) - 1:
+            edge = "right"
+        else:
+            edge = "middle"
 
     word_data: WordData = {
         "kanji_pos": kanji_pos,
@@ -1812,6 +1841,7 @@ def kana_highlight(
         :param match: re.Match, the match object
         :return: string, the modified furigana
         """
+        nonlocal kanji_to_highlight
         word = match.group(1)
         furigana = match.group(2)
         okurigana = match.group(3)
@@ -1863,6 +1893,7 @@ def kana_highlight(
         cur_furigana_section = furigana
         cur_word = word
         cur_edge: Edge = "left"
+        is_last_kanji = False
         kanji_to_highlight_passed = False
         final_furigana = ""
         final_okurigana = ""
@@ -1871,6 +1902,7 @@ def kana_highlight(
         final_left_word = ""
         final_middle_word = ""
         final_right_word = ""
+        force_merge = False
 
         juku_word_start = None
         juku_word_end = None
@@ -1878,38 +1910,42 @@ def kana_highlight(
         juku_word_start_edge = None
         juku_word_pos_to_highlight: Union[Literal["left", "middle", "right"], None] = None
 
-        replace_ten_kanji = None
-        replaced_ten = False
-        # For the partial case, we need to split the furigana for each kanji using the kanji_data
-        # for each one, highlight the kanji_to_match and reconstruct the furigana
-        for index, kanji in enumerate(word):
-            if kanji == "々":
-                # Skip repeater as this will have been handled in the previous iteration
-                continue
-            if replaced_ten:
-                # If we replaced the 10 or １０ with 十, we should skip this kanji (which is 0 or ０)
-                # as it was already processed
-                replaced_ten = False
-                continue
+        replace_num_kanji = None
+        num_in_kanji_to_replace = None
+        last_replaced_kanji_index = None
+
+        def process_kanji_in_word(
+            kanji: str,
+            index: int,
+            word: str,
+            cur_edge: Edge,
+        ):
+            nonlocal cur_furigana_section, cur_word, final_furigana, final_left_word
+            nonlocal final_middle_word, final_right_word, final_edge, final_rest_kana
+            nonlocal final_okurigana, juku_word_start, juku_word_end, juku_furigana
+            nonlocal juku_word_start_edge, juku_word_pos_to_highlight, replace_num_kanji
+            nonlocal num_in_kanji_to_replace, last_replaced_kanji_index, is_last_kanji
+            nonlocal kanji_to_highlight_passed
+
             is_first_kanji = index == 0
-            is_last_kanji = index == len(word) - 1
+            is_last_kanji = index >= max(len(cur_word), len(word)) - 1
             is_middle_kanji = not is_first_kanji and not is_last_kanji
             if is_middle_kanji:
                 cur_edge = "middle"
             elif is_last_kanji:
                 cur_edge = "right"
 
-            next_kanji = word[index + 1] if not is_last_kanji else ""
-            next_next_kanji = word[index + 2] if index + 2 < len(word) else ""
-            # Handle the case where 10 and １０ have furigana, these should be read as 十
-            cur_and_next_kanji = kanji + next_kanji
-            if cur_and_next_kanji in ["10", "１０"] and next_next_kanji not in ["0", "０"]:
-                # skip this kanji and process on the next zero
-                kanji = "十"
-                replace_ten_kanji = cur_and_next_kanji
-                # replace the 10 or １０ with 十 in cur_word, then we can process it as usual
-                cur_word = cur_word.replace(replace_ten_kanji, "十", 1)
-                replaced_ten = True
+            logger.debug(
+                f"process_kanji_in_word - kanji: {kanji}, index: {index}, word: {word},"
+                f" cur_furigana_section: {cur_furigana_section}, cur_word: {cur_word}, cur_edge:"
+                f" {cur_edge}, final_furigana: {final_furigana}, final_left_word:"
+                f" {final_left_word}, final_middle_word: {final_middle_word}, final_right_word:"
+                f" {final_right_word}, final_edge: {final_edge}, final_rest_kana:"
+                f" {final_rest_kana}, final_okurigana: {final_okurigana},"
+                f" {final_rest_kana}, okurigana: {okurigana}, is_first_kanji: {is_first_kanji},"
+                f" is_last_kanji: {is_last_kanji}, is_middle_kanji: {is_middle_kanji},"
+                f" kanji_to_highlight: {kanji_to_highlight},"
+            )
             kanji_data_key = NUMBER_TO_KANJI.get(kanji, kanji)
             kanji_data = all_kanji_data.get(kanji_data_key)
             if not kanji_data:
@@ -1949,7 +1985,7 @@ def kana_highlight(
                 juku_furigana = cur_furigana_section
                 if kanji_to_highlight_passed:
                     juku_word_pos_to_highlight = "right"
-                break
+                return False
             matched_furigana = partial_result["matched_furigana"]
             wrapped_furigana = matched_furigana
 
@@ -2010,10 +2046,21 @@ def kana_highlight(
             elif is_last_kanji:
                 final_right_word += kanji + rep_kanji
 
+            logger.debug(
+                f"rest_kana: {partial_result['rest_kana']}, okurigana:"
+                f" {partial_result['okurigana']}, is_last_kanji: {is_last_kanji}"
+            )
             # Rest_kana and okurigana is only added on processing the last kanji
             if is_last_kanji:
                 final_rest_kana = partial_result["rest_kana"]
                 final_okurigana = partial_result["okurigana"]
+
+            logger.debug(
+                f"final_furigana: {final_furigana}, final_left_word: {final_left_word},"
+                f" final_middle_word: {final_middle_word}, final_right_word: {final_right_word},"
+                f" final_edge: {final_edge}, final_rest_kana: {final_rest_kana},"
+                f" final_okurigana: {final_okurigana}"
+            )
 
             if not matched_furigana:
                 logger.error(
@@ -2026,6 +2073,136 @@ def kana_highlight(
                 final_right_word += cur_word
                 cur_word = ""
                 cur_furigana_section = ""
+                return False
+            return True
+
+        # For the partial case, we need to split the furigana for each kanji using the kanji_data
+        # for each one, highlight the kanji_to_match and reconstruct the furigana
+        for index, kanji in enumerate(word):
+            logger.debug(
+                f"main word loop - kanji: {kanji}, index: {index}, word: {word},"
+                f" cur_furigana_section: {cur_furigana_section}, cur_word: {cur_word}"
+            )
+            if kanji == "々":
+                # Skip repeater as this will have been handled in the previous iteration
+                continue
+            if last_replaced_kanji_index is not None and index < last_replaced_kanji_index:
+                # If we replaced roman numerals with kanji, skip until we reach normal kanji again
+                logger.debug(
+                    f"skipping kanji {kanji} at index {index} - last_replaced_kanji_index:"
+                    f" {last_replaced_kanji_index}"
+                )
+                continue
+            elif last_replaced_kanji_index is not None and index == last_replaced_kanji_index:
+                logger.debug(
+                    f"resuming kanji {kanji} at index {index} - last_replaced_kanji_index:"
+                    f" {last_replaced_kanji_index}"
+                )
+                last_replaced_kanji_index = None
+                continue
+            elif last_replaced_kanji_index is not None and index > last_replaced_kanji_index:
+                last_replaced_kanji_index = None
+
+            is_last_kanji = index == len(word) - 1
+
+            next_kanji = word[index + 1] if not is_last_kanji else ""
+            # Get all next characters that are numbers that ought to be processed as kanji
+            number_kanji = []
+            num_index = index
+            num_kanji = kanji
+            while num_kanji and num_kanji in NUMBER_TO_KANJI:
+                last_replaced_kanji_index = num_index
+                number_kanji.append(num_kanji)
+                num_index += 1
+                if num_index < len(word):
+                    num_kanji = word[num_index]
+                else:
+                    num_kanji = ""
+
+            if number_kanji:
+                # If the next kanjis contain numbers, we should replace them with kanji
+                # and process them as kanji
+                replace_num_kanji = "".join(number_kanji)
+                if replace_num_kanji:
+                    # Replace the kanji with the kanji from NUMBER_TO_KANJI
+                    num_in_kanji_to_replace = number_to_kanji(replace_num_kanji, logger=logger)
+
+                    logger.debug(
+                        f"replacing kanji {replace_num_kanji} with {num_in_kanji_to_replace}"
+                    )
+                    cur_word = cur_word.replace(replace_num_kanji, num_in_kanji_to_replace, 1)
+                    # Process all the number kanji
+                    for num_kanji_index, num_kanji_char in enumerate(num_in_kanji_to_replace):
+                        kanji_pos_in_cur_word = cur_word.find(num_kanji_char)
+                        if kanji_pos_in_cur_word == 0 and len(cur_word) > 1:
+                            cur_edge = "left"
+                        should_continue = process_kanji_in_word(
+                            kanji=num_kanji_char,
+                            index=index + num_kanji_index,
+                            word=num_in_kanji_to_replace,
+                            cur_edge=cur_edge,
+                        )
+                        if not should_continue:
+                            logger.debug(
+                                f"replacing kanji {replace_num_kanji} - breaking out of loop"
+                            )
+                            break
+                    # Return back to the main kanji loop, where we skip until the next kanji
+                    # that is not a number kanji
+                    logger.debug(
+                        f"replacing kanji {replace_num_kanji} - completing the loop, index:"
+                        f" {index}, last_replaced_kanji_index: {last_replaced_kanji_index},"
+                        f" cur_word: {cur_word}, final_left_word: {final_left_word},"
+                        f" final_middle_word: {final_middle_word}, final_right_word:"
+                        f" {final_right_word}"
+                        f", final_furigana: {final_furigana}, final_edge: {final_edge},"
+                        f" final_rest_kana: {final_rest_kana}, final_okurigana: {final_okurigana}"
+                    )
+                    cur_word = cur_word.replace(num_in_kanji_to_replace, replace_num_kanji, 1)
+                    # replace converted num_kanji in final_left_word, final_middle_word,
+                    # final_right_word with the original characters
+                    if (
+                        len(num_in_kanji_to_replace) == 2
+                        and len(final_left_word) == 1
+                        and len(final_right_word) == 1
+                    ):
+                        logger.debug(
+                            f"replacing kanji {replace_num_kanji} in final_left_word and"
+                            f" final_right_word - final_left_word: {final_left_word},"
+                            f" final_right_word: {final_right_word}, final_edge: {final_edge}"
+                        )
+                        # If the kanji is a 2-kanji number, we should replace it in the left and
+                        # right words
+                        final_left_word = final_left_word.replace(
+                            num_in_kanji_to_replace[0], replace_num_kanji[0]
+                        )
+                        final_right_word = final_right_word.replace(
+                            num_in_kanji_to_replace[1], replace_num_kanji[1]
+                        )
+                    elif len(num_in_kanji_to_replace) > 2:
+                        # for more complex case, just merge them all together
+                        force_merge = True
+                        final_left_word += final_middle_word + final_right_word
+                        final_middle_word = ""
+                        final_right_word = ""
+                        final_edge = "left"
+                        logger.debug(
+                            "merging all final words together - final_left_word:"
+                            f" {final_left_word}, final_middle_word: {final_middle_word},"
+                            f" final_right_word: {final_right_word}, final_edge: {final_edge}"
+                            f" final_furigana: {final_furigana}, final_rest_kana:"
+                            f" {final_rest_kana}, final_okurigana: {final_okurigana}"
+                        )
+
+                    continue
+
+            kanji_pos = word.find(kanji)
+            if kanji_pos == 0 and len(cur_word) > 1:
+                # If the kanji is the first one in the word, the edge is "left"
+                cur_edge = "left"
+            should_continue = process_kanji_in_word(kanji, index, word, cur_edge)
+            if not should_continue:
+                logger.debug("process_kanji_in_word - breaking out of loop")
                 break
 
         # If cur_word is not empty, we need to handle the rest of the word as jukujikun
@@ -2092,7 +2269,8 @@ def kana_highlight(
             )
             logger.debug(
                 f"reversing, partial_result: {partial_result}, is_kanji_to_highlight:"
-                f" {is_kanji_to_highlight}"
+                f" {is_kanji_to_highlight}, cur_word: {cur_word}, cur_furigana_section:"
+                f" {cur_furigana_section}, original_word_index: {original_word_index}"
             )
             if partial_result is None:
                 # Found the end of the jukujikun part, this can be the same as juku_word_start
@@ -2270,11 +2448,21 @@ def kana_highlight(
             final_result,
             with_tags_def=with_tags_def,
             reconstruct_type=return_type,
+            force_merge=force_merge,
+            logger=logger,
         )
-        if replace_ten_kanji is not None:
-            # If we replaced the 10 or １０ with 十, we should revert the replacement,
-            # so that the final result uses the original characters
-            reconstructed_result = reconstructed_result.replace("十", replace_ten_kanji, 1)
+        if replace_num_kanji is not None:
+            if num_in_kanji_to_replace is None:
+                logger.error(
+                    "Error in kana_highlight[]: replace_num_kanji is not None but"
+                    " num_in_kanji_to_replace is None"
+                )
+                return reconstructed_result
+            # If we replaced roman numerals with kanji, we need to replace them back
+            # in the reconstructed result
+            reconstructed_result = reconstructed_result.replace(
+                num_in_kanji_to_replace, replace_num_kanji, 1
+            )
         return reconstructed_result
 
     # Clean any potential mixed okurigana cases, turning them normal
@@ -2284,5 +2472,5 @@ def kana_highlight(
     # Clean any double spaces that might have been created by the furigana reconstruction
     # Including those right before a<b> tag as the space is added with those
     processed_text = re.sub(r" {2}", " ", processed_text)
-    processed_text = re.sub(r" <(b|on|kun|juk)> ", r"<\1> ", processed_text)
-    return re.sub(r" <b><(on|kun|juk)> ", r"<b><\1> ", processed_text)
+    processed_text = re.sub(r" <(b|on|kun|juk|mix)> ", r"<\1> ", processed_text)
+    return re.sub(r" <b><(on|kun|juk|mix)> ", r"<b><\1> ", processed_text)
