@@ -217,14 +217,21 @@ class PickCopyDefinitionDialog(QDialog):
             copy_definition = dialog.get_copy_definition()
             if index is None and copy_definition is not None:
                 config.add_definition(copy_definition)
-                self.add_definition_row(len(self.copy_definitions), copy_definition)
             elif index is not None and copy_definition is not None:
                 config.update_definition_by_index(index, copy_definition)
-                for func in self.remove_row_funcs:
-                    func()
-                self.remove_row_funcs = []
+
+            # Always reload configuration to ensure we have the latest definitions
             config.load()
             self.copy_definitions = config.copy_definitions
+
+            # Clear existing UI before rebuilding
+            for func in self.remove_row_funcs:
+                func()
+            self.remove_row_funcs = []
+            self.checkboxes = []
+            self.definition_note_ids = []
+
+            # Rebuild the UI with the updated definitions
             self.add_all_definition_rows()
             self.update_card_counts_for_all_cards()
             return 0
