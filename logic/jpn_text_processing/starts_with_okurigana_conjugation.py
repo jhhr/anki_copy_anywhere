@@ -3,13 +3,10 @@ from typing import Literal, NamedTuple
 
 from .okurigana_dict import get_okuri_dict_for_okurigana
 
-LOG = False
-
-
-def log(*args):
-    if LOG:
-        print(*args)
-
+try:
+    from ...utils.logger import Logger
+except ImportError:
+    from utils.logger import Logger
 
 OkuriType = Literal["full_okuri", "partial_okuri", "empty_okuri", "no_okuri"]
 
@@ -25,6 +22,7 @@ def starts_with_okurigana_conjugation(
     kanji_okurigana: str,
     kanji: str,
     kanji_reading: str,
+    logger: Logger = Logger("error"),
 ) -> OkuriResults:
     """
     Determine if a kana text starts with okurigana and return that portion and the rest of the text.
@@ -45,13 +43,13 @@ def starts_with_okurigana_conjugation(
     if not okuri_dict:
         return OkuriResults("", kana_text, "no_okuri")
 
-    log(
+    logger.debug(
         f"kana_text: {kana_text}, kanji_okurigana: {kanji_okurigana}, kanji: {kanji},"
         f" kanji_reading: {kanji_reading}, okuri_dict: {okuri_dict}"
     )
 
     if not kana_text[0] in okuri_dict and not okuri_dict[""]:
-        log("no okurigana found and no empty string okurigana")
+        logger.debug("no okurigana found and no empty string okurigana")
         return OkuriResults("", kana_text, "no_okuri")
 
     okurigana = ""
@@ -62,12 +60,12 @@ def starts_with_okurigana_conjugation(
     # ending in either cur_char not being in the dict or the dict being empty
     while True:
         cur_char = rest[0]
-        log(
+        logger.debug(
             f"okurigana: {okurigana}, rest: {rest}, cur_char: {cur_char}, in dict:"
             f" {cur_char in prev_dict}"
         )
         if cur_char not in prev_dict:
-            log(
+            logger.debug(
                 f"reached dict end, empty_dict: {not prev_dict}, is_last:"
                 f" {prev_dict.get('is_last')}"
             )
@@ -77,7 +75,7 @@ def starts_with_okurigana_conjugation(
         okurigana += cur_char
         rest = rest[1:]
         if not rest:
-            log("reached text end")
+            logger.debug("reached text end")
             okuri_result = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
             break
     if not okurigana and okuri_dict[""]:

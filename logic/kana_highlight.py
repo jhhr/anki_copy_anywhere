@@ -801,6 +801,7 @@ def process_readings(
         edge,
         process_type=process_type,
         wrap_readings_with_tags=with_tags_def.with_tags,
+        logger=logger,
     )
     onyomi_process_result = None
     if onyomi_match["type"] == "onyomi":
@@ -818,6 +819,7 @@ def process_readings(
         edge,
         process_type=process_type,
         wrap_readings_with_tags=with_tags_def.with_tags,
+        logger=logger,
     )
     kunyomi_process_result = None
     logger.debug(
@@ -1164,6 +1166,7 @@ def check_onyomi_readings(
             target_furigana_section,
             okurigana,
             edge,
+            logger=logger,
         )
         logger.debug(
             f"check_onyomi_readings 2 - onyomi_reading: {onyomi_reading}, in_section:"
@@ -1354,13 +1357,20 @@ def check_kunyomi_readings(
         if kunyomi_dict_form_okuri:
             kunyomi_stem_and_okuris.append((kunyomi_stem, kunyomi_dict_form_okuri, kunyomi_reading))
 
+    kanji_to_match = highlight_args.get("kanji_to_match", "")
+    if kanji_to_match == "為":
+        # Special case for 為, add し as a stem
+        for kunyomi_stem in ["し", "さ"]:
+            kunyomi_stems.add((kunyomi_stem, "す.る"))
+            kunyomi_stem_and_okuris.append((kunyomi_stem, "", "す.る"))
+
     okurigana = word_data.get("okurigana", "")
     # First check matches against the stem
     for kunyomi_stem, full_reading in kunyomi_stems:
         if not kunyomi_stem:
             continue
         match_in_section, match_type = is_reading_in_furigana_section(
-            kunyomi_stem, target_furigana_section, okurigana, edge
+            kunyomi_stem, target_furigana_section, okurigana, edge, logger=logger
         )
         logger.debug(
             f"check_kunyomi_readings - kunyomi_stem: {kunyomi_stem}, in_section:"
@@ -1403,7 +1413,7 @@ def check_kunyomi_readings(
             if noun_form_okuri:
                 okuri_included_reading = f"{kunyomi_stem}{noun_form_okuri}"
             match_in_section, match_type = is_reading_in_furigana_section(
-                okuri_included_reading, target_furigana_section, okurigana, edge
+                okuri_included_reading, target_furigana_section, okurigana, edge, logger=logger
             )
             logger.debug(
                 f"check_kunyomi_readings - okuri_included form: {okuri_included_reading},"

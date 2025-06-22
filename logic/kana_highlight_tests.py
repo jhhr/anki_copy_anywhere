@@ -2416,6 +2416,37 @@ def main():
             "<mix> よんセンロッピャクロクジュウ[４６６０]</mix>"
         ),
     )
+    test(
+        test_name="為る conjugations /!",
+        kanji="",
+        sentence="為[し]て 為[し]た 為[し]ました 為[さ]れる 為[し]ろ 為[し]ません それを為[し]",
+        expected_kana_only_with_tags_split=(
+            "<kun>し</kun><oku>て</oku> <kun>し</kun><oku>た</oku> <kun>し</kun><oku>ました</oku>"
+            " <kun>さ</kun><oku>れる</oku> <kun>し</kun><oku>ろ</oku> <kun>し</kun><oku>ません</oku>"
+            " それを<kun>し</kun>"
+        ),
+    )
+    test(
+        test_name="為る conjugations /2",
+        kanji="",
+        sentence="為[し]まった 為[し]ない 為[し]なかった 為[さ]せない 為[さ]せた 為[さ]せました",
+        expected_kana_only_with_tags_split=(
+            "<kun>し</kun><oku>ま</oku>った <kun>し</kun><oku>ない</oku>"
+            " <kun>し</kun><oku>なかった</oku>"
+            " <kun>さ</kun><oku>せない</oku> <kun>さ</kun><oku>せ</oku>た"
+            " <kun>さ</kun><oku>せま</oku>した"
+        ),
+    )
+    test(
+        test_name="為る conjugations /3",
+        kanji="",
+        sentence="為[さ]せて 為[さ]せられ 為[さ]せろ 為[さ]せません 為[さ]せて 為[さ]せられた",
+        expected_kana_only_with_tags_split=(
+            "<kun>さ</kun><oku>せ</oku>て <kun>さ</kun><oku>せられ</oku> <kun>さ</kun><oku>せ</oku>ろ"
+            " <kun>さ</kun><oku>せません</oku> <kun>さ</kun><oku>せ</oku>て"
+            " <kun>さ</kun><oku>せられ</oku>た"
+        ),
+    )
     print("\n\033[92mTests passed\033[0m")
 
 
