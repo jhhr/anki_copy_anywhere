@@ -419,6 +419,86 @@ def main():
         expected_furikanji_with_tags_merged="<kun> みずみず[瑞々]</kun><oku>しさ</oku>",
     )
     test(
+        test_name="Matches repeater adjective with other word - with highlight",
+        kanji="瑞",
+        sentence="超瑞々[ちょうみずみず]しい",
+        expected_kana_only="チョウ<b>みずみずしい</b>",
+        expected_furigana=" 超[チョウ]<b> 瑞々[みずみず]しい</b>",
+        expected_furikanji=" チョウ[超]<b> みずみず[瑞々]しい</b>",
+        expected_kana_only_with_tags_split="<on>チョウ</on><b><kun>みずみず</kun><oku>しい</oku></b>",
+        expected_furigana_with_tags_split=(
+            "<on> 超[チョウ]</on><b><kun> 瑞々[みずみず]</kun><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> チョウ[超]</on><b><kun> みずみず[瑞々]</kun><oku>しい</oku></b>"
+        ),
+        expected_kana_only_with_tags_merged="<on>チョウ</on><b><kun>みずみず</kun><oku>しい</oku></b>",
+        expected_furigana_with_tags_merged=(
+            "<on> 超[チョウ]</on><b><kun> 瑞々[みずみず]</kun><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> チョウ[超]</on><b><kun> みずみず[瑞々]</kun><oku>しい</oku></b>"
+        ),
+    )
+    test(
+        test_name="Matches repeater adjective with other word - no highlight",
+        kanji="",
+        sentence="超瑞々[ちょうみずみず]しい",
+        expected_kana_only="チョウみずみずしい",
+        expected_furigana=" 超瑞々[チョウみずみず]しい",
+        expected_furikanji=" チョウみずみず[超瑞々]しい",
+        expected_kana_only_with_tags_split="<on>チョウ</on><kun>みずみず</kun><oku>しい</oku>",
+        expected_furigana_with_tags_split="<on> 超[チョウ]</on><kun> 瑞々[みずみず]</kun><oku>しい</oku>",
+        expected_furikanji_with_tags_split="<on> チョウ[超]</on><kun> みずみず[瑞々]</kun><oku>しい</oku>",
+        expected_kana_only_with_tags_merged="<on>チョウ</on><kun>みずみず</kun><oku>しい</oku>",
+        expected_furigana_with_tags_merged="<on> 超[チョウ]</on><kun> 瑞々[みずみず]</kun><oku>しい</oku>",
+        expected_furikanji_with_tags_merged="<on> チョウ[超]</on><kun> みずみず[瑞々]</kun><oku>しい</oku>",
+    )
+    test(
+        test_name="Matches repeater adjective with other repeater word - with highlight",
+        kanji="瑞",
+        sentence="精々瑞々[せいせいみずみず]しい",
+        expected_kana_only="セイセイ<b>みずみずしい</b>",
+        expected_furigana=" 精々[セイセイ]<b> 瑞々[みずみず]しい</b>",
+        expected_furikanji=" セイセイ[精々]<b> みずみず[瑞々]しい</b>",
+        expected_kana_only_with_tags_split="<on>セイセイ</on><b><kun>みずみず</kun><oku>しい</oku></b>",
+        expected_furigana_with_tags_split=(
+            "<on> 精々[セイセイ]</on><b><kun> 瑞々[みずみず]</kun><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> セイセイ[精々]</on><b><kun> みずみず[瑞々]</kun><oku>しい</oku></b>"
+        ),
+        expected_kana_only_with_tags_merged="<on>セイセイ</on><b><kun>みずみず</kun><oku>しい</oku></b>",
+        expected_furigana_with_tags_merged=(
+            "<on> 精々[セイセイ]</on><b><kun> 瑞々[みずみず]</kun><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> セイセイ[精々]</on><b><kun> みずみず[瑞々]</kun><oku>しい</oku></b>"
+        ),
+    )
+    test(
+        test_name="Matches repeater adjective with other repeater word - no highlight",
+        kanji="",
+        sentence="精々瑞々[せいせいみずみず]しい",
+        expected_kana_only="セイセイみずみずしい",
+        expected_furigana=" 精々瑞々[セイセイみずみず]しい",
+        expected_furikanji=" セイセイみずみず[精々瑞々]しい",
+        expected_kana_only_with_tags_split="<on>セイセイ</on><kun>みずみず</kun><oku>しい</oku>",
+        expected_furigana_with_tags_split=(
+            "<on> 精々[セイセイ]</on><kun> 瑞々[みずみず]</kun><oku>しい</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> セイセイ[精々]</on><kun> みずみず[瑞々]</kun><oku>しい</oku>"
+        ),
+        expected_kana_only_with_tags_merged="<on>セイセイ</on><kun>みずみず</kun><oku>しい</oku>",
+        expected_furigana_with_tags_merged=(
+            "<on> 精々[セイセイ]</on><kun> 瑞々[みずみず]</kun><oku>しい</oku>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> セイセイ[精々]</on><kun> みずみず[瑞々]</kun><oku>しい</oku>"
+        ),
+    )
+    test(
         test_name="Matches rendaku containing repeater adjective 猛々しい - with highlight",
         kanji="猛",
         sentence="猛々[たけだけ]しい",
@@ -435,7 +515,7 @@ def main():
     test(
         test_name="Matches rendaku containing repeater adjective 猛々しい - no highlight",
         kanji="",
-        sentence="猛々[たけだけ]しい",
+        sentence="猛猛[たけだけ]しい",
         expected_kana_only="たけだけしい",
         expected_furigana=" 猛々[たけだけ]しい",
         expected_furikanji=" たけだけ[猛々]しい",
@@ -1336,6 +1416,118 @@ def main():
         ),
         expected_furikanji_with_tags_merged=(
             "<kun> あ[明]</kun><b><juk> さっ[後]</juk></b><juk> て[日]</juk>"
+        ),
+    )
+    test(
+        test_name="jukujikun test 清々しい no highlight",
+        kanji="",
+        sentence=" 清清[すがすが]しい",
+        expected_kana_only=" すがすがしい",
+        expected_furigana=" 清々[すがすが]しい",
+        expected_furikanji=" すがすが[清々]しい",
+        expected_kana_only_with_tags_split=" <juk>すがすが</juk>しい",
+        expected_furigana_with_tags_split="<juk> 清々[すがすが]</juk>しい",
+        expected_furikanji_with_tags_split="<juk> すがすが[清々]</juk>しい",
+        expected_kana_only_with_tags_merged=" <juk>すがすが</juk>しい",
+        expected_furigana_with_tags_merged="<juk> 清々[すがすが]</juk>しい",
+        expected_furikanji_with_tags_merged="<juk> すがすが[清々]</juk>しい",
+    )
+    test(
+        test_name="jukujikun test 清々しい with highlight",
+        kanji="清",
+        sentence="清清[すがすが]しい",
+        expected_kana_only="<b>すがすが</b>しい",
+        expected_furigana="<b> 清々[すがすが]</b>しい",
+        expected_furikanji="<b> すがすが[清々]</b>しい",
+        expected_kana_only_with_tags_split="<b><juk>すがすが</juk></b>しい",
+        expected_furigana_with_tags_split="<b><juk> 清々[すがすが]</juk></b>しい",
+        expected_furikanji_with_tags_split="<b><juk> すがすが[清々]</juk></b>しい",
+        expected_kana_only_with_tags_merged="<b><juk>すがすが</juk></b>しい",
+        expected_furigana_with_tags_merged="<b><juk> 清々[すがすが]</juk></b>しい",
+        expected_furikanji_with_tags_merged="<b><juk> すがすが[清々]</juk></b>しい",
+    )
+    test(
+        test_name="jukujikun test 清々しい with another word at left - no highlight",
+        kanji="",
+        sentence="趙清々[ちょうすがすが]しい",
+        expected_kana_only="チョウすがすがしい",
+        expected_furigana=" 趙清々[チョウすがすが]しい",
+        expected_furikanji=" チョウすがすが[趙清々]しい",
+        expected_kana_only_with_tags_split="<on>チョウ</on><juk>すがすが</juk>しい",
+        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk>しい",
+        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><juk> すがすが[清々]</juk>しい",
+        expected_kana_only_with_tags_merged="<on>チョウ</on><juk>すがすが</juk>しい",
+        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk>しい",
+        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><juk> すがすが[清々]</juk>しい",
+    )
+    test(
+        test_name="jukujikun test 清々しい with another word at left - with highlight",
+        kanji="清",
+        sentence="趙清々[ちょうすがすが]しい",
+        expected_kana_only="チョウ<b>すがすが</b>しい",
+        expected_furigana=" 趙[チョウ]<b> 清々[すがすが]</b>しい",
+        expected_furikanji=" チョウ[趙]<b> すがすが[清々]</b>しい",
+        expected_kana_only_with_tags_split="<on>チョウ</on><b><juk>すがすが</juk></b>しい",
+        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b>しい",
+        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b>しい",
+        expected_kana_only_with_tags_merged="<on>チョウ</on><b><juk>すがすが</juk></b>しい",
+        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b>しい",
+        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b>しい",
+    )
+    test(
+        test_name="jukujikun test 清々しい in middle of two words - no highlight",
+        kanji="",
+        sentence="趙清々瑞々[ちょうすがすがみずみず]しい",
+        expected_kana_only="チョウすがすがみずみずしい",
+        expected_furigana=" 趙清々瑞々[チョウすがすがみずみず]しい",
+        expected_furikanji=" チョウすがすがみずみず[趙清々瑞々]しい",
+        expected_kana_only_with_tags_split=(
+            "<on>チョウ</on><juk>すがすが</juk><kun>みずみず</kun><oku>しい</oku>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk><kun> 瑞々[みずみず]</kun><oku>しい</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> チョウ[趙]</on><juk> すがすが[清々]</juk><kun> みずみず[瑞々]</kun><oku>しい</oku>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>チョウ</on><juk>すがすが</juk><kun>みずみず</kun><oku>しい</oku>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk><kun> 瑞々[みずみず]</kun><oku>しい</oku>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> チョウ[趙]</on><juk> すがすが[清々]</juk><kun> みずみず[瑞々]</kun><oku>しい</oku>"
+        ),
+    )
+    test(
+        test_name="jukujikun test 清々しい in middle of two words - with highlight",
+        kanji="清",
+        sentence="趙清々瑞々[ちょうすがすがみずみず]しい",
+        expected_kana_only="チョウ<b>すがすが</b>みずみずしい",
+        expected_furigana=" 趙[チョウ]<b> 清々[すがすが]</b> 瑞々[みずみず]しい",
+        expected_furikanji=" チョウ[趙]<b> すがすが[清々]</b> みずみず[瑞々]しい",
+        expected_kana_only_with_tags_split=(
+            "<on>チョウ</on><b><juk>すがすが</juk></b><kun>みずみず</kun><oku>しい</oku>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b><kun>"
+            " 瑞々[みずみず]</kun><oku>しい</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b><kun>"
+            " みずみず[瑞々]</kun><oku>しい</oku>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>チョウ</on><b><juk>すがすが</juk></b><kun>みずみず</kun><oku>しい</oku>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b><kun>"
+            " 瑞々[みずみず]</kun><oku>しい</oku>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b><kun>"
+            " みずみず[瑞々]</kun><oku>しい</oku>"
         ),
     )
     test(
