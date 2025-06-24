@@ -391,6 +391,34 @@ def main():
         expected_furigana_with_tags_merged="<b><on> 刻々[コッコク]</on></b>と<on> 変化[ヘンカ]</on>する。",
     )
     test(
+        test_name="Matches repeater adjective 瑞々しい - with highlight",
+        kanji="瑞",
+        sentence="瑞々[みずみず]しく",
+        expected_kana_only="<b>みずみずしく</b>",
+        expected_furigana="<b> 瑞々[みずみず]しく</b>",
+        expected_furikanji="<b> みずみず[瑞々]しく</b>",
+        expected_kana_only_with_tags_split="<b><kun>みずみず</kun><oku>しく</oku></b>",
+        expected_furigana_with_tags_split="<b><kun> 瑞々[みずみず]</kun><oku>しく</oku></b>",
+        expected_furikanji_with_tags_split="<b><kun> みずみず[瑞々]</kun><oku>しく</oku></b>",
+        expected_kana_only_with_tags_merged="<b><kun>みずみず</kun><oku>しく</oku></b>",
+        expected_furigana_with_tags_merged="<b><kun> 瑞々[みずみず]</kun><oku>しく</oku></b>",
+        expected_furikanji_with_tags_merged="<b><kun> みずみず[瑞々]</kun><oku>しく</oku></b>",
+    )
+    test(
+        test_name="Matches repeater adjective 瑞々しい - no highlight",
+        kanji="",
+        sentence="瑞々[みずみず]しさ",
+        expected_kana_only="みずみずしさ",
+        expected_furigana=" 瑞々[みずみず]しさ",
+        expected_furikanji=" みずみず[瑞々]しさ",
+        expected_kana_only_with_tags_split="<kun>みずみず</kun><oku>しさ</oku>",
+        expected_furigana_with_tags_split="<kun> 瑞々[みずみず]</kun><oku>しさ</oku>",
+        expected_furikanji_with_tags_split="<kun> みずみず[瑞々]</kun><oku>しさ</oku>",
+        expected_kana_only_with_tags_merged="<kun>みずみず</kun><oku>しさ</oku>",
+        expected_furigana_with_tags_merged="<kun> 瑞々[みずみず]</kun><oku>しさ</oku>",
+        expected_furikanji_with_tags_merged="<kun> みずみず[瑞々]</kun><oku>しさ</oku>",
+    )
+    test(
         test_name="Should be able to clean furigana that bridges over some okurigana 3/",
         kanji="止",
         # A third edge case: there is only okurigana at the end

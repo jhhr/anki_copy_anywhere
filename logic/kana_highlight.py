@@ -822,14 +822,25 @@ def process_readings(
         logger=logger,
     )
     kunyomi_process_result = None
+    kanji_count = word_data.get("kanji_count", 0)
+    kanji_pos = word_data.get("kanji_pos", None)
+    next_kanji_in_word_is_repeater = (
+        kanji_pos is not None
+        and kanji_pos + 1 < kanji_count
+        and word_data["word"][kanji_pos + 1] == "々"
+    )
     logger.debug(
         f"kunyomi_results: {kunyomi_results}, word_data: {word_data}, kana_highlight:"
-        f" {highlight_args}"
+        f" {highlight_args}, next_kanji_in_word_is_repeater:"
+        f" {next_kanji_in_word_is_repeater}"
     )
     if (
         not with_tags_def.assume_dictionary_form
         and kunyomi_results["type"] == "kunyomi"
-        and word_data["edge"] in ["right", "whole"]
+        and (
+            word_data["edge"] in ["right", "whole"]
+            or (word_data["edge"] == "left" and next_kanji_in_word_is_repeater)
+        )
     ):
         kunyomi = highlight_args.get("kunyomi", "")
         okurigana_to_highlight = ""
@@ -847,14 +858,16 @@ def process_readings(
                 logger.debug(f"check_kunyomi_readings while - next_kunyomi: {next_kunyomi}")
                 kunyomi_reading, kunyomi_okurigana = next_kunyomi.split(".")
             except ValueError:
+                logger.debug("check_kunyomi_readings while - non okuri reading, skipping")
                 continue
             # The reading stems must match
             if kunyomi_reading != matched_kunyomi_stem:
                 logger.debug(f"check_kunyomi_readings while - non-matching stem: {kunyomi_reading}")
                 continue
             res = check_okurigana_for_kunyomi_inflection(
-                kunyomi_okurigana, kunyomi_reading, word_data, highlight_args
+                kunyomi_okurigana, kunyomi_reading, word_data, highlight_args, logger
             )
+            logger.debug(f"check_kunyomi_readings while - check_okurigana result: {res}")
             if res.result in ["partial_okuri", "empty_okuri"]:
                 # If we only got a partial or empty okurigana match, continue looking
                 # in case we get a full match instead
@@ -1939,6 +1952,7 @@ def kana_highlight(
 
             is_first_kanji = index == 0
             is_last_kanji = index >= max(len(cur_word), len(word)) - 1
+            next_kanji_is_repeater_and_last = index + 1 < len(word) and word[index + 1] == "々"
             is_middle_kanji = not is_first_kanji and not is_last_kanji
             if is_middle_kanji:
                 cur_edge = "middle"
@@ -1954,7 +1968,7 @@ def kana_highlight(
                 f" {final_rest_kana}, final_okurigana: {final_okurigana},"
                 f" {final_rest_kana}, okurigana: {okurigana}, is_first_kanji: {is_first_kanji},"
                 f" is_last_kanji: {is_last_kanji}, is_middle_kanji: {is_middle_kanji},"
-                f" kanji_to_highlight: {kanji_to_highlight},"
+                f" kanji_to_highlight: {kanji_to_highlight}, next_kanji: {next_kanji}"
             )
             kanji_data_key = NUMBER_TO_KANJI.get(kanji, kanji)
             kanji_data = all_kanji_data.get(kanji_data_key)
@@ -1980,7 +1994,7 @@ def kana_highlight(
                 highlight_args,
                 cur_word,
                 cur_furigana_section,
-                okurigana if is_last_kanji else "",
+                okurigana if (is_last_kanji or next_kanji_is_repeater_and_last) else "",
                 with_tags_def=with_tags_def,
                 logger=logger,
             )
