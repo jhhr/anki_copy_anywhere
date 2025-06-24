@@ -2519,7 +2519,12 @@ def main():
             "<on> ジュッ[１０]</on><b><on> プン[分]</on></b>と<on> ジッ[10]</on><b><on>"
             " プン[分]</on></b>と<on> ジュッ[１０]</on><on> サツ[冊]</on>"
         ),
-        expected_kana_only_with_tags_merged="<on>ジュッ</on><b><on>プン</on></b>と<on>ジッ</on><b><on>プン</on></b>と<on>ジュッサツ</on>",
+        # fmt: off
+        expected_kana_only_with_tags_merged=(
+            "<on>ジュッ</on><b><on>プン</on></b>と<on>ジッ</on><b><on>プン</on></b>と"
+            "<on>ジュッサツ</on>"
+        ),
+        # fmt: on
         expected_furigana_with_tags_merged=(
             "<on> １０[ジュッ]</on><b><on> 分[プン]</on></b>と<on> 10[ジッ]</on><b><on>"
             " 分[プン]</on></b>と<on> １０冊[ジュッサツ]</on>"
