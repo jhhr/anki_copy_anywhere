@@ -1517,6 +1517,52 @@ def process_kunyomi_match(
     return re.sub(reg, replacer, furigana)
 
 
+def handle_furigana_doubling(
+    partial_result: YomiMatchResult,
+    cur_furigana_section: str,
+    matched_furigana: str,
+    logger: Logger = Logger("error"),
+) -> str:
+    """
+    Function that handles the case of a word with doubled furigana, due it using the repeater
+    kanji 々.
+    """
+    doubled_furigana = ""
+    # If this was a normal match, the furigana should be repeating
+    # check if there's rendaku in the following furigana
+    furigana_after_matched = cur_furigana_section[len(matched_furigana) :]
+    rendaku_matched_furigana = (
+        [f"{kana}{matched_furigana[1:]}" for kana in RENDAKU_CONVERSION_DICT[matched_furigana[0]]]
+        if matched_furigana[0] in RENDAKU_CONVERSION_DICT
+        else []
+    )
+    rendaku_matched_furigana.append(to_hiragana(matched_furigana))  # Add the original
+    logger.debug(
+        f"repeater kanji - doubling furigana: {matched_furigana},"
+        f" furigana_after_matched: {furigana_after_matched},"
+        f" rendaku_matched_furigana:{rendaku_matched_furigana}"
+    )
+    if furigana_after_matched:
+        for rf in rendaku_matched_furigana:
+            if furigana_after_matched.startswith(rf):
+                doubled_furigana = matched_furigana + (
+                    to_katakana(rf) if partial_result["match_type"] == "onyomi" else rf
+                )
+                logger.debug(
+                    f"repeater kanji - found rendaku match: {rf} in"
+                    f" furigana_after_matched: {furigana_after_matched}"
+                )
+                break
+    else:
+        logger.debug(
+            "repeater kanji - no furigana_after_matched, simply doubling with"
+            f" matched_furigana: {matched_furigana}"
+        )
+        doubled_furigana = matched_furigana * 2
+
+    return doubled_furigana
+
+
 def handle_jukujikun_case(
     word_data: WordData,
     highlightArgs: HighlightArgs,
@@ -2017,10 +2063,12 @@ def kana_highlight(
                 logger.debug(f"repeater kanji: {next_kanji}")
                 rep_kanji = next_kanji
                 cur_word = cur_word[2:]
-                # if we had the repeater kanji, we should add more furigana to this result
-                # If this was a normal match, the furigana should be repeating
-                logger.debug(f"repeater kanji - doubling furigana: {matched_furigana}")
-                matched_furigana *= 2
+                matched_furigana = handle_furigana_doubling(
+                    partial_result,
+                    cur_furigana_section,
+                    matched_furigana,
+                    logger=logger,
+                )
                 wrapped_furigana = matched_furigana
                 # If the repeater is the last kanji, then edge should be "right" and not "middle"
                 next_kanji_is_last = index + 2 == len(word)

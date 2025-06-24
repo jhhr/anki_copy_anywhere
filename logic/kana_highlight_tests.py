@@ -419,6 +419,34 @@ def main():
         expected_furikanji_with_tags_merged="<kun> みずみず[瑞々]</kun><oku>しさ</oku>",
     )
     test(
+        test_name="Matches rendaku containing repeater adjective 猛々しい - with highlight",
+        kanji="猛",
+        sentence="猛々[たけだけ]しい",
+        expected_kana_only="<b>たけだけしい</b>",
+        expected_furigana="<b> 猛々[たけだけ]しい</b>",
+        expected_furikanji="<b> たけだけ[猛々]しい</b>",
+        expected_kana_only_with_tags_split="<b><kun>たけだけ</kun><oku>しい</oku></b>",
+        expected_furigana_with_tags_split="<b><kun> 猛々[たけだけ]</kun><oku>しい</oku></b>",
+        expected_furikanji_with_tags_split="<b><kun> たけだけ[猛々]</kun><oku>しい</oku></b>",
+        expected_kana_only_with_tags_merged="<b><kun>たけだけ</kun><oku>しい</oku></b>",
+        expected_furigana_with_tags_merged="<b><kun> 猛々[たけだけ]</kun><oku>しい</oku></b>",
+        expected_furikanji_with_tags_merged="<b><kun> たけだけ[猛々]</kun><oku>しい</oku></b>",
+    )
+    test(
+        test_name="Matches rendaku containing repeater adjective 猛々しい - no highlight",
+        kanji="",
+        sentence="猛々[たけだけ]しい",
+        expected_kana_only="たけだけしい",
+        expected_furigana=" 猛々[たけだけ]しい",
+        expected_furikanji=" たけだけ[猛々]しい",
+        expected_kana_only_with_tags_split="<kun>たけだけ</kun><oku>しい</oku>",
+        expected_furigana_with_tags_split="<kun> 猛々[たけだけ]</kun><oku>しい</oku>",
+        expected_furikanji_with_tags_split="<kun> たけだけ[猛々]</kun><oku>しい</oku>",
+        expected_kana_only_with_tags_merged="<kun>たけだけ</kun><oku>しい</oku>",
+        expected_furigana_with_tags_merged="<kun> 猛々[たけだけ]</kun><oku>しい</oku>",
+        expected_furikanji_with_tags_merged="<kun> たけだけ[猛々]</kun><oku>しい</oku>",
+    )
+    test(
         test_name="Should be able to clean furigana that bridges over some okurigana 3/",
         kanji="止",
         # A third edge case: there is only okurigana at the end
