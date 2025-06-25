@@ -287,6 +287,48 @@ def main():
         ),
     )
     test(
+        test_name="Onyomi repeater word with no highlight",
+        kanji="",
+        sentence=" 愈々[いよいよ]",
+        expected_kana_only=" いよいよ",
+        expected_furigana=" 愈々[いよいよ]",
+        expected_furikanji=" いよいよ[愈々]",
+        expected_kana_only_with_tags_split=" <kun>いよいよ</kun>",
+        expected_furigana_with_tags_split="<kun> 愈々[いよいよ]</kun>",
+        expected_furikanji_with_tags_split="<kun> いよいよ[愈々]</kun>",
+        expected_kana_only_with_tags_merged=" <kun>いよいよ</kun>",
+        expected_furigana_with_tags_merged="<kun> 愈々[いよいよ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> いよいよ[愈々]</kun>",
+    )
+    test(
+        test_name="Kunyomi repeater word with no highlight",
+        kanji="",
+        sentence=" 努々[ゆめゆめ]",
+        expected_kana_only=" ゆめゆめ",
+        expected_furigana=" 努々[ゆめゆめ]",
+        expected_furikanji=" ゆめゆめ[努々]",
+        expected_kana_only_with_tags_split=" <kun>ゆめゆめ</kun>",
+        expected_furigana_with_tags_split="<kun> 努々[ゆめゆめ]</kun>",
+        expected_furikanji_with_tags_split="<kun> ゆめゆめ[努々]</kun>",
+        expected_kana_only_with_tags_merged=" <kun>ゆめゆめ</kun>",
+        expected_furigana_with_tags_merged="<kun> 努々[ゆめゆめ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> ゆめゆめ[努々]</kun>",
+    )
+    test(
+        test_name="Jukujikun repeater word with no repeating furigana with no highlight",
+        kanji="",
+        sentence="<gikun> 清々[すっきり]する</gikun>",
+        expected_kana_only="<gikun> すっきりする</gikun>",
+        expected_furigana="<gikun> 清々[すっきり]する</gikun>",
+        expected_furikanji="<gikun> すっきり[清々]する</gikun>",
+        expected_kana_only_with_tags_split="<gikun> <juk>すっきり</juk>する</gikun>",
+        expected_furigana_with_tags_split="<gikun><juk> 清々[すっきり]</juk>する</gikun>",
+        expected_furikanji_with_tags_split="<gikun><juk> すっきり[清々]</juk>する</gikun>",
+        expected_kana_only_with_tags_merged="<gikun> <juk>すっきり</juk>する</gikun>",
+        expected_furigana_with_tags_merged="<gikun><juk> 清々[すっきり]</juk>する</gikun>",
+        expected_furikanji_with_tags_merged="<gikun><juk> すっきり[清々]</juk>する</gikun>",
+    )
+    test(
         test_name="Matches word that uses the repeater 々 with rendaku 1/",
         kanji="国",
         sentence="国々[くにぐに]の 関係[かんけい]が 深い[ふかい]。",

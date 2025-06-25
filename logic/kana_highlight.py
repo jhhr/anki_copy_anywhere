@@ -1769,16 +1769,17 @@ def handle_whole_word_case(
         f" {okurigana_to_highlight}, rest_kana: {rest_kana}"
     )
 
+    kanji_to_highlight = highlight_args.get("kanji_to_highlight", None)
     if result["type"] == "onyomi":
         onyomi_kana = to_katakana(furigana) if with_tags_def.onyomi_to_katakana else furigana
+        # For onyomi matches the furigana may be be in katakana
         if with_tags_def.with_tags:
             onyomi_kana = f"<on>{onyomi_kana}</on>"
-        # For onyomi matches the furigana should be in katakana
-        final_furigana = f"<b>{onyomi_kana}</b>"
+        final_furigana = f"<b>{onyomi_kana}</b>" if kanji_to_highlight else onyomi_kana
     elif result["type"] == "kunyomi":
         if with_tags_def.with_tags:
             furigana = f"<kun>{furigana}</kun>"
-        final_furigana = f"<b>{furigana}</b>"
+        final_furigana = f"<b>{furigana}</b>" if kanji_to_highlight else furigana
     elif result["type"] == "jukujikun":
         final_furigana = result["text"]
     return {
@@ -1969,19 +1970,22 @@ def kana_highlight(
             or f"{kanji_to_highlight}々" == word
             or kanji_to_highlight * 2 == word
         )
+        word_is_repeated_kanji = len(word) == 2 and word[1] == "々"
+        is_whole_word_case = highlight_kanji_is_whole_word or word_is_repeated_kanji
 
         # Whole word case is easy, just highlight the whole furigana
-        if highlight_kanji_is_whole_word and kanji_to_highlight is not None:
-            kanji_data = all_kanji_data.get(kanji_to_highlight)
+        if is_whole_word_case:
+            kanji_to_match = kanji_to_highlight if highlight_kanji_is_whole_word else word[0]
+            kanji_data = all_kanji_data.get(kanji_to_match)
             if not kanji_data:
                 logger.error(
-                    f"Error in kana_highlight[]: kanji '{kanji_to_highlight}' not found in"
+                    f"Error in kana_highlight[]: kanji '{kanji_to_match}' not found in"
                     " all_kanji_data"
                 )
                 return furigana + okurigana
             highlight_args: HighlightArgs = {
                 "kanji_to_highlight": kanji_to_highlight,
-                "kanji_to_match": kanji_to_highlight,
+                "kanji_to_match": kanji_to_match,
                 "onyomi": kanji_data.get("onyomi", ""),
                 "kunyomi": kanji_data.get("kunyomi", ""),
                 "add_highlight": True,
@@ -2368,8 +2372,8 @@ def kana_highlight(
                 cur_edge = juku_word_start_edge
             elif is_middle_kanji:
                 cur_edge = "middle"
-            kanji_data_key = NUMBER_TO_KANJI.get(kanji, kanji)
-            kanji_data = all_kanji_data.get(kanji_data_key)
+            kanji_to_match = NUMBER_TO_KANJI.get(kanji, kanji)
+            kanji_data = all_kanji_data.get(kanji_to_match)
             if not kanji_data:
                 logger.error(
                     f"Error in kana_highlight[]: reversing, kanji '{kanji}' not found in"
