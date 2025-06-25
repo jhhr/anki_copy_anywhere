@@ -60,6 +60,7 @@ RENDAKU_CONVERSION_DICT = {
     "ふ": ["ぶ", "ぷ"],
     "へ": ["べ", "ぺ"],
     "ほ": ["ぼ", "ぽ"],
+    "う": ["ぬ"],
 }
 # Convert HIRAGANA_CONVERSION_DICT to katakana with to_katakana
 KATAKANA_CONVERSION_DICT = {

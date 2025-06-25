@@ -15,6 +15,7 @@ def test(
     sentence: str,
     ignore_fail: bool = False,
     assume_dictionary_form: bool = False,
+    onyomi_to_katakana: bool = True,
     expected_furigana: Optional[str] = None,
     expected_furigana_with_tags_split: Optional[str] = None,
     expected_furigana_with_tags_merged: Optional[str] = None,
@@ -29,37 +30,49 @@ def test(
     Function that tests the kana_highlight function
     """
     cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
-        ("furigana", WithTagsDef(False, False, True, assume_dictionary_form), expected_furigana),
         (
             "furigana",
-            WithTagsDef(True, False, True, assume_dictionary_form),
+            WithTagsDef(False, False, onyomi_to_katakana, assume_dictionary_form),
+            expected_furigana,
+        ),
+        (
+            "furigana",
+            WithTagsDef(True, False, onyomi_to_katakana, assume_dictionary_form),
             expected_furigana_with_tags_split,
         ),
         (
             "furigana",
-            WithTagsDef(True, True, True, assume_dictionary_form),
+            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form),
             expected_furigana_with_tags_merged,
         ),
-        ("furikanji", WithTagsDef(False, False, True, assume_dictionary_form), expected_furikanji),
         (
             "furikanji",
-            WithTagsDef(True, False, True, assume_dictionary_form),
+            WithTagsDef(False, False, onyomi_to_katakana, assume_dictionary_form),
+            expected_furikanji,
+        ),
+        (
+            "furikanji",
+            WithTagsDef(True, False, onyomi_to_katakana, assume_dictionary_form),
             expected_furikanji_with_tags_split,
         ),
         (
             "furikanji",
-            WithTagsDef(True, True, True, assume_dictionary_form),
+            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form),
             expected_furikanji_with_tags_merged,
         ),
-        ("kana_only", WithTagsDef(False, False, True, assume_dictionary_form), expected_kana_only),
         (
             "kana_only",
-            WithTagsDef(True, False, True, assume_dictionary_form),
+            WithTagsDef(False, False, onyomi_to_katakana, assume_dictionary_form),
+            expected_kana_only,
+        ),
+        (
+            "kana_only",
+            WithTagsDef(True, False, onyomi_to_katakana, assume_dictionary_form),
             expected_kana_only_with_tags_split,
         ),
         (
             "kana_only",
-            WithTagsDef(True, True, True, assume_dictionary_form),
+            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form),
             expected_kana_only_with_tags_merged,
         ),
     ]
@@ -328,6 +341,21 @@ def main():
         expected_furikanji_with_tags_merged=(
             "<b><kun> ときどき[時々]</kun></b><kun> あめ[雨]</kun>が<kun> ふ[降]</kun><oku>る</oku>。"
         ),
+    )
+
+    test(
+        test_name="Matches word that uses the repeater 々 with rendaku 3/",
+        kanji="云",
+        sentence="云々[うんぬん]",
+        expected_kana_only="<b>ウンヌン</b>",
+        expected_furigana="<b> 云々[ウンヌン]</b>",
+        expected_furikanji="<b> ウンヌン[云々]</b>",
+        expected_kana_only_with_tags_split="<b><on>ウンヌン</on></b>",
+        expected_furigana_with_tags_split="<b><on> 云々[ウンヌン]</on></b>",
+        expected_furikanji_with_tags_split="<b><on> ウンヌン[云々]</on></b>",
+        expected_kana_only_with_tags_merged="<b><on>ウンヌン</on></b>",
+        expected_furigana_with_tags_merged="<b><on> 云々[ウンヌン]</on></b>",
+        expected_furikanji_with_tags_merged="<b><on> ウンヌン[云々]</on></b>",
     )
     test(
         test_name="Rendaku test 1/",
