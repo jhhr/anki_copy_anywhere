@@ -360,6 +360,9 @@ class KanaHighlightProcessDialog(QDialog):
         self.merge_consecutive_tags_checkbox = QCheckBox("Merge consecutive tags")
         self.form.addRow("", self.merge_consecutive_tags_checkbox)
 
+        self.onyomi_to_katakana_checkbox = QCheckBox("Convert onyomi to katakana")
+        self.form.addRow("", self.onyomi_to_katakana_checkbox)
+
         self.update_combobox_options()
 
         with suppress(KeyError):
@@ -375,6 +378,10 @@ class KanaHighlightProcessDialog(QDialog):
         with suppress(KeyError):
             self.merge_consecutive_tags_checkbox.setChecked(
                 self.process.get("merge_consecutive_tags", False)
+            )
+        with suppress(KeyError):
+            self.onyomi_to_katakana_checkbox.setChecked(
+                self.process.get("onyomi_to_katakana", False)
             )
 
         # Add Ok and Cancel buttons as QPushButtons
@@ -402,6 +409,7 @@ class KanaHighlightProcessDialog(QDialog):
             "assume_dictionary_form": self.assume_dictionary_form_checkbox.isChecked(),
             "wrap_readings_in_tags": self.wrap_readings_checkbox.isChecked(),
             "merge_consecutive_tags": self.merge_consecutive_tags_checkbox.isChecked(),
+            "onyomi_to_katakana": self.onyomi_to_katakana_checkbox.isChecked(),
         }
         self.accept()
 

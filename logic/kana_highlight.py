@@ -350,11 +350,11 @@ def re_match_from_middle(text):
     return re.compile(rf"^(.*?)({text})(.*?)$")
 
 
-def onyomi_replacer(match, wrap_readings_with_tags=True):
+def onyomi_replacer(match, wrap_readings_with_tags=True, convert_to_katakana=True):
     """
     re.sub replacer function for onyomi used with the above regexes§
     """
-    onyomi_kana = to_katakana(match.group(2))
+    onyomi_kana = to_katakana(match.group(2)) if convert_to_katakana else match.group(2)
     if wrap_readings_with_tags:
         onyomi_kana = f"<on>{onyomi_kana}</on>"
     return f"{match.group(1)}<b>{onyomi_kana}</b>{match.group(3)}"
@@ -420,6 +420,7 @@ class WithTagsDef(NamedTuple):
 
     with_tags: bool
     merge_consecutive: bool
+    onyomi_to_katakana: bool
     assume_dictionary_form: bool
 
 
@@ -808,6 +809,7 @@ def process_readings(
         edge,
         process_type=process_type,
         wrap_readings_with_tags=with_tags_def.with_tags,
+        convert_to_katakana=with_tags_def.onyomi_to_katakana,
         logger=logger,
     )
     onyomi_process_result = None
@@ -1137,6 +1139,7 @@ def check_onyomi_readings(
     target_furigana_section: str,
     edge: Edge,
     wrap_readings_with_tags: bool = True,
+    convert_to_katakana: bool = True,
     process_type: MatchProcess = "match",
     logger: Logger = Logger("error"),
 ) -> YomiMatchResult:
@@ -1200,6 +1203,7 @@ def check_onyomi_readings(
                     edge,
                     process_type,
                     wrap_readings_with_tags,
+                    convert_to_katakana,
                 ),
                 "type": "onyomi",
                 "match_edge": edge,
@@ -1221,6 +1225,7 @@ def process_onyomi_match(
     edge: Edge,
     process_type: MatchProcess,
     wrap_readings_with_tags: bool,
+    convert_to_katakana: bool,
 ) -> str:
     """
     Function that replaces the furigana with the onyomi reading that matched
@@ -1236,10 +1241,14 @@ def process_onyomi_match(
     if process_type == "match":
         match = reg.match(furigana)
         if match:
-            return to_katakana(match.group(2))
+            return to_katakana(match.group(2)) if convert_to_katakana else match.group(2)
         # return nothing if we have no match
         return ""
-    replacer = partial(onyomi_replacer, wrap_readings_with_tags=wrap_readings_with_tags)
+    replacer = partial(
+        onyomi_replacer,
+        wrap_readings_with_tags=wrap_readings_with_tags,
+        convert_to_katakana=convert_to_katakana,
+    )
     return re.sub(reg, replacer, furigana)
 
 
@@ -1542,6 +1551,7 @@ def handle_furigana_doubling(
     partial_result: YomiMatchResult,
     cur_furigana_section: str,
     matched_furigana: str,
+    onyomi_to_katakana: bool = True,
     logger: Logger = Logger("error"),
 ) -> str:
     """
@@ -1567,7 +1577,9 @@ def handle_furigana_doubling(
         for rf in rendaku_matched_furigana:
             if furigana_after_matched.startswith(rf):
                 doubled_furigana = matched_furigana + (
-                    to_katakana(rf) if partial_result["match_type"] == "onyomi" else rf
+                    to_katakana(rf)
+                    if partial_result["match_type"] == "onyomi" and onyomi_to_katakana
+                    else rf
                 )
                 logger.debug(
                     f"repeater kanji - found rendaku match: {rf} in"
@@ -1757,7 +1769,7 @@ def handle_whole_word_case(
     )
 
     if result["type"] == "onyomi":
-        onyomi_kana = to_katakana(furigana)
+        onyomi_kana = to_katakana(furigana) if with_tags_def.onyomi_to_katakana else furigana
         if with_tags_def.with_tags:
             onyomi_kana = f"<on>{onyomi_kana}</on>"
         # For onyomi matches the furigana should be in katakana
@@ -1907,7 +1919,10 @@ def kana_highlight(
 ) -> str:
     if with_tags_def is None:
         with_tags_def = WithTagsDef(
-            True, True, False  # with_tags  # merge_consecutive  # assume dictionary form
+            True,
+            True,
+            True,
+            False,  # with_tags, merge_consecutive, onyomi_to_katakana, assume dictionary form
         )
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
@@ -2093,6 +2108,7 @@ def kana_highlight(
                     partial_result,
                     cur_furigana_section,
                     matched_furigana,
+                    onyomi_to_katakana=with_tags_def.onyomi_to_katakana,
                     logger=logger,
                 )
                 wrapped_furigana = matched_furigana
@@ -2425,6 +2441,7 @@ def kana_highlight(
                     partial_result,
                     furigana_section_starting_from_matched,
                     matched_furigana,
+                    onyomi_to_katakana=with_tags_def.onyomi_to_katakana,
                     logger=logger,
                 )
                 logger.debug(f"reversing, matched_furigana after doubling: {matched_furigana}")

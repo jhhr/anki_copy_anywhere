@@ -29,37 +29,37 @@ def test(
     Function that tests the kana_highlight function
     """
     cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
-        ("furigana", WithTagsDef(False, False, assume_dictionary_form), expected_furigana),
+        ("furigana", WithTagsDef(False, False, True, assume_dictionary_form), expected_furigana),
         (
             "furigana",
-            WithTagsDef(True, False, assume_dictionary_form),
+            WithTagsDef(True, False, True, assume_dictionary_form),
             expected_furigana_with_tags_split,
         ),
         (
             "furigana",
-            WithTagsDef(True, True, assume_dictionary_form),
+            WithTagsDef(True, True, True, assume_dictionary_form),
             expected_furigana_with_tags_merged,
         ),
-        ("furikanji", WithTagsDef(False, False, assume_dictionary_form), expected_furikanji),
+        ("furikanji", WithTagsDef(False, False, True, assume_dictionary_form), expected_furikanji),
         (
             "furikanji",
-            WithTagsDef(True, False, assume_dictionary_form),
+            WithTagsDef(True, False, True, assume_dictionary_form),
             expected_furikanji_with_tags_split,
         ),
         (
             "furikanji",
-            WithTagsDef(True, True, assume_dictionary_form),
+            WithTagsDef(True, True, True, assume_dictionary_form),
             expected_furikanji_with_tags_merged,
         ),
-        ("kana_only", WithTagsDef(False, False, assume_dictionary_form), expected_kana_only),
+        ("kana_only", WithTagsDef(False, False, True, assume_dictionary_form), expected_kana_only),
         (
             "kana_only",
-            WithTagsDef(True, False, assume_dictionary_form),
+            WithTagsDef(True, False, True, assume_dictionary_form),
             expected_kana_only_with_tags_split,
         ),
         (
             "kana_only",
-            WithTagsDef(True, True, assume_dictionary_form),
+            WithTagsDef(True, True, True, assume_dictionary_form),
             expected_kana_only_with_tags_merged,
         ),
     ]

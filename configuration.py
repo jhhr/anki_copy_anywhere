@@ -80,6 +80,7 @@ class KanaHighlightProcess(TypedDict):
     assume_dictionary_form: bool
     wrap_readings_in_tags: bool
     merge_consecutive_tags: bool
+    onyomi_to_katakana: bool
 
 
 AnyProcess = Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]
