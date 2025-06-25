@@ -1449,34 +1449,36 @@ def check_kunyomi_readings(
         noun_form_okuri = get_verb_noun_form_okuri(
             kunyomi_dict_form_okuri, kanji_to_match, kunyomi_reading
         )
-        if (
-            (not okurigana and edge in ["right", "whole"]) or (edge in ["left", "middle"])
-        ) and kunyomi_dict_form_okuri:
-            # Replace last kana in dict form okuri with the noun form ending
-            okuri_included_reading = f"{kunyomi_stem}{kunyomi_dict_form_okuri}"
-            if noun_form_okuri:
-                okuri_included_reading = f"{kunyomi_stem}{noun_form_okuri}"
-            match_in_section, match_type = is_reading_in_furigana_section(
-                okuri_included_reading, target_furigana_section, okurigana, edge, logger=logger
-            )
-            logger.debug(
-                f"check_kunyomi_readings - okuri_included form: {okuri_included_reading},"
-                f" in_section: {match_in_section}, type: {match_type}"
-            )
-            if match_in_section:
-                okuri_included_results.append({
-                    "text": process_kunyomi_match(
-                        furigana,
-                        match_in_section,
-                        edge,
-                        process_type,
-                        wrap_readings_with_tags,
-                    ),
-                    "match_edge": edge,
-                    "type": "kunyomi",
-                    "actual_match": match_in_section,
-                    "matched_reading": full_reading,
-                })
+        okuris_in_furi = [kunyomi_dict_form_okuri, noun_form_okuri]
+        for okuri_in_furi in okuris_in_furi:
+            if (
+                (not okurigana and edge in ["right", "whole"]) or (edge in ["left", "middle"])
+            ) and kunyomi_dict_form_okuri:
+                # Replace last kana in dict form okuri with the noun form ending
+                okuri_included_reading = f"{kunyomi_stem}{kunyomi_dict_form_okuri}"
+                if okuri_in_furi:
+                    okuri_included_reading = f"{kunyomi_stem}{okuri_in_furi}"
+                match_in_section, match_type = is_reading_in_furigana_section(
+                    okuri_included_reading, target_furigana_section, okurigana, edge, logger=logger
+                )
+                logger.debug(
+                    f"check_kunyomi_readings - okuri_included form: {okuri_included_reading},"
+                    f" in_section: {match_in_section}, type: {match_type}"
+                )
+                if match_in_section:
+                    okuri_included_results.append({
+                        "text": process_kunyomi_match(
+                            furigana,
+                            match_in_section,
+                            edge,
+                            process_type,
+                            wrap_readings_with_tags,
+                        ),
+                        "match_edge": edge,
+                        "type": "kunyomi",
+                        "actual_match": match_in_section,
+                        "matched_reading": full_reading,
+                    })
     logger.debug(
         f"check_kunyomi_readings - stem_match_results: {stem_match_results},"
         f" okuri_included_results: {okuri_included_results}"

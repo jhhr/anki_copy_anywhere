@@ -1866,6 +1866,54 @@ def main():
         ),
     )
     test(
+        test_name="Match 釣瓶落とし jukujikun reading - with highlight",
+        kanji="釣",
+        sentence="釣瓶落[つるべお]とし",
+        expected_kana_only="<b>つる</b>べおとし",
+        expected_furigana="<b> 釣[つる]</b> 瓶落[べお]とし",
+        expected_furikanji="<b> つる[釣]</b> べお[瓶落]とし",
+        expected_kana_only_with_tags_split=(
+            "<b><kun>つる</kun></b><juk>べ</juk><kun>お</kun><oku>とし</oku>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<b><kun> 釣[つる]</kun></b><juk> 瓶[べ]</juk><kun> 落[お]</kun><oku>とし</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><kun> つる[釣]</kun></b><juk> べ[瓶]</juk><kun> お[落]</kun><oku>とし</oku>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<b><kun>つる</kun></b><juk>べ</juk><kun>お</kun><oku>とし</oku>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<b><kun> 釣[つる]</kun></b><juk> 瓶[べ]</juk><kun> 落[お]</kun><oku>とし</oku>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><kun> つる[釣]</kun></b><juk> べ[瓶]</juk><kun> お[落]</kun><oku>とし</oku>"
+        ),
+    )
+    test(
+        test_name="Match 釣瓶落とし jukujikun reading - no highlight",
+        kanji="",
+        sentence="釣瓶落[つるべお]とし",
+        expected_kana_only="つるべおとし",
+        expected_furigana=" 釣瓶落[つるべお]とし",
+        expected_furikanji=" つるべお[釣瓶落]とし",
+        expected_kana_only_with_tags_split="<kun>つる</kun><juk>べ</juk><kun>お</kun><oku>とし</oku>",
+        expected_furigana_with_tags_split=(
+            "<kun> 釣[つる]</kun><juk> 瓶[べ]</juk><kun> 落[お]</kun><oku>とし</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<kun> つる[釣]</kun><juk> べ[瓶]</juk><kun> お[落]</kun><oku>とし</oku>"
+        ),
+        expected_kana_only_with_tags_merged="<kun>つる</kun><juk>べ</juk><kun>お</kun><oku>とし</oku>",
+        expected_furigana_with_tags_merged=(
+            "<kun> 釣[つる]</kun><juk> 瓶[べ]</juk><kun> 落[お]</kun><oku>とし</oku>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<kun> つる[釣]</kun><juk> べ[瓶]</juk><kun> お[落]</kun><oku>とし</oku>"
+        ),
+    )
+    test(
         test_name="ん should be combined with previous mora in jukujikun",
         kanji="麻",
         sentence="麻雀[まーじゃん]",
