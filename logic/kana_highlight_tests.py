@@ -16,6 +16,7 @@ def test(
     ignore_fail: bool = False,
     assume_dictionary_form: bool = False,
     onyomi_to_katakana: bool = True,
+    debug: bool = False,
     expected_furigana: Optional[str] = None,
     expected_furigana_with_tags_split: Optional[str] = None,
     expected_furigana_with_tags_merged: Optional[str] = None,
@@ -79,7 +80,10 @@ def test(
     for return_type, with_tags_def, expected in cases:
         if not expected:
             continue
-        result = kana_highlight(kanji, sentence, return_type, with_tags_def)
+        logger = Logger("debug") if debug else Logger("error")
+        result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
+        if debug:
+            print("\n\n")
         try:
             assert result == expected
         except AssertionError:
@@ -327,6 +331,34 @@ def main():
         expected_kana_only_with_tags_merged="<gikun> <juk>すっきり</juk>する</gikun>",
         expected_furigana_with_tags_merged="<gikun><juk> 清々[すっきり]</juk>する</gikun>",
         expected_furikanji_with_tags_merged="<gikun><juk> すっきり[清々]</juk>する</gikun>",
+    )
+    test(
+        test_name="Should match 斯斯 as kunyomi in 斯斯然然 - no highlight",
+        kanji="",
+        sentence=" 斯々然々[かくかくしかじか]",
+        expected_kana_only=" かくかくしかじか",
+        expected_furigana=" 斯々然々[かくかくしかじか]",
+        expected_furikanji=" かくかくしかじか[斯々然々]",
+        expected_kana_only_with_tags_split=" <kun>かくかく</kun><kun>しかじか</kun>",
+        expected_furigana_with_tags_split="<kun> 斯々[かくかく]</kun><kun> 然々[しかじか]</kun>",
+        expected_furikanji_with_tags_split="<kun> かくかく[斯々]</kun><kun> しかじか[然々]</kun>",
+        expected_kana_only_with_tags_merged=" <kun>かくかくしかじか</kun>",
+        expected_furigana_with_tags_merged="<kun> 斯々然々[かくかくしかじか]</kun>",
+        expected_furikanji_with_tags_merged="<kun> かくかくしかじか[斯々然々]</kun>",
+    )
+    test(
+        test_name="Should match 斯斯 as kunyomi in 斯斯然然 - with highlight",
+        kanji="斯",
+        sentence=" 斯々然々[かくかくしかじか]",
+        expected_kana_only=" <b>かくかく</b>しかじか",
+        expected_furigana="<b> 斯々[かくかく]</b> 然々[しかじか]",
+        expected_furikanji="<b> かくかく[斯々]</b> しかじか[然々]",
+        expected_kana_only_with_tags_split=" <b><kun>かくかく</kun></b><kun>しかじか</kun>",
+        expected_furigana_with_tags_split="<b><kun> 斯々[かくかく]</kun></b><kun> 然々[しかじか]</kun>",
+        expected_furikanji_with_tags_split="<b><kun> かくかく[斯々]</kun></b><kun> しかじか[然々]</kun>",
+        expected_kana_only_with_tags_merged=" <b><kun>かくかく</kun></b><kun>しかじか</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 斯々[かくかく]</kun></b><kun> 然々[しかじか]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> かくかく[斯々]</kun></b><kun> しかじか[然々]</kun>",
     )
     test(
         test_name="Matches word that uses the repeater 々 with rendaku 1/",
