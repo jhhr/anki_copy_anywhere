@@ -805,7 +805,7 @@ def process_readings(
     onyomi_match = check_onyomi_readings(
         highlight_args.get("onyomi", ""),
         furigana,
-        word_data.get("okurigana", ""),
+        word_data,
         target_furigana_section,
         edge,
         process_type=process_type,
@@ -1136,7 +1136,7 @@ def is_reading_in_furigana_section(
 def check_onyomi_readings(
     onyomi: str,
     furigana: str,
-    okurigana: str,
+    word_data: WordData,
     target_furigana_section: str,
     edge: Edge,
     wrap_readings_with_tags: bool = True,
@@ -1161,6 +1161,7 @@ def check_onyomi_readings(
     onyomi_readings = onyomi.split("、")
     # order readings by length so that we try to match the longest reading first
     onyomi_readings.sort(key=len, reverse=True)
+    okurigana = word_data.get("okurigana", "")
 
     logger.debug(
         f"check_onyomi_readings - target_furigana_section: {target_furigana_section}, edge: {edge}"
@@ -1175,6 +1176,24 @@ def check_onyomi_readings(
             "match_edge": "none",
             "actual_match": "",
             "matched_reading": "",
+        }
+
+    # Exception for 不都合[ふつごう] where　we should match the shortest onyomi ふ instead of the
+    # longer ふつ
+    if furigana == "ふつごう" and word_data.get("word") == "不都合":
+        return {
+            "text": process_onyomi_match(
+                furigana,
+                "ふ",
+                edge,
+                process_type,
+                wrap_readings_with_tags,
+                convert_to_katakana,
+            ),
+            "type": "onyomi",
+            "match_edge": edge,
+            "actual_match": "ふ",
+            "matched_reading": "ふ",
         }
 
     for onyomi_reading in onyomi_readings:

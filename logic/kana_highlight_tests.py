@@ -2850,6 +2850,20 @@ def main():
             " <kun>さ</kun><oku>せられ</oku>た"
         ),
     )
+    test(
+        test_name="correct onyomi for 不 in 不都合",
+        kanji="不",
+        sentence="不都合[ふつごう]",
+        expected_kana_only="<b>フ</b>ツゴウ",
+        expected_furigana="<b> 不[フ]</b> 都合[ツゴウ]",
+        expected_furikanji="<b> フ[不]</b> ツゴウ[都合]",
+        expected_kana_only_with_tags_split="<b><on>フ</on></b><on>ツ</on><on>ゴウ</on>",
+        expected_furigana_with_tags_split="<b><on> 不[フ]</on></b><on> 都[ツ]</on><on> 合[ゴウ]</on>",
+        expected_furikanji_with_tags_split="<b><on> フ[不]</on></b><on> ツ[都]</on><on> ゴウ[合]</on>",
+        expected_kana_only_with_tags_merged="<b><on>フ</on></b><on>ツゴウ</on>",
+        expected_furigana_with_tags_merged="<b><on> 不[フ]</on></b><on> 都合[ツゴウ]</on>",
+        expected_furikanji_with_tags_merged="<b><on> フ[不]</on></b><on> ツゴウ[都合]</on>",
+    )
     print("\n\033[92mTests passed\033[0m")
 
 
