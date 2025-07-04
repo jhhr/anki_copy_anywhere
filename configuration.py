@@ -231,18 +231,22 @@ class CopyDefinition(TypedDict):
     select_card_separator: Optional[str]
 
 
-def get_variable_names_from_copy_definition(
-    copy_definition: Optional[CopyDefinition],
+def get_variables_dict_from_variable_defs(
+    copy_mode: CopyModeType,
+    variable_defs: Union[Sequence[CopyFieldToVariable], Sequence[str]],
 ) -> dict[str, str]:
     variable_menu_dict: dict[str, str] = {}
-    if copy_definition is None:
-        return variable_menu_dict
     # Always include the target notes count variable as it will be generated
     # in any across notes mode copy operation
-    if copy_definition.get("copy_mode") == COPY_MODE_ACROSS_NOTES:
+    if copy_mode == COPY_MODE_ACROSS_NOTES:
         variable_menu_dict[TARGET_NOTES_COUNT] = intr_format(TARGET_NOTES_COUNT)
-    for variable_def in copy_definition.get("field_to_variable_defs", []):
-        variable_name = variable_def["copy_into_variable"]
+    for variable_def in variable_defs:
+        if isinstance(variable_def, str):
+            # If the variable definition is just a string, use it directly
+            variable_name = variable_def
+        else:
+            # Otherwise, extract the variable name from the definition
+            variable_name = variable_def["copy_into_variable"]
         if variable_name is not None:
             variable_menu_dict[variable_name] = intr_format(variable_name)
     return variable_menu_dict

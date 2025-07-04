@@ -1,10 +1,6 @@
 from contextlib import suppress
 from typing import Optional, Union, Tuple, cast
 
-from anki.models import NotetypeDict
-from anki.decks import DeckId
-
-from anki.utils import ids2str
 
 from aqt import mw
 
@@ -30,10 +26,8 @@ from aqt.qt import (
 
 from aqt.utils import showInfo
 
-from .add_intersecting_model_field_options_to_dict import (
-    add_intersecting_model_field_options_to_dict,
-)
-from .add_model_options_to_dict import add_model_options_to_dict
+from .edit_state import EditState
+
 from .copy_field_to_field_editor import CopyFieldToFieldEditor
 from .copy_field_to_file_editor import CopyFieldToFileEditor
 from .field_to_variable_editor import CopyFieldToVariableEditor
@@ -54,11 +48,8 @@ from ..configuration import (
     DirectionType,
     SelectCardByType,
     SELECT_CARD_BY_VALUES,
-    get_variable_names_from_copy_definition,
 )
 from ..logic.interpolate_fields import (
-    VARIABLES_KEY,
-    BASE_NOTE_MENU_DICT,
     intr_format,
 )
 from ..utils.block_signals import block_signals
@@ -93,49 +84,6 @@ def set_size_policy_for_all_widgets(layout, h_policy, v_policy):
                 set_size_policy_for_all_widgets(inner_layout, h_policy, v_policy)
 
 
-class EditState:
-    """
-    Class to hold the shared state of the editors
-    """
-
-    def __init__(
-        self,
-        copy_definition: Optional[CopyDefinition] = None,
-        copy_mode: CopyModeType = COPY_MODE_WITHIN_NOTE,
-    ):
-        self.definition_name = ""
-        self.copy_mode = copy_mode
-        if copy_definition is not None:
-            self.definition_name = copy_definition.get("definition_name", "")
-            self.copy_mode = copy_definition.get("copy_mode", COPY_MODE_WITHIN_NOTE)
-
-        self.definition_name_editors: list[RequiredLineEdit] = []
-
-    def update_definition_name_editors(self, triggering_editor: RequiredLineEdit):
-        """
-        Updates all editors connected to the definition name.
-        This is called when the state changes to ensure all editors are in sync.
-        """
-        for editor in self.definition_name_editors:
-            if editor is triggering_editor:
-                continue
-            editor.setText(self.definition_name)
-            editor.update_required_style()
-
-    def connect_definition_name_editor(self, line_edit: RequiredLineEdit):
-        """
-        Connects the definition name editor to the state, updating state when the text changes
-        and updating all connected editors when the state changes.
-        """
-        self.definition_name_editors.append(line_edit)
-
-        def update_state(text: str):
-            self.definition_name = text.strip()
-            self.update_definition_name_editors(line_edit)
-
-        line_edit.textChanged.connect(update_state)
-
-
 class BasicEditorFormLayout(QFormLayout):
     """
     Editor for the basic fields of a copy definition that both AcrossNotesCopyEditor
@@ -152,13 +100,12 @@ class BasicEditorFormLayout(QFormLayout):
         super().__init__(parent)
 
         self.copy_definition = copy_definition
+        self.state = state
 
         # Get the names of all the decks
         model_names_list = []
         for model in mw.col.models.all_names_and_ids():
             model_names_list.append(model.name)
-
-        self.selected_models: list[NotetypeDict] = []
 
         self.definition_name_edit = RequiredLineEdit(is_required=True)
         self.addRow(QLabel("<h2>Name for this copy definition</h2>"), self.definition_name_edit)
@@ -184,7 +131,10 @@ class BasicEditorFormLayout(QFormLayout):
         self.note_type_target_cbox.addItems([f'"{model_name}"' for model_name in model_names_list])
         self.target_note_type_label = QLabel("<h3>Trigger (destination) note type</h3>")
         self.addRow(self.target_note_type_label, self.note_type_target_cbox)
-        self.note_type_target_cbox.currentTextChanged.connect(self.set_current_models)
+        state.connect_target_note_type_editor(
+            self.note_type_target_cbox,
+            self.set_note_type_warning,
+        )
 
         # Set up a label for showing a warning, if selecting multiple models
         self.note_type_target_warning = QLabel("")
@@ -203,23 +153,30 @@ class BasicEditorFormLayout(QFormLayout):
         If your note type has multiple card types, the whitelisting applies to the note,<rb>
         if any of its cards belong to a whitelisted deck.</small>"""),
         )
+        state.connect_only_copy_into_decks_editor(
+            self.decks_limit_multibox,
+            self.update_deck_multibox_options,
+        )
 
         self.copy_on_sync_checkbox = QCheckBox("Run on sync for reviewed cards")
         self.copy_on_sync_checkbox.setChecked(False)
         self.addRow("", self.copy_on_sync_checkbox)
+        state.connect_copy_on_sync_checkbox(self.copy_on_sync_checkbox)
 
         self.copy_on_add_checkbox = QCheckBox("Run when adding new note")
         self.copy_on_add_checkbox.setChecked(False)
         self.addRow("", self.copy_on_add_checkbox)
+        state.connect_copy_on_add_checkbox(self.copy_on_add_checkbox)
 
         self.copy_on_review_checkbox = QCheckBox("Run on review")
         self.copy_on_review_checkbox.setChecked(False)
         self.addRow("", self.copy_on_review_checkbox)
+        state.connect_copy_on_review_checkbox(self.copy_on_review_checkbox)
 
         spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
         self.addItem(spacer)
 
-        self.init_fields(copy_definition)
+        self.init_ui_from_state()
 
     def update_direction_labels(self, direction):
         if direction == DIRECTION_SOURCE_TO_DESTINATIONS:
@@ -229,49 +186,27 @@ class BasicEditorFormLayout(QFormLayout):
         self.target_note_type_label.setText(f"<h3>Trigger ({target_type}) note type</h3>")
         self.deck_limit_label.setText(f"<h4>Trigger ({target_type}) deck limit</h4>")
 
-    def init_fields(self, copy_definition: Optional[CopyDefinition]):
-        if copy_definition:
-            with suppress(KeyError):
-                self.note_type_target_cbox.setCurrentText(copy_definition["copy_into_note_types"])
-                self.note_type_target_cbox.update_required_style()
-                self.set_current_models()
-            with suppress(KeyError):
-                self.copy_on_sync_checkbox.setChecked(copy_definition["copy_on_sync"])
-            with suppress(KeyError):
-                self.copy_on_add_checkbox.setChecked(copy_definition["copy_on_add"])
-            with suppress(KeyError):
-                self.copy_on_review_checkbox.setChecked(copy_definition["copy_on_review"])
-            with suppress(KeyError):
-                self.decks_limit_multibox.setCurrentText(copy_definition["only_copy_into_decks"])
-            with suppress(KeyError):
-                copy_mode: CopyModeType = copy_definition["copy_mode"]
-                if copy_mode == COPY_MODE_ACROSS_NOTES:
-                    direction = (
-                        copy_definition.get("across_mode_direction")
-                        or DIRECTION_DESTINATION_TO_SOURCES
-                    )
-                    self.update_direction_labels(direction)
+    def init_ui_from_state(self):
+        self.note_type_target_cbox.setCurrentText(self.state.copy_into_note_types)
+        self.note_type_target_cbox.update_required_style()
+        # self.note_type_target_cbox.update_required_style()
+        self.copy_on_sync_checkbox.setChecked(self.state.copy_on_sync)
+        self.copy_on_add_checkbox.setChecked(self.state.copy_on_add)
+        self.copy_on_review_checkbox.setChecked(self.state.copy_on_review)
+        self.decks_limit_multibox.setCurrentText(self.state.only_copy_into_decks)
+        self.update_direction_labels(self.state.copy_direction)
+        self.set_note_type_warning(None)
+        self.update_deck_multibox_options(None)
 
-    def set_current_models(self):
-        models = list(
-            filter(
-                None,
-                [
-                    mw.col.models.by_name(name.strip('""'))
-                    for name in self.note_type_target_cbox.currentData()
-                ],
-            )
-        )
-        self.selected_models = models
-
-        if len(models) > 1:
+    def set_note_type_warning(self, _):
+        if len(self.state.selected_models) > 1:
             text = (
                 "When selecting multiple note types, only the fields that are common to all"
                 + " note types will be available as destinations."
             )
             # Check that each model has a single card template only
             models_first_templates = []
-            for model in models:
+            for model in self.state.selected_models:
                 if len(model["tmpls"]) > 1:
                     models_first_templates.append((model["name"], model["tmpls"][0]["name"]))
             if models_first_templates:
@@ -286,48 +221,27 @@ class BasicEditorFormLayout(QFormLayout):
         else:
             self.note_type_target_warning.setText("")
 
-    def set_current_decks(self):
-        assert mw.col.db is not None
-        mids: list[int] = [model["id"] for model in self.selected_models]
-        dids: list[DeckId] = mw.col.db.list(f"""
-                SELECT DISTINCT CASE WHEN odid==0 THEN did ELSE odid END
-                FROM cards c, notes n
-                WHERE n.mid IN {ids2str(mids)}
-                AND c.nid = n.id
-            """)
-
-        if self.decks_init_done:
-            current_deck_names = [d.strip('""') for d in self.decks_limit_multibox.currentData()]
-        elif self.copy_definition:
-            current_deck_names = (
-                self.copy_definition.get("only_copy_into_decks", "").strip('""').split('", "')
-            )
-        else:
-            current_deck_names = []
+    def update_deck_multibox_options(self, _):
+        self.decks_limit_multibox.blockSignals(True)
         self.decks_limit_multibox.clear()
-        for deck in [mw.col.decks.get(did) for did in dids]:
-            if deck is None:
-                continue
+        for deck in self.state.all_decks:
             # Wrap name in "" to avoid issues with commas in the name
             self.decks_limit_multibox.addItem(f'"{deck["name"]}"')
-            if deck["name"] in current_deck_names:
+            if deck["name"] in self.state.current_deck_names:
                 self.decks_limit_multibox.addSelectedItem(f'"{deck["name"]}"')
-
         self.decks_limit_multibox.set_popup_and_box_width()
+        self.decks_limit_multibox.blockSignals(False)
 
         # Update placeholder text
-        if len(self.selected_models) == 0:
+        if len(self.state.selected_models) == 0:
             self.decks_limit_multibox.setPlaceholderText("First, select a trigger note type")
             self.decks_limit_multibox.setDisabled(True)
-        elif len(dids) > 0:
+        elif len(self.state.all_decks) > 0:
             self.decks_limit_multibox.setPlaceholderText("Select decks (optional)")
             self.decks_limit_multibox.setDisabled(False)
         else:
             self.decks_limit_multibox.setPlaceholderText("No decks found for selected note types")
             self.decks_limit_multibox.setDisabled(True)
-
-    def get_selected_models(self):
-        return self.selected_models
 
 
 class TabEditorComponents(QTabWidget):
@@ -372,7 +286,9 @@ class TabEditorComponents(QTabWidget):
             variables_layout.setAlignment(QAlignTop)
 
             variables_layout.addWidget(QLabel("<h3>Fields to copy into variables</h3>"))
-            self.field_to_variable_editor = CopyFieldToVariableEditor(parent, copy_definition)
+            self.field_to_variable_editor = CopyFieldToVariableEditor(
+                parent, state, copy_definition
+            )
             variables_layout.addWidget(self.field_to_variable_editor)
             spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
             variables_layout.addItem(spacer)
@@ -388,7 +304,9 @@ class TabEditorComponents(QTabWidget):
         fields_layout.setAlignment(QAlignTop)
 
         fields_layout.addWidget(QLabel("<h2>Copy content to notes</h2>"))
-        self.field_to_field_editor = CopyFieldToFieldEditor(parent, copy_definition, copy_mode)
+        self.field_to_field_editor = CopyFieldToFieldEditor(
+            parent, state, copy_definition, copy_mode
+        )
         fields_layout.addWidget(self.field_to_field_editor)
         spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
         fields_layout.addItem(spacer)
@@ -402,7 +320,7 @@ class TabEditorComponents(QTabWidget):
         files_layout.setAlignment(QAlignTop)
 
         files_layout.addWidget(QLabel("<h2>Copy content to files</h2>"))
-        self.field_to_file_editor = CopyFieldToFileEditor(parent, copy_definition, copy_mode)
+        self.field_to_file_editor = CopyFieldToFileEditor(parent, state, copy_definition, copy_mode)
         files_layout.addWidget(self.field_to_file_editor)
         spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
         files_layout.addItem(spacer)
@@ -421,11 +339,6 @@ class TabEditorComponents(QTabWidget):
             return self.field_to_variable_editor
         return None
 
-    def update_fields_by_target_note_type(self, models):
-        self.field_to_field_editor.set_selected_copy_into_models(models)
-        if hasattr(self, "field_to_variable_editor"):
-            self.field_to_variable_editor.set_selected_copy_into_models(models)
-
 
 class AcrossNotesCopyEditor(QWidget):
     def __init__(
@@ -435,6 +348,7 @@ class AcrossNotesCopyEditor(QWidget):
         copy_definition: Optional[CopyDefinition],
     ):
         super().__init__(parent)
+        self.state = state
         self.copy_definition = copy_definition
 
         self.main_layout = QVBoxLayout()
@@ -450,13 +364,13 @@ class AcrossNotesCopyEditor(QWidget):
         self.direction_radio_buttons.addWidget(self.source_to_destination_radio)
         # Connect the radio buttons to update the labels in the basic editor form layout
         self.source_to_destination_radio.toggled.connect(
-            lambda: self.update_direction_labels(DIRECTION_SOURCE_TO_DESTINATIONS)
+            lambda: state.update_copy_direction(DIRECTION_SOURCE_TO_DESTINATIONS)
         )
         self.destination_to_source_radio.toggled.connect(
-            lambda: self.update_direction_labels(DIRECTION_DESTINATION_TO_SOURCES)
+            lambda: state.update_copy_direction(DIRECTION_DESTINATION_TO_SOURCES)
         )
         self.direction_radio_buttons.addStretch(1)
-
+        state.add_copy_direction_callback(self.update_direction_labels)
         # Create the tabbed editor components
         self.editor_tabs = TabEditorComponents(self, state, copy_definition, COPY_MODE_ACROSS_NOTES)
 
@@ -490,6 +404,8 @@ class AcrossNotesCopyEditor(QWidget):
         # Make the card_query_widget start at a maximum of 200px height, but expand vertically
         self.card_query_widget.setMinimumHeight(100)
         self.card_query_widget.setSizePolicy(QSizePolicyPreferred, QSizePolicyFixed)
+        state.add_selected_model_callback(self.update_fields_by_target_note_type)
+        state.variable_names_callbacks.append(self.update_fields_by_target_note_type)
 
         query_form.addRow(self.card_query_text_label)
         query_form.addRow(self.card_query_widget)
@@ -607,15 +523,11 @@ class AcrossNotesCopyEditor(QWidget):
         return widget
 
     def update_direction_labels(self, direction: DirectionType):
-        self.editor_tabs.basic_editor_form_layout.update_direction_labels(direction)
-        self.get_field_to_field_editor().update_direction_labels(direction)
-
         with block_signals(self.source_to_destination_radio, self.destination_to_source_radio):
             if direction == DIRECTION_SOURCE_TO_DESTINATIONS:
                 self.source_to_destination_radio.setChecked(True)
                 self.destination_to_source_radio.setChecked(False)
                 self.card_query_text_label.setText("<h3>Search query to get source cards</h3>")
-                self.editor_tabs.field_to_field_editor.update_all_field_target_cboxes()
             else:
                 self.destination_to_source_radio.setChecked(True)
                 self.source_to_destination_radio.setChecked(False)
@@ -627,27 +539,12 @@ class AcrossNotesCopyEditor(QWidget):
         else:
             return DIRECTION_DESTINATION_TO_SOURCES
 
-    def update_fields_by_target_note_type(self, models: list[NotetypeDict]):
-        self.editor_tabs.field_to_field_editor.set_selected_copy_into_models(models)
-        if self.editor_tabs.get_field_to_variable_editor():
-            self.editor_tabs.get_field_to_variable_editor().set_selected_copy_into_models(models)
-
-        new_options_dict = BASE_NOTE_MENU_DICT.copy()
-        variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
-        if variables_dict:
-            new_options_dict[VARIABLES_KEY] = variables_dict
-
-        # If there are multiple models, add the intersecting fields only
-        if len(models) > 1:
-            add_intersecting_model_field_options_to_dict(
-                models,
-                new_options_dict,
-            )
-        elif len(models) == 1:
-            model = models[0]
-            add_model_options_to_dict(model["name"], model["id"], new_options_dict)
-
-        self.card_query_text_layout.update_options(new_options_dict)
+    def update_fields_by_target_note_type(self, _):
+        options_dict = self.state.pre_query_menu_options_dict.copy()
+        options_dict.update(self.state.variables_dict)
+        validate_dict = self.state.pre_query_text_edit_validate_dict.copy()
+        validate_dict.update(self.state.variables_validate_dict)
+        self.card_query_text_layout.update_options(options_dict, validate_dict)
         self.card_query_text_layout.validate_text()
 
     def get_field_to_field_editor(self) -> CopyFieldToFieldEditor:
@@ -683,9 +580,6 @@ class WithinNoteCopyEditor(QWidget):
 
     def get_field_to_file_editor(self):
         return self.editor_tabs.get_field_to_file_editor()
-
-    def update_fields_by_target_note_type(self, models):
-        self.editor_tabs.update_fields_by_target_note_type(models)
 
 
 class EditCopyDefinitionDialog(ScrollableQDialog):
@@ -765,32 +659,6 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                         self.within_note_editor_tab.get_field_to_field_editor()
                     )
 
-        # Connect signals
-        across_target_cbox = (
-            self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout.note_type_target_cbox
-        )
-        within_target_cbox = (
-            self.within_note_editor_tab.editor_tabs.basic_editor_form_layout.note_type_target_cbox
-        )
-        across_target_cbox.currentTextChanged.connect(
-            lambda _: self.update_fields_by_target_note_type(
-                self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout
-            )
-        )
-        within_target_cbox.currentTextChanged.connect(
-            lambda _: self.update_fields_by_target_note_type(
-                self.within_note_editor_tab.editor_tabs.basic_editor_form_layout
-            )
-        )
-
-        # Initialize the fields in the editor tabs
-        self.update_fields_by_target_note_type(
-            self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout
-        )
-        self.update_fields_by_target_note_type(
-            self.within_note_editor_tab.editor_tabs.basic_editor_form_layout
-        )
-
         # Set dialog width window width
         screen = QGuiApplication.primaryScreen()
         if screen:
@@ -865,27 +733,11 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 self.within_note_editor_tab.get_field_to_field_editor()
             )
 
-    def update_fields_by_target_note_type(self, basic_editor_layout: BasicEditorFormLayout):
-        """
-        Updates the "Note field to copy into" and whatever fields in the editor widgets that depend
-        on the note type chosen in the "Note type to copy into" dropdown box.
-        """
-        models = basic_editor_layout.get_selected_models()
-
-        # Update fields in editor tabs
-        self.across_notes_editor_tab.update_fields_by_target_note_type(models)
-        self.within_note_editor_tab.update_fields_by_target_note_type(models)
-
-        # Update deck options in the basic editor form layout
-        self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout.set_current_decks()
-        self.within_note_editor_tab.editor_tabs.basic_editor_form_layout.set_current_decks()
-
     def get_copy_mode(self) -> CopyModeType:
         return self.selected_editor_type or COPY_MODE_ACROSS_NOTES
 
     def get_copy_definition(self) -> Union[CopyDefinition, None]:
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
-            basic_editor = self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout
             field_to_field_editor = self.across_notes_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.across_notes_editor_tab.get_field_to_file_editor()
             field_to_variable_editor = self.across_notes_editor_tab.get_field_to_variable_editor()
@@ -895,11 +747,11 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             )
             across_copy_definition: CopyDefinition = {
                 "definition_name": self.state.definition_name,
-                "copy_into_note_types": basic_editor.note_type_target_cbox.currentText(),
-                "only_copy_into_decks": basic_editor.decks_limit_multibox.currentText(),
-                "copy_on_sync": basic_editor.copy_on_sync_checkbox.isChecked(),
-                "copy_on_add": basic_editor.copy_on_add_checkbox.isChecked(),
-                "copy_on_review": basic_editor.copy_on_review_checkbox.isChecked(),
+                "copy_into_note_types": self.state.copy_into_note_types,
+                "only_copy_into_decks": self.state.only_copy_into_decks,
+                "copy_on_sync": self.state.copy_on_sync,
+                "copy_on_add": self.state.copy_on_add,
+                "copy_on_review": self.state.copy_on_review,
                 "field_to_field_defs": field_to_field_editor.get_field_to_field_defs(),
                 "field_to_file_defs": field_to_file_editor.get_field_to_file_defs(),
                 "field_to_variable_defs": field_to_variable_editor.get_field_to_variable_defs(),
@@ -915,16 +767,15 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             }
             return across_copy_definition
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
-            basic_editor = self.within_note_editor_tab.editor_tabs.basic_editor_form_layout
             field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             within_copy_definition: CopyDefinition = {
                 "definition_name": self.state.definition_name,
-                "copy_into_note_types": basic_editor.note_type_target_cbox.currentText(),
-                "only_copy_into_decks": basic_editor.decks_limit_multibox.currentText(),
-                "copy_on_sync": basic_editor.copy_on_sync_checkbox.isChecked(),
-                "copy_on_add": basic_editor.copy_on_add_checkbox.isChecked(),
-                "copy_on_review": basic_editor.copy_on_review_checkbox.isChecked(),
+                "copy_into_note_types": self.state.copy_into_note_types,
+                "only_copy_into_decks": self.state.only_copy_into_decks,
+                "copy_on_sync": self.state.copy_on_sync,
+                "copy_on_add": self.state.copy_on_add,
+                "copy_on_review": self.state.copy_on_review,
                 "field_to_variable_defs": [],
                 "field_to_field_defs": field_to_field_editor.get_field_to_field_defs(),
                 "field_to_file_defs": field_to_file_editor.get_field_to_file_defs(),

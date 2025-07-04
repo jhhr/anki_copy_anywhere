@@ -1,8 +1,6 @@
 from contextlib import suppress
 from typing import Optional, TypedDict
 
-from aqt import mw
-
 from aqt.qt import (
     QWidget,
     QVBoxLayout,
@@ -13,10 +11,6 @@ from aqt.qt import (
     qtmajor,
 )
 
-from .add_intersecting_model_field_options_to_dict import (
-    get_intersecting_model_fields,
-    add_intersecting_model_field_options_to_dict,
-)
 from .required_text_input import RequiredLineEdit
 from ..configuration import ALL_FIELD_TO_VARIABLE_PROCESS_NAMES, CopyDefinition
 
@@ -37,8 +31,7 @@ from ..logic.interpolate_fields import (
     intr_format,
 )
 from ..configuration import CopyFieldToVariable
-
-from .add_model_options_to_dict import add_model_options_to_dict
+from .edit_state import EditState
 
 
 class VariableInputsDict(TypedDict):
@@ -55,27 +48,17 @@ class CopyFieldToVariableEditor(QWidget):
     Remove button for removing definitions is at the top-right of each definition.
     """
 
-    def __init__(self, parent, copy_definition: Optional[CopyDefinition]):
+    def __init__(
+        self,
+        parent,
+        state: EditState,
+        copy_definition: Optional[CopyDefinition],
+    ):
         super().__init__(parent)
+        self.state = state
         self.fields_to_variable_defs: list[CopyFieldToVariable] = (
             copy_definition.get("field_to_variable_defs", []) if copy_definition else []
         )
-        clean_model_names = (
-            copy_definition.get("copy_into_note_types", "").strip('""').split('", "')
-            if copy_definition
-            else []
-        )
-        self.selected_copy_into_models = list(
-            filter(
-                None,
-                [mw.col.models.by_name(model_name) for model_name in clean_model_names],
-            )
-        )
-        self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
-
-        self.copy_from_menu_options_dict = BASE_NOTE_MENU_DICT.copy()
-        self.update_copy_from_options_dict()
-
         self.copy_definition = copy_definition
 
         self.vbox = QVBoxLayout()
@@ -91,6 +74,8 @@ class CopyFieldToVariableEditor(QWidget):
         self.add_new_button.clicked.connect(self.show_editor)
 
         self.copy_field_inputs: list[VariableInputsDict] = []
+
+        state.add_selected_model_callback(self.update_variables_options_dicts)
 
         # There has to be at least one definition so initialize with one
         if len(self.fields_to_variable_defs) == 0:
@@ -122,6 +107,11 @@ class CopyFieldToVariableEditor(QWidget):
         self.fields_to_variable_defs.append(new_definition)
         self.add_copy_field_row(len(self.fields_to_variable_defs) - 1, new_definition)
 
+    def update_variable_names_in_state(self):
+        self.state.update_variable_names(
+            [inputs["copy_into_variable"].text() for inputs in self.copy_field_inputs]
+        )
+
     def add_copy_field_row(self, index, copy_field_to_variable_definition):
         # Create a QFrame
         frame = QFrame(self)
@@ -146,6 +136,8 @@ class CopyFieldToVariableEditor(QWidget):
             variable_name_field.setText(copy_field_to_variable_definition["copy_into_variable"])
             variable_name_field.update_required_style()
 
+        variable_name_field.textChanged.connect(self.update_variable_names_in_state)
+
         # Copy from field
         copy_from_text_layout = InterpolatedTextEditLayout(
             is_required=True,
@@ -160,7 +152,10 @@ class CopyFieldToVariableEditor(QWidget):
         )
         row_form.addRow(copy_from_text_layout)
 
-        copy_from_text_layout.update_options(self.copy_from_menu_options_dict)
+        copy_from_text_layout.update_options(
+            self.state.pre_query_menu_options_dict,
+            self.state.pre_query_text_edit_validate_dict,
+        )
         with suppress(KeyError):
             copy_from_text_layout.set_text(copy_field_to_variable_definition["copy_from_text"])
 
@@ -210,6 +205,7 @@ class CopyFieldToVariableEditor(QWidget):
         """
         self.fields_to_variable_defs.remove(definition)
         self.copy_field_inputs.remove(inputs_dict)
+        self.update_variable_names_in_state()
 
     def get_field_to_variable_defs(self):
         """
@@ -225,33 +221,9 @@ class CopyFieldToVariableEditor(QWidget):
             field_to_field_defs.append(copy_variable_definition)
         return field_to_field_defs
 
-    def set_selected_copy_into_models(self, models):
-        self.selected_copy_into_models = models
-        self.update_copy_from_options_dict()
+    def update_variables_options_dicts(self, _):
         for copy_field_inputs in self.copy_field_inputs:
-            copy_field_inputs["copy_from_text"].update_options(self.copy_from_menu_options_dict)
-
-    def update_copy_from_options_dict(self):
-        """
-        Updates the raw options dict used for the "Define content for variable" TextEdit right-click
-        menu. The raw dict is used for validating the text in the TextEdit.
-        """
-        field_names_by_model_dict = BASE_NOTE_MENU_DICT.copy()
-
-        if len(self.selected_copy_into_models) > 1:
-            # If there are multiple models, add the intersecting fields only
-            self.intersecting_fields = get_intersecting_model_fields(self.selected_copy_into_models)
-            add_intersecting_model_field_options_to_dict(
-                models=self.selected_copy_into_models,
-                target_dict=field_names_by_model_dict,
-                intersecting_fields=self.intersecting_fields,
+            copy_field_inputs["copy_from_text"].update_options(
+                self.state.pre_query_menu_options_dict,
+                self.state.pre_query_text_edit_validate_dict,
             )
-        elif len(self.selected_copy_into_models) == 1:
-            model = self.selected_copy_into_models[0]
-            add_model_options_to_dict(
-                model_name=model["name"],
-                model_id=model["id"],
-                target_dict=field_names_by_model_dict,
-            )
-
-        self.copy_from_menu_options_dict = field_names_by_model_dict

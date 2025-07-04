@@ -17,6 +17,26 @@ from ..logic.interpolate_fields import (
 )
 
 
+def make_validate_dict(new_options_dict: dict):
+    validate_dict = {}
+
+    # Recursively add options to the context menu to
+    # allow arbitrary nesting of options and submenus
+    def add_options_to_validate_dict(option: Union[list, dict, str]):
+        if isinstance(option, dict):
+            for field, value in option.items():
+                # new_dict_level = self.text_edit.add_option_group(menu_key)
+                add_options_to_validate_dict(value)
+        elif isinstance(option, list):
+            for field in option:
+                validate_dict[field.lower()] = True
+        else:
+            validate_dict[option.lower()] = True
+
+    add_options_to_validate_dict(new_options_dict)
+    return validate_dict
+
+
 class InterpolatedTextEditLayout(QVBoxLayout):
     """
     Layout containing a PasteableTextEdit that allows for interpolation of fields.
@@ -65,7 +85,7 @@ class InterpolatedTextEditLayout(QVBoxLayout):
         self.addWidget(self.text_edit)
         self.addWidget(self.error_label)
 
-        self.update_options(options_dict)
+        self.update_options(options_dict, self.validate_dict)
 
     def get_text(self):
         """Get current text from the text field."""
@@ -84,28 +104,13 @@ class InterpolatedTextEditLayout(QVBoxLayout):
         else:
             self.optional_description.hide()
 
-    def update_options(self, new_options_dict):
+    def update_options(self, new_options_dict: dict, new_validate_dict: dict):
         """
         Updates the options in the "Define what to copy from" TextEdit right-click menu.
         """
         self.text_edit.clear_options()
         self.options_dict = new_options_dict
-        self.validate_dict = {}
-
-        # Recursively add options to the context menu to
-        # allow arbitrary nesting of options and submenus
-        def add_options_to_validate_dict(option: Union[list, dict, str]):
-            if isinstance(option, dict):
-                for field, value in option.items():
-                    # new_dict_level = self.text_edit.add_option_group(menu_key)
-                    add_options_to_validate_dict(value)
-            elif isinstance(option, list):
-                for field in option:
-                    self.validate_dict[field.lower()] = True
-            else:
-                self.validate_dict[option.lower()] = True
-
-        add_options_to_validate_dict(new_options_dict)
+        self.validate_dict = new_validate_dict
         self.text_edit.set_options_dict(new_options_dict)
         self.validate_text()
 
