@@ -277,37 +277,97 @@ class BasicEditorFormLayout(QFormLayout):
         return self.selected_models
 
 
-class FieldToFieldEditorVBox(QVBoxLayout):
+class TabEditorComponents(QTabWidget):
+    """
+    Organizes the editor components (BasicEditorFormLayout, FieldsToVariableEditor,
+    FieldToFieldEditor, FieldToFileEditor) in tabs.
+    """
+
     def __init__(self, parent, copy_definition: Optional[CopyDefinition], copy_mode: CopyModeType):
         super().__init__(parent)
-        self.addWidget(QLabel("<h2>Copy content to notes</h2>"))
+        self.copy_definition = copy_definition
+        self.copy_mode = copy_mode
+        self.parent = parent
+
+        # Basic Settings Tab
+        self.basic_widget = QWidget()
+        basic_layout = QVBoxLayout(self.basic_widget)
+        basic_layout.setAlignment(QAlignTop)
+
+        # Add extra widgets for across notes mode (direction radio buttons)
+        extra_widgets = None
+        if copy_mode == COPY_MODE_ACROSS_NOTES and hasattr(parent, "direction_radio_buttons"):
+            extra_widgets = [(
+                QLabel("<h3>Copy direction</h3>"),
+                parent.wrap_in_widget(parent.direction_radio_buttons),
+            )]
+
+        self.basic_editor_form_layout = BasicEditorFormLayout(
+            parent, copy_definition, extra_top_widgets=extra_widgets
+        )
+        basic_layout.addLayout(self.basic_editor_form_layout)
+        self.addTab(self.basic_widget, "Basic Settings")
+
+        # Variables Tab (only for ACROSS_NOTES mode)
+        if copy_mode == COPY_MODE_ACROSS_NOTES:
+            self.variables_widget = QWidget()
+            variables_layout = QVBoxLayout(self.variables_widget)
+            variables_layout.setAlignment(QAlignTop)
+
+            variables_layout.addWidget(QLabel("<h3>Fields to copy into variables</h3>"))
+            self.field_to_variable_editor = CopyFieldToVariableEditor(parent, copy_definition)
+            variables_layout.addWidget(self.field_to_variable_editor)
+            spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
+            variables_layout.addItem(spacer)
+            set_size_policy_for_all_widgets(
+                variables_layout, QSizePolicyPreferred, QSizePolicyFixed
+            )
+
+            self.addTab(self.variables_widget, "Variables")
+
+        # Field to Field Tab
+        self.fields_widget = QWidget()
+        fields_layout = QVBoxLayout(self.fields_widget)
+        fields_layout.setAlignment(QAlignTop)
+
+        fields_layout.addWidget(QLabel("<h2>Copy content to notes</h2>"))
         self.field_to_field_editor = CopyFieldToFieldEditor(parent, copy_definition, copy_mode)
-        self.addWidget(self.field_to_field_editor)
+        fields_layout.addWidget(self.field_to_field_editor)
         spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
-        self.addItem(spacer)
-        set_size_policy_for_all_widgets(self, QSizePolicyPreferred, QSizePolicyFixed)
+        fields_layout.addItem(spacer)
+        set_size_policy_for_all_widgets(fields_layout, QSizePolicyPreferred, QSizePolicyFixed)
 
+        self.addTab(self.fields_widget, "Field to Field")
 
-class FieldToFileEditorVBox(QVBoxLayout):
-    def __init__(self, parent, copy_definition: Optional[CopyDefinition], copy_mode: CopyModeType):
-        super().__init__(parent)
-        self.addWidget(QLabel("<h2>Copy content to files</h2>"))
+        # Field to File Tab
+        self.files_widget = QWidget()
+        files_layout = QVBoxLayout(self.files_widget)
+        files_layout.setAlignment(QAlignTop)
+
+        files_layout.addWidget(QLabel("<h2>Copy content to files</h2>"))
         self.field_to_file_editor = CopyFieldToFileEditor(parent, copy_definition, copy_mode)
-        self.addWidget(self.field_to_file_editor)
+        files_layout.addWidget(self.field_to_file_editor)
         spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
-        self.addItem(spacer)
-        set_size_policy_for_all_widgets(self, QSizePolicyPreferred, QSizePolicyFixed)
+        files_layout.addItem(spacer)
+        set_size_policy_for_all_widgets(files_layout, QSizePolicyPreferred, QSizePolicyFixed)
 
+        self.addTab(self.files_widget, "Field to File")
 
-class FieldsToVariableEditorVBox(QVBoxLayout):
-    def __init__(self, parent, copy_definition: Optional[CopyDefinition]):
-        super().__init__(parent)
-        self.addWidget(QLabel("<h3>Fields to copy into variables</h3>"))
-        self.field_to_variable_editor = CopyFieldToVariableEditor(parent, copy_definition)
-        self.addWidget(self.field_to_variable_editor)
-        spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
-        self.addItem(spacer)
-        set_size_policy_for_all_widgets(self, QSizePolicyPreferred, QSizePolicyFixed)
+    def get_field_to_field_editor(self):
+        return self.field_to_field_editor
+
+    def get_field_to_file_editor(self):
+        return self.field_to_file_editor
+
+    def get_field_to_variable_editor(self):
+        if hasattr(self, "field_to_variable_editor"):
+            return self.field_to_variable_editor
+        return None
+
+    def update_fields_by_target_note_type(self, models):
+        self.field_to_field_editor.set_selected_copy_into_models(models)
+        if hasattr(self, "field_to_variable_editor"):
+            self.field_to_variable_editor.set_selected_copy_into_models(models)
 
 
 class AcrossNotesCopyEditor(QWidget):
@@ -335,21 +395,12 @@ class AcrossNotesCopyEditor(QWidget):
         )
         self.direction_radio_buttons.addStretch(1)
 
-        self.basic_editor_form_layout = BasicEditorFormLayout(
-            self,
-            copy_definition,
-            extra_top_widgets=[(
-                QLabel("<h3>Copy direction</h3>"),
-                self.wrap_in_widget(self.direction_radio_buttons),
-            )],
-        )
-        self.main_layout.addLayout(self.basic_editor_form_layout)
+        # Create the tabbed editor components
+        self.editor_tabs = TabEditorComponents(self, copy_definition, COPY_MODE_ACROSS_NOTES)
 
-        self.variables_vbox = FieldsToVariableEditorVBox(self, copy_definition)
-        self.main_layout.addLayout(self.variables_vbox)
-
-        self.form = QFormLayout()
-        self.main_layout.addLayout(self.form)
+        # Move query form to basic settings tab
+        query_form = QFormLayout()
+        self.editor_tabs.basic_widget.layout().addLayout(query_form)
 
         self.card_query_text_label = QLabel("<h3>Search query to get source notes</h3>")
         self.card_query_text_layout = InterpolatedTextEditLayout(
@@ -368,10 +419,10 @@ class AcrossNotesCopyEditor(QWidget):
             ),
         )
 
-        self.form.addRow(self.card_query_text_layout)
+        query_form.addRow(self.card_query_text_layout)
 
         self.sort_by_field_cbox = GroupedComboBox(is_required=False)
-        self.form.addRow("<h4>Sort queried notes by field</h4>", self.sort_by_field_cbox)
+        query_form.addRow("<h4>Sort queried notes by field</h4>", self.sort_by_field_cbox)
         # Add all fields from all note types
         self.sort_by_field_cbox.addItem("-")
         self.sort_by_field_cbox.setCurrentText("-")
@@ -389,7 +440,7 @@ class AcrossNotesCopyEditor(QWidget):
         self.card_select_by_right_label = QLabel("")
         self.card_select_hbox.addWidget(self.card_select_cbox)
         self.card_select_hbox.addWidget(self.card_select_by_right_label)
-        self.form.addRow("<h4>How to select a card to copy from</h4>", self.card_select_hbox)
+        query_form.addRow("<h4>How to select a card to copy from</h4>", self.card_select_hbox)
 
         card_select_count_hbox = QHBoxLayout()
         self.card_select_count = QLineEdit()
@@ -402,23 +453,18 @@ class AcrossNotesCopyEditor(QWidget):
         card_select_count_hbox.addWidget(self.card_select_count)
         card_select_count_hbox.addWidget(self.card_select_count_right_label)
         card_select_count_hbox.addStretch(1)
-        self.form.addRow("<h5>Select multiple cards? (set 0 for all)</h5>", card_select_count_hbox)
+        query_form.addRow("<h5>Select multiple cards? (set 0 for all)</h5>", card_select_count_hbox)
 
         self.card_select_count.textChanged.connect(self.on_card_select_count_changed)
 
         self.card_select_separator = RequiredLineEdit()
         self.card_select_separator.setText(", ")
-        self.form.addRow("<h5>Separator for multiple values</h5>", self.card_select_separator)
+        query_form.addRow("<h5>Separator for multiple values</h5>", self.card_select_separator)
         spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
-        self.form.addItem(spacer)
+        query_form.addItem(spacer)
 
-        # Add field-to-field editor
-        self.fields_vbox = FieldToFieldEditorVBox(self, copy_definition, COPY_MODE_ACROSS_NOTES)
-        self.main_layout.addLayout(self.fields_vbox)
-
-        # Add field-to-file editor
-        self.files_vbox = FieldToFileEditorVBox(self, copy_definition, COPY_MODE_ACROSS_NOTES)
-        self.main_layout.addLayout(self.files_vbox)
+        # Add the tabbed widget to the main layout
+        self.main_layout.addWidget(self.editor_tabs)
 
         # Set the current text in the combo boxes to what we had in memory in the configuration
         # (if we had something)
@@ -485,7 +531,7 @@ class AcrossNotesCopyEditor(QWidget):
         return widget
 
     def update_direction_labels(self, direction: DirectionType):
-        self.basic_editor_form_layout.update_direction_labels(direction)
+        self.editor_tabs.basic_editor_form_layout.update_direction_labels(direction)
         self.get_field_to_field_editor().update_direction_labels(direction)
 
         with block_signals(self.source_to_destination_radio, self.destination_to_source_radio):
@@ -493,7 +539,7 @@ class AcrossNotesCopyEditor(QWidget):
                 self.source_to_destination_radio.setChecked(True)
                 self.destination_to_source_radio.setChecked(False)
                 self.card_query_text_label.setText("<h3>Search query to get source cards</h3>")
-                self.fields_vbox.field_to_field_editor.update_all_field_target_cboxes()
+                self.editor_tabs.field_to_field_editor.update_all_field_target_cboxes()
             else:
                 self.destination_to_source_radio.setChecked(True)
                 self.source_to_destination_radio.setChecked(False)
@@ -506,8 +552,9 @@ class AcrossNotesCopyEditor(QWidget):
             return DIRECTION_DESTINATION_TO_SOURCES
 
     def update_fields_by_target_note_type(self, models: list[NotetypeDict]):
-        self.fields_vbox.field_to_field_editor.set_selected_copy_into_models(models)
-        self.variables_vbox.field_to_variable_editor.set_selected_copy_into_models(models)
+        self.editor_tabs.field_to_field_editor.set_selected_copy_into_models(models)
+        if self.editor_tabs.get_field_to_variable_editor():
+            self.editor_tabs.get_field_to_variable_editor().set_selected_copy_into_models(models)
 
         new_options_dict = BASE_NOTE_MENU_DICT.copy()
         variables_dict = get_variable_names_from_copy_definition(self.copy_definition)
@@ -528,13 +575,13 @@ class AcrossNotesCopyEditor(QWidget):
         self.card_query_text_layout.validate_text()
 
     def get_field_to_field_editor(self) -> CopyFieldToFieldEditor:
-        return self.fields_vbox.field_to_field_editor
+        return self.editor_tabs.get_field_to_field_editor()
 
     def get_field_to_file_editor(self) -> CopyFieldToFileEditor:
-        return self.files_vbox.field_to_file_editor
+        return self.editor_tabs.get_field_to_file_editor()
 
     def get_field_to_variable_editor(self) -> CopyFieldToVariableEditor:
-        return self.variables_vbox.field_to_variable_editor
+        return self.editor_tabs.get_field_to_variable_editor()
 
 
 class WithinNoteCopyEditor(QWidget):
@@ -550,25 +597,18 @@ class WithinNoteCopyEditor(QWidget):
         self.main_layout.setAlignment(QAlignTop)
         self.setLayout(self.main_layout)
 
-        self.basic_editor_form_layout = BasicEditorFormLayout(self, copy_definition)
-        self.main_layout.addLayout(self.basic_editor_form_layout)
-
-        # Add field-to-field editor
-        self.fields_vbox = FieldToFieldEditorVBox(self, copy_definition, COPY_MODE_WITHIN_NOTE)
-        self.main_layout.addLayout(self.fields_vbox)
-
-        # Add field-to-file editor
-        self.files_vbox = FieldToFileEditorVBox(self, copy_definition, COPY_MODE_WITHIN_NOTE)
-        self.main_layout.addLayout(self.files_vbox)
+        # Create the tabbed editor components
+        self.editor_tabs = TabEditorComponents(self, copy_definition, COPY_MODE_WITHIN_NOTE)
+        self.main_layout.addWidget(self.editor_tabs)
 
     def get_field_to_field_editor(self):
-        return self.fields_vbox.field_to_field_editor
+        return self.editor_tabs.get_field_to_field_editor()
 
     def get_field_to_file_editor(self):
-        return self.files_vbox.field_to_file_editor
+        return self.editor_tabs.get_field_to_file_editor()
 
     def update_fields_by_target_note_type(self, models):
-        self.fields_vbox.field_to_field_editor.set_selected_copy_into_models(models)
+        self.editor_tabs.update_fields_by_target_note_type(models)
 
 
 class EditCopyDefinitionDialog(ScrollableQDialog):
@@ -655,27 +695,29 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
 
         # Connect signals
         across_target_cbox = (
-            self.across_notes_editor_tab.basic_editor_form_layout.note_type_target_cbox
+            self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout.note_type_target_cbox
         )
         within_target_cbox = (
-            self.within_note_editor_tab.basic_editor_form_layout.note_type_target_cbox
+            self.within_note_editor_tab.editor_tabs.basic_editor_form_layout.note_type_target_cbox
         )
         across_target_cbox.currentTextChanged.connect(
             lambda _: self.update_fields_by_target_note_type(
-                self.across_notes_editor_tab.basic_editor_form_layout
+                self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout
             )
         )
         within_target_cbox.currentTextChanged.connect(
             lambda _: self.update_fields_by_target_note_type(
-                self.within_note_editor_tab.basic_editor_form_layout
+                self.within_note_editor_tab.editor_tabs.basic_editor_form_layout
             )
         )
 
         # Initialize the fields in the editor tabs
         self.update_fields_by_target_note_type(
-            self.across_notes_editor_tab.basic_editor_form_layout
+            self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout
         )
-        self.update_fields_by_target_note_type(self.within_note_editor_tab.basic_editor_form_layout)
+        self.update_fields_by_target_note_type(
+            self.within_note_editor_tab.editor_tabs.basic_editor_form_layout
+        )
 
         # Set dialog width window width
         screen = QGuiApplication.primaryScreen()
@@ -763,15 +805,15 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.within_note_editor_tab.update_fields_by_target_note_type(models)
 
         # Update deck options in the basic editor form layout
-        self.across_notes_editor_tab.basic_editor_form_layout.set_current_decks()
-        self.within_note_editor_tab.basic_editor_form_layout.set_current_decks()
+        self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout.set_current_decks()
+        self.within_note_editor_tab.editor_tabs.basic_editor_form_layout.set_current_decks()
 
     def get_copy_mode(self) -> CopyModeType:
         return self.selected_editor_type or COPY_MODE_ACROSS_NOTES
 
     def get_copy_definition(self) -> Union[CopyDefinition, None]:
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
-            basic_editor = self.across_notes_editor_tab.basic_editor_form_layout
+            basic_editor = self.across_notes_editor_tab.editor_tabs.basic_editor_form_layout
             field_to_field_editor = self.across_notes_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.across_notes_editor_tab.get_field_to_file_editor()
             field_to_variable_editor = self.across_notes_editor_tab.get_field_to_variable_editor()
@@ -801,7 +843,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             }
             return across_copy_definition
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
-            basic_editor = self.within_note_editor_tab.basic_editor_form_layout
+            basic_editor = self.within_note_editor_tab.editor_tabs.basic_editor_form_layout
             field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             within_copy_definition: CopyDefinition = {
