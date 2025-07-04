@@ -35,7 +35,6 @@ from ..configuration import (
 )
 
 from .multi_combo_box import MultiComboBox
-from .grouped_combo_box import GroupedComboBox
 from .add_model_options_to_dict import add_model_options_to_dict
 from .add_intersecting_model_field_options_to_dict import (
     add_intersecting_model_field_options_to_dict,
@@ -382,7 +381,10 @@ class CopyFieldToFileEditor(QWidget):
         """
         Updates the placeholder text of the "Copy on unfocus trigger field" dropdown box.
         """
-        if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+        if (
+            self.copy_mode == COPY_MODE_WITHIN_NOTE
+            or self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS
+        ):
             if len(self.selected_copy_into_models) > 0:
                 unfocus_field_trigger_multibox.setPlaceholderText(
                     "Select note fields of the trigger note that will trigger the copy"
@@ -391,8 +393,8 @@ class CopyFieldToFileEditor(QWidget):
                 unfocus_field_trigger_multibox.setPlaceholderText(
                     "First select a trigger note type"
                 )
-        else:
-            unfocus_field_trigger_multibox.setPlaceholderText("Not required in this mode")
+        elif self.across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES:
+            unfocus_field_trigger_multibox.setPlaceholderText("Cannot be used in this mode")
 
     def update_an_unfocus_trigger_field_cbox(self, unfocus_field_trigger_multibox: MultiComboBox):
         """
@@ -414,66 +416,6 @@ class CopyFieldToFileEditor(QWidget):
                 )
         unfocus_field_trigger_multibox.setCurrentText(previous_text)
         unfocus_field_trigger_multibox.set_popup_and_box_width()
-
-    def update_a_destination_field_target_cbox(self, field_target_cbox: GroupedComboBox):
-        """
-        Updates the options in the "Destination field" dropdown box.
-        """
-        previous_text = field_target_cbox.currentText()
-        previous_text_in_new_options = False
-        # Clear will unset the current selected text
-        field_target_cbox.clear()
-        # within note mode is by definition destination to source, because
-        # the trigger note is both the source and the destination
-        is_destination_to_sources = (
-            self.copy_mode == COPY_MODE_WITHIN_NOTE
-            or self.across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES
-        )
-        if is_destination_to_sources:
-            # Options are based on the selected trigger note types
-            if len(self.selected_copy_into_models) > 1:
-                # intersecting fields should be set
-                if not self.intersecting_fields:
-                    self.intersecting_fields = get_intersecting_model_fields(
-                        self.selected_copy_into_models
-                    )
-                group_name = (
-                    "Intersecting fields of"
-                    f" {', '.join([model['name'] for model in self.selected_copy_into_models])}"
-                )
-                field_target_cbox.addGroup(group_name)
-                for field_name in self.intersecting_fields:
-                    field_target_cbox.addItemToGroup(group_name, field_name)
-            elif len(self.selected_copy_into_models) == 1:
-                model = self.selected_copy_into_models[0]
-                field_target_cbox.addGroup(model["name"])
-                for field_name in mw.col.models.field_names(model):
-                    if field_name == previous_text:
-                        previous_text_in_new_options = True
-                    field_target_cbox.addItemToGroup(model["name"], field_name)
-        else:
-            # Options are based on the possible note types defined by the card_query search in
-            # crossNotesCopyEditor, however we'll just make it all fields in all note types for now
-            for model in mw.col.models.all():
-                field_target_cbox.addGroup(model["name"])
-                for field_name in mw.col.models.field_names(model):
-                    if field_name == previous_text:
-                        previous_text_in_new_options = True
-                    field_target_cbox.addItemToGroup(model["name"], field_name)
-
-        # Reset the selected text, if the new options still include it
-        if previous_text_in_new_options:
-            field_target_cbox.setCurrentText(previous_text)
-
-        # Change placeholder text if we have some options
-        if field_target_cbox.count() > 0:
-            field_target_cbox.setPlaceholderText("Select a note field")
-            field_target_cbox.setDisabled(False)
-        else:
-            field_target_cbox.setPlaceholderText("First select a trigger note type")
-            field_target_cbox.setDisabled(True)
-
-        field_target_cbox.set_popup_and_box_width()
 
     def update_copy_from_options_dict(self):
         """

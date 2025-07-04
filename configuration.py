@@ -175,8 +175,10 @@ def get_field_to_field_unfocus_trigger_fields(
         return field_to_field.get("copy_on_unfocus_trigger_field", "").strip('""').split('", "')
     else:
         # destination to sources mode or within note mode the destination and trigger fields
-        # are the same
-        return [field_to_field.get("copy_into_note_field", "")]
+        # are in the same note
+        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip('""').split(
+            '", "'
+        ) or [field_to_field.get("copy_into_note_field", "")]
 
 
 def get_triggered_field_to_field_def_for_field(

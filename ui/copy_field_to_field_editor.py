@@ -158,6 +158,23 @@ class CopyFieldToFieldEditor(QWidget):
         self.field_to_field_defs.append(new_definition)
         self.add_copy_field_row(len(self.field_to_field_defs) - 1, new_definition)
 
+    def create_unfocus_check_handler(
+        self,
+        target_field_cbox: GroupedComboBox,
+        trigger_field_cbox: MultiComboBox,
+    ):
+        def handler(checked: bool):
+            if checked:
+                if (
+                    not trigger_field_cbox.currentText()
+                    and self.across_mode_direction != DIRECTION_DESTINATION_TO_SOURCES
+                ):
+                    target_field = target_field_cbox.currentText()
+                    if target_field:
+                        trigger_field_cbox.setCurrentText(f'"{target_field}"')
+
+        return handler
+
     def add_copy_field_row(self, index, copy_field_to_field_definition: CopyFieldToField):
         # Create a QFrame
         frame = QFrame(self)
@@ -243,13 +260,19 @@ class CopyFieldToFieldEditor(QWidget):
         copy_on_unfocus_trigger_label = QLabel("Copy on unfocus trigger field")
         row_form.addRow(copy_on_unfocus_trigger_label, copy_on_unfocus_trigger_field)
         # Options need to exist before we can set the initial text
+        self.update_an_unfocus_trigger_field_cbox(copy_on_unfocus_trigger_field)
         if self.copy_mode == COPY_MODE_ACROSS_NOTES:
-            self.update_an_unfocus_trigger_field_cbox(copy_on_unfocus_trigger_field)
             self.update_direction_labels(self.across_mode_direction)
         with suppress(KeyError):
             copy_on_unfocus_trigger_field.setCurrentText(
                 copy_field_to_field_definition["copy_on_unfocus_trigger_field"]
             )
+        unfocus_handler = self.create_unfocus_check_handler(
+            field_target_cbox,
+            copy_on_unfocus_trigger_field,
+        )
+        copy_on_unfocus_when_edit.toggled.connect(unfocus_handler)
+        copy_on_unfocus_when_add.toggled.connect(unfocus_handler)
 
         process_chain_widget = EditExtraProcessingWidget(
             self,
@@ -388,7 +411,10 @@ class CopyFieldToFieldEditor(QWidget):
         """
         Updates the placeholder text of the "Copy on unfocus trigger field" dropdown box.
         """
-        if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+        if (
+            self.copy_mode == COPY_MODE_WITHIN_NOTE
+            or self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS
+        ):
             if len(self.selected_copy_into_models) > 0:
                 unfocus_field_trigger_multibox.setPlaceholderText(
                     "Select note fields of the trigger note that will trigger the copy"
@@ -397,8 +423,8 @@ class CopyFieldToFieldEditor(QWidget):
                 unfocus_field_trigger_multibox.setPlaceholderText(
                     "First select a trigger note type"
                 )
-        else:
-            unfocus_field_trigger_multibox.setPlaceholderText("Not required in this mode")
+        elif self.across_mode_direction == DIRECTION_DESTINATION_TO_SOURCES:
+            unfocus_field_trigger_multibox.setPlaceholderText("Cannot be used in this mode")
 
     def update_an_unfocus_trigger_field_cbox(self, unfocus_field_trigger_multibox: MultiComboBox):
         """
@@ -408,16 +434,15 @@ class CopyFieldToFieldEditor(QWidget):
         previous_text = unfocus_field_trigger_multibox.currentText()
         unfocus_field_trigger_multibox.clear()
         self.update_unfocus_trigger_field_placeholder(unfocus_field_trigger_multibox)
-        if self.across_mode_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
-            if len(self.selected_copy_into_models) == 1:
-                model = self.selected_copy_into_models[0]
-                unfocus_field_trigger_multibox.addItems(
-                    [f'"{field_name}"' for field_name in mw.col.models.field_names(model)]
-                )
-            elif len(self.selected_copy_into_models) > 1:
-                unfocus_field_trigger_multibox.addItems(
-                    [f'"{field_name}"' for field_name in self.intersecting_fields]
-                )
+        if len(self.selected_copy_into_models) == 1:
+            model = self.selected_copy_into_models[0]
+            unfocus_field_trigger_multibox.addItems(
+                [f'"{field_name}"' for field_name in mw.col.models.field_names(model)]
+            )
+        elif len(self.selected_copy_into_models) > 1:
+            unfocus_field_trigger_multibox.addItems(
+                [f'"{field_name}"' for field_name in self.intersecting_fields]
+            )
         unfocus_field_trigger_multibox.setCurrentText(previous_text)
         unfocus_field_trigger_multibox.set_popup_and_box_width()
 
