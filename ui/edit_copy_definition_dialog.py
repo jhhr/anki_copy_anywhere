@@ -93,6 +93,49 @@ def set_size_policy_for_all_widgets(layout, h_policy, v_policy):
                 set_size_policy_for_all_widgets(inner_layout, h_policy, v_policy)
 
 
+class EditState:
+    """
+    Class to hold the shared state of the editors
+    """
+
+    def __init__(
+        self,
+        copy_definition: Optional[CopyDefinition] = None,
+        copy_mode: CopyModeType = COPY_MODE_WITHIN_NOTE,
+    ):
+        self.definition_name = ""
+        self.copy_mode = copy_mode
+        if copy_definition is not None:
+            self.definition_name = copy_definition.get("definition_name", "")
+            self.copy_mode = copy_definition.get("copy_mode", COPY_MODE_WITHIN_NOTE)
+
+        self.definition_name_editors: list[RequiredLineEdit] = []
+
+    def update_definition_name_editors(self, triggering_editor: RequiredLineEdit):
+        """
+        Updates all editors connected to the definition name.
+        This is called when the state changes to ensure all editors are in sync.
+        """
+        for editor in self.definition_name_editors:
+            if editor is triggering_editor:
+                continue
+            editor.setText(self.definition_name)
+            editor.update_required_style()
+
+    def connect_definition_name_editor(self, line_edit: RequiredLineEdit):
+        """
+        Connects the definition name editor to the state, updating state when the text changes
+        and updating all connected editors when the state changes.
+        """
+        self.definition_name_editors.append(line_edit)
+
+        def update_state(text: str):
+            self.definition_name = text.strip()
+            self.update_definition_name_editors(line_edit)
+
+        line_edit.textChanged.connect(update_state)
+
+
 class BasicEditorFormLayout(QFormLayout):
     """
     Editor for the basic fields of a copy definition that both AcrossNotesCopyEditor
@@ -102,6 +145,7 @@ class BasicEditorFormLayout(QFormLayout):
     def __init__(
         self,
         parent,
+        state: EditState,
         copy_definition: Optional[CopyDefinition] = None,
         extra_top_widgets: Optional[list[Tuple[QLabel, QWidget]]] = None,
     ):
@@ -115,6 +159,15 @@ class BasicEditorFormLayout(QFormLayout):
             model_names_list.append(model.name)
 
         self.selected_models: list[NotetypeDict] = []
+
+        self.definition_name_edit = RequiredLineEdit(is_required=True)
+        self.addRow(QLabel("<h2>Name for this copy definition</h2>"), self.definition_name_edit)
+        # Set the initial definition name from the state
+        if state.definition_name:
+            self.definition_name_edit.setText(state.definition_name)
+            self.definition_name_edit.update_required_style()
+        # link the definition name to the state
+        state.connect_definition_name_editor(self.definition_name_edit)
 
         if extra_top_widgets:
             for label, widget in extra_top_widgets:
@@ -283,7 +336,13 @@ class TabEditorComponents(QTabWidget):
     FieldToFieldEditor, FieldToFileEditor) in tabs.
     """
 
-    def __init__(self, parent, copy_definition: Optional[CopyDefinition], copy_mode: CopyModeType):
+    def __init__(
+        self,
+        parent,
+        state: EditState,
+        copy_definition: Optional[CopyDefinition],
+        copy_mode: CopyModeType,
+    ):
         super().__init__(parent)
         self.copy_definition = copy_definition
         self.copy_mode = copy_mode
@@ -293,17 +352,15 @@ class TabEditorComponents(QTabWidget):
         self.basic_widget = QWidget()
         basic_layout = QVBoxLayout(self.basic_widget)
         basic_layout.setAlignment(QAlignTop)
-
-        # Add extra widgets for across notes mode (direction radio buttons)
-        extra_widgets = None
+        extra_widgets: list[Tuple[QLabel, QWidget]] = []
         if copy_mode == COPY_MODE_ACROSS_NOTES and hasattr(parent, "direction_radio_buttons"):
-            extra_widgets = [(
+            extra_widgets.append((
                 QLabel("<h3>Copy direction</h3>"),
                 parent.wrap_in_widget(parent.direction_radio_buttons),
-            )]
+            ))
 
         self.basic_editor_form_layout = BasicEditorFormLayout(
-            parent, copy_definition, extra_top_widgets=extra_widgets
+            parent, state, copy_definition, extra_top_widgets=extra_widgets
         )
         basic_layout.addLayout(self.basic_editor_form_layout)
         self.addTab(self.basic_widget, "Basic Settings")
@@ -371,7 +428,12 @@ class TabEditorComponents(QTabWidget):
 
 
 class AcrossNotesCopyEditor(QWidget):
-    def __init__(self, parent, copy_definition: Optional[CopyDefinition]):
+    def __init__(
+        self,
+        parent,
+        state: EditState,
+        copy_definition: Optional[CopyDefinition],
+    ):
         super().__init__(parent)
         self.copy_definition = copy_definition
 
@@ -396,7 +458,7 @@ class AcrossNotesCopyEditor(QWidget):
         self.direction_radio_buttons.addStretch(1)
 
         # Create the tabbed editor components
-        self.editor_tabs = TabEditorComponents(self, copy_definition, COPY_MODE_ACROSS_NOTES)
+        self.editor_tabs = TabEditorComponents(self, state, copy_definition, COPY_MODE_ACROSS_NOTES)
 
         # Create Query Tab for search settings
         self.query_widget = QWidget()
@@ -602,6 +664,7 @@ class WithinNoteCopyEditor(QWidget):
     def __init__(
         self,
         parent,
+        state: EditState,
         copy_definition: Optional[CopyDefinition],
     ):
         super().__init__(parent)
@@ -612,7 +675,7 @@ class WithinNoteCopyEditor(QWidget):
         self.setLayout(self.main_layout)
 
         # Create the tabbed editor components
-        self.editor_tabs = TabEditorComponents(self, copy_definition, COPY_MODE_WITHIN_NOTE)
+        self.editor_tabs = TabEditorComponents(self, state, copy_definition, COPY_MODE_WITHIN_NOTE)
         self.main_layout.addWidget(self.editor_tabs)
 
     def get_field_to_field_editor(self):
@@ -649,15 +712,13 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
 
         super().__init__(parent, footer_layout=self.bottom_grid)
         self.copy_definition = copy_definition
+        self.state = EditState(copy_definition)
 
         # Build form layout
         self.setWindowModality(WindowModal)
         self.main_layout = QVBoxLayout(self.inner_widget)
         self.top_form = QFormLayout()
         self.main_layout.addLayout(self.top_form)
-
-        self.definition_name = RequiredLineEdit(is_required=True)
-        self.top_form.addRow("<h2>Name for this copy definition</h2>", self.definition_name)
 
         self.tabs_vbox = QVBoxLayout()
         self.main_layout.addLayout(self.tabs_vbox)
@@ -674,11 +735,11 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         }
         """)
 
-        self.across_notes_editor_tab = AcrossNotesCopyEditor(self, copy_definition)
+        self.across_notes_editor_tab = AcrossNotesCopyEditor(self, self.state, copy_definition)
         self.editor_type_tabs.addTab(self.across_notes_editor_tab, COPY_MODE_ACROSS_NOTES)
         self.active_field_to_field_editor = self.across_notes_editor_tab.get_field_to_field_editor()
 
-        self.within_note_editor_tab = WithinNoteCopyEditor(self, copy_definition)
+        self.within_note_editor_tab = WithinNoteCopyEditor(self, self.state, copy_definition)
         self.editor_type_tabs.addTab(self.within_note_editor_tab, COPY_MODE_WITHIN_NOTE)
 
         self.tabs_vbox.addWidget(self.editor_type_tabs)
@@ -688,9 +749,6 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         self.editor_type_tabs.currentChanged.connect(self.update_editor_type)
 
         if copy_definition:
-            with suppress(KeyError):
-                self.definition_name.setText(copy_definition["definition_name"])
-                self.definition_name.update_required_style()
             with suppress(KeyError):
                 self.selected_editor_type = copy_definition["copy_mode"]
             with suppress(KeyError):
@@ -749,9 +807,6 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         missing_copy_from_error = ""
         missing_card_query_error = ""
         missing_card_select_error = ""
-        if self.definition_name.text() == "":
-            missing_name_error = "Definition name cannot be empty."
-            show_error = True
         for (
             field_to_field_definition
         ) in self.active_field_to_field_editor.get_field_to_field_defs():
@@ -762,6 +817,9 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 missing_copy_from_error = "Copied content cannot be empty."
                 show_error = True
 
+        if self.state.definition_name is None or self.state.definition_name == "":
+            missing_name_error = "Definition name cannot be empty."
+            show_error = True
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
             if self.across_notes_editor_tab.card_query_text_layout.get_text() == "":
                 show_error = True
@@ -781,7 +839,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 {missing_card_select_error if missing_card_select_error else ""}
                 """)
         else:  # Check that name is unique
-            definition_name = self.definition_name.text()
+            definition_name = self.state.definition_name
             config = Config()
             config.load()
             name_match_count = 0
@@ -836,7 +894,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 SelectCardByType, self.across_notes_editor_tab.card_select_cbox.currentText()
             )
             across_copy_definition: CopyDefinition = {
-                "definition_name": self.definition_name.text(),
+                "definition_name": self.state.definition_name,
                 "copy_into_note_types": basic_editor.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": basic_editor.decks_limit_multibox.currentText(),
                 "copy_on_sync": basic_editor.copy_on_sync_checkbox.isChecked(),
@@ -861,7 +919,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             within_copy_definition: CopyDefinition = {
-                "definition_name": self.definition_name.text(),
+                "definition_name": self.state.definition_name,
                 "copy_into_note_types": basic_editor.note_type_target_cbox.currentText(),
                 "only_copy_into_decks": basic_editor.decks_limit_multibox.currentText(),
                 "copy_on_sync": basic_editor.copy_on_sync_checkbox.isChecked(),
