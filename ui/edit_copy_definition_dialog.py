@@ -398,9 +398,14 @@ class AcrossNotesCopyEditor(QWidget):
         # Create the tabbed editor components
         self.editor_tabs = TabEditorComponents(self, copy_definition, COPY_MODE_ACROSS_NOTES)
 
-        # Move query form to basic settings tab
+        # Create Query Tab for search settings
+        self.query_widget = QWidget()
+        query_layout = QVBoxLayout(self.query_widget)
+        query_layout.setAlignment(QAlignTop)
+
         query_form = QFormLayout()
-        self.editor_tabs.basic_widget.layout().addLayout(query_form)
+        query_form.setAlignment(QAlignTop)
+        query_layout.addLayout(query_form)
 
         self.card_query_text_label = QLabel("<h3>Search query to get source notes</h3>")
         self.card_query_text_layout = InterpolatedTextEditLayout(
@@ -418,8 +423,14 @@ class AcrossNotesCopyEditor(QWidget):
                 f'"deck:My deck" "A Different Field:*{intr_format("Field_Name")}*" -is:suspended'
             ),
         )
+        self.card_query_widget = QWidget()
+        self.card_query_widget.setLayout(self.card_query_text_layout)
+        # Make the card_query_widget start at a maximum of 200px height, but expand vertically
+        self.card_query_widget.setMinimumHeight(100)
+        self.card_query_widget.setSizePolicy(QSizePolicyPreferred, QSizePolicyFixed)
 
-        query_form.addRow(self.card_query_text_layout)
+        query_form.addRow(self.card_query_text_label)
+        query_form.addRow(self.card_query_widget)
 
         self.sort_by_field_cbox = GroupedComboBox(is_required=False)
         query_form.addRow("<h4>Sort queried notes by field</h4>", self.sort_by_field_cbox)
@@ -460,8 +471,11 @@ class AcrossNotesCopyEditor(QWidget):
         self.card_select_separator = RequiredLineEdit()
         self.card_select_separator.setText(", ")
         query_form.addRow("<h5>Separator for multiple values</h5>", self.card_select_separator)
-        spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
-        query_form.addItem(spacer)
+        spacer = QSpacerItem(100, 40, QSizePolicyMinimum, QSizePolicyExpanding)
+        query_layout.addSpacerItem(spacer)
+
+        # Insert the Query tab after Variables tab (index 2)
+        self.editor_tabs.insertTab(2, self.query_widget, "Search Query")
 
         # Add the tabbed widget to the main layout
         self.main_layout.addWidget(self.editor_tabs)
