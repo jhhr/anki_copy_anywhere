@@ -108,7 +108,7 @@ class BasicEditorFormLayout(QFormLayout):
             model_names_list.append(model.name)
 
         self.definition_name_edit = RequiredLineEdit(is_required=True)
-        self.addRow(QLabel("<h2>Name for this copy definition</h2>"), self.definition_name_edit)
+        self.addRow(QLabel("<h3>Name for this copy definition</h3>"), self.definition_name_edit)
         # Set the initial definition name from the state
         if state.definition_name:
             self.definition_name_edit.setText(state.definition_name)
@@ -285,7 +285,8 @@ class TabEditorComponents(QTabWidget):
             variables_layout = QVBoxLayout(self.variables_widget)
             variables_layout.setAlignment(QAlignTop)
 
-            variables_layout.addWidget(QLabel("<h3>Fields to copy into variables</h3>"))
+            variables_layout.addWidget(QLabel("""<h2>Variables to use in Search Query
+            <br><small>or in Field-to-Fields or Field-to-Files</small></h3>"""))
             self.field_to_variable_editor = CopyFieldToVariableEditor(
                 parent, state, copy_definition
             )
@@ -303,7 +304,7 @@ class TabEditorComponents(QTabWidget):
         fields_layout = QVBoxLayout(self.fields_widget)
         fields_layout.setAlignment(QAlignTop)
 
-        fields_layout.addWidget(QLabel("<h2>Copy content to notes</h2>"))
+        fields_layout.addWidget(QLabel("<h2>Copy content to note fields</h2>"))
         self.field_to_field_editor = CopyFieldToFieldEditor(
             parent, state, copy_definition, copy_mode
         )
@@ -383,7 +384,7 @@ class AcrossNotesCopyEditor(QWidget):
         query_form.setAlignment(QAlignTop)
         query_layout.addLayout(query_form)
 
-        self.card_query_text_label = QLabel("<h3>Search query to get source notes</h3>")
+        self.card_query_text_label = QLabel("<h2>Search query to get source notes</h2>")
         self.card_query_text_layout = InterpolatedTextEditLayout(
             label=self.card_query_text_label,
             is_required=True,
@@ -527,11 +528,11 @@ class AcrossNotesCopyEditor(QWidget):
             if direction == DIRECTION_SOURCE_TO_DESTINATIONS:
                 self.source_to_destination_radio.setChecked(True)
                 self.destination_to_source_radio.setChecked(False)
-                self.card_query_text_label.setText("<h3>Search query to get source cards</h3>")
+                self.card_query_text_label.setText("<h2>Search query to get source notes</h3>")
             else:
                 self.destination_to_source_radio.setChecked(True)
                 self.source_to_destination_radio.setChecked(False)
-                self.card_query_text_label.setText("<h3>Search query to get destination cards</h3>")
+                self.card_query_text_label.setText("<h2>Search query to get destination notes</h3>")
 
     def get_selected_direction(self) -> DirectionType:
         if self.source_to_destination_radio.isChecked():
