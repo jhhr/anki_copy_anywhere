@@ -1633,6 +1633,20 @@ def main():
         ),
     )
     test(
+        test_name="jukujikun test 田圃",
+        kanji="田",
+        sentence="田圃[たんぼ]",
+        expected_kana_only="<b>たん</b>ボ",
+        expected_furigana="<b> 田[たん]</b> 圃[ボ]",
+        expected_furikanji="<b> たん[田]</b> ボ[圃]",
+        expected_kana_only_with_tags_split="<b><juk>たん</juk></b><on>ボ</on>",
+        expected_furigana_with_tags_split="<b><juk> 田[たん]</juk></b><on> 圃[ボ]</on>",
+        expected_furikanji_with_tags_split="<b><juk> たん[田]</juk></b><on> ボ[圃]</on>",
+        expected_kana_only_with_tags_merged="<b><juk>たん</juk></b><on>ボ</on>",
+        expected_furigana_with_tags_merged="<b><juk> 田[たん]</juk></b><on> 圃[ボ]</on>",
+        expected_furikanji_with_tags_merged="<b><juk> たん[田]</juk></b><on> ボ[圃]</on>",
+    )
+    test(
         test_name="jukujikun test ん ending",
         kanji="魁",
         sentence="花魁[おいらん]",

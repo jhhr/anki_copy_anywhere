@@ -1391,19 +1391,35 @@ def check_kunyomi_readings(
             "matched_reading": "",
         }
 
-    # Exception for 清々[すがすが]しい where すがすが should be a jukujikun, but the す would
-    # match kunyomi reading す.む for 清, so this is needed
-    if furigana.startswith("すがすが") and highlight_args.get("kanji_to_match") == "清":
+    # Exceptions that shouldn't be matched for some kunyomi
+    no_match_exceptions: list[str, Union[str, None], Union[str, None]] = [
+        # 清々[すがすが]しい should be jukujikun, す in すがすが would match す.む for 清
+        ("すがすが", None, "清"),
+        # 田圃[たんぼ] where 田[たん] should be a jukujikun, but た is a kunyomi for 田
+        ("たんぼ", "田圃", None),
+    ]
+    for ex_furigana, ex_word, ex_kanji in no_match_exceptions:
         logger.debug(
-            "\ncheck_kunyomi_readings - exception for 清々[すがすが]しい, returning empty result"
+            "check_kunyomi_readings - checking exception:"
+            f" {ex_furigana}({furigana == ex_furigana}), word:"
+            f" {ex_word}({word_data.get('word') == ex_word}), kanji:"
+            f" {ex_kanji}({highlight_args.get('kanji_to_match', '') == ex_kanji})"
         )
-        return {
-            "text": "",
-            "type": "none",
-            "match_edge": "none",
-            "actual_match": "",
-            "matched_reading": "",
-        }
+        if furigana.startswith(ex_furigana) and (
+            (ex_word and word_data.get("word") == ex_word)
+            or (ex_kanji and highlight_args.get("kanji_to_match") == ex_kanji)
+        ):
+            logger.debug(
+                f"check_kunyomi_readings - skipping kunyomi check for furigana: {ex_furigana} "
+                f"and {f'word: {ex_word}' if ex_word else f'kanji: {ex_kanji}'}"
+            )
+            return {
+                "text": "",
+                "type": "none",
+                "match_edge": "none",
+                "actual_match": "",
+                "matched_reading": "",
+            }
 
     kunyomi_readings = kunyomi.split("、")
     stem_match_results: list[YomiMatchResult] = []
