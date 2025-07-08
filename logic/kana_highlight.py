@@ -39,7 +39,7 @@ all_kanji_data: dict[str, KanjiData] = {}
 with open(json_file_path, "r", encoding="utf-8") as f:
     all_kanji_data = json.load(f)
 
-RENDAKU_CONVERSION_DICT = {
+RENDAKU_CONVERSION_DICT_HIRAGANA = {
     "か": ["が"],
     "き": ["ぎ"],
     "く": ["ぐ"],
@@ -63,13 +63,17 @@ RENDAKU_CONVERSION_DICT = {
     "う": ["ぬ"],
 }
 # Convert HIRAGANA_CONVERSION_DICT to katakana with to_katakana
-KATAKANA_CONVERSION_DICT = {
-    to_katakana(k): [to_katakana(v) for v in vs] for k, vs in RENDAKU_CONVERSION_DICT.items()
+RENDAKU_CONVERSION_DICT_KATAKANA = {
+    to_katakana(k): [to_katakana(v) for v in vs]
+    for k, vs in RENDAKU_CONVERSION_DICT_HIRAGANA.items()
 }
 
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
+SMALL_TSU_POSSIBLE_KATAKANA = [to_katakana(k) for k in SMALL_TSU_POSSIBLE_HIRAGANA]
 
 HIRAGANA_RE = "([ぁ-ん])"
+KATAKANA_RE = "([ァ-ン])"
+KATAKANA_REC = re.compile(KATAKANA_RE)
 
 # Palatilized (拗音) mora and other non-straight mora
 PALATALIZED_MORA = [
@@ -253,10 +257,13 @@ ALL_MORA = (
 ALL_MORA_RE = "|".join([m + "っ" for m in ALL_MORA] + ALL_MORA)
 ALL_MORA_REC = re.compile(rf"({ALL_MORA_RE})")
 
-VOWEL_CHANGE_DICT = {
+VOWEL_CHANGE_DICT_HIRAGANA = {
     "お": ["よ", "ょ"],
     "あ": ["や", "ゃ"],
     "う": ["ゆ", "ゅ"],
+}
+VOWEL_CHANGE_DICT_KATAKANA = {
+    to_katakana(k): [to_katakana(v) for v in vs] for k, vs in VOWEL_CHANGE_DICT_HIRAGANA.items()
 }
 
 # Regex matching any kanji characters
@@ -443,6 +450,7 @@ class WordData(TypedDict):
     kanji_count: int
     word: str
     furigana: str
+    furigana_is_katakana: bool
     okurigana: str
     edge: Edge
 
@@ -1034,6 +1042,7 @@ ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_ts
 def is_reading_in_furigana_section(
     reading: str,
     furigana_section: str,
+    check_in_katakana: bool,
     okurigana: str,
     edge: Edge,
     logger: Logger = Logger("error"),
@@ -1048,13 +1057,19 @@ def is_reading_in_furigana_section(
     # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
     # This only applies to the first kana in the reading and if the reading isn't a single kana
     rendaku_readings = []
-    if possible_rendaku_kana := RENDAKU_CONVERSION_DICT.get(reading[0]):
+    rendaku_dict = (
+        RENDAKU_CONVERSION_DICT_KATAKANA if check_in_katakana else RENDAKU_CONVERSION_DICT_HIRAGANA
+    )
+    if possible_rendaku_kana := rendaku_dict.get(reading[0]):
         for kana in possible_rendaku_kana:
             rendaku_readings.append(f"{kana}{reading[1:]}")
     # Then also check for small tsu conversion of some consonants
     # this only happens in the last kana of the reading
     small_tsu_readings = []
-    for kana in SMALL_TSU_POSSIBLE_HIRAGANA:
+    small_tsu_list = (
+        SMALL_TSU_POSSIBLE_KATAKANA if check_in_katakana else SMALL_TSU_POSSIBLE_HIRAGANA
+    )
+    for kana in small_tsu_list:
         if reading[-1] == kana:
             small_tsu_readings.append(f"{reading[:-1]}っ")
     # Handle う-->っ cases, these can have the っ in the okurigana so it's more like
@@ -1068,8 +1083,11 @@ def is_reading_in_furigana_section(
             u_dropped_readings.append(f"{rendaku_reading[:-1]}")
     # Handle vowel change
     vowel_change_readings = []
-    if reading[0] in VOWEL_CHANGE_DICT:
-        for kana in VOWEL_CHANGE_DICT[reading[0]]:
+    vowel_change_dict = (
+        VOWEL_CHANGE_DICT_KATAKANA if check_in_katakana else VOWEL_CHANGE_DICT_HIRAGANA
+    )
+    if reading[0] in vowel_change_dict:
+        for kana in vowel_change_dict[reading[0]]:
             vowel_change_readings.append(f"{kana}{reading[1:]}")
 
     if edge == "whole":
@@ -1202,11 +1220,11 @@ def check_onyomi_readings(
         logger.debug(f"check_onyomi_readings 1 - onyomi_reading: {onyomi_reading}")
         if not onyomi_reading:
             continue
-        # Convert the onyomi to hiragana since the furigana is in hiragana
-        onyomi_reading = to_hiragana(onyomi_reading)
+        furigana_is_katakana = word_data.get("furigana_is_katakana", False)
         match_in_section, match_type = is_reading_in_furigana_section(
-            onyomi_reading,
+            onyomi_reading if furigana_is_katakana else to_hiragana(onyomi_reading),
             target_furigana_section,
+            furigana_is_katakana,
             okurigana,
             edge,
             logger=logger,
@@ -1391,6 +1409,7 @@ def check_kunyomi_readings(
     stem_match_results: list[YomiMatchResult] = []
     kunyomi_stems: set[Tuple[str, str]] = set()
     kunyomi_stem_and_okuris: list[Tuple[str, str, str]] = []
+    furigana_is_katakana = word_data.get("furigana_is_katakana", False)
     for kunyomi_reading in kunyomi_readings:
         if not kunyomi_reading:
             continue
@@ -1415,6 +1434,8 @@ def check_kunyomi_readings(
                     "matched_reading": "",
                 }
         # We only need to check unique stems
+        if furigana_is_katakana:
+            kunyomi_stem = to_katakana(kunyomi_stem)
         kunyomi_stems.add((kunyomi_stem, kunyomi_reading))
         # And noun forms for readings that have okuri
         if kunyomi_dict_form_okuri:
@@ -1423,9 +1444,12 @@ def check_kunyomi_readings(
     kanji_to_match = highlight_args.get("kanji_to_match", "")
     if kanji_to_match == "為":
         # Special case for 為, add し as a stem
-        for kunyomi_stem in ["し", "さ"]:
-            kunyomi_stems.add((kunyomi_stem, "す.る"))
-            kunyomi_stem_and_okuris.append((kunyomi_stem, "", "す.る"))
+        for suru_stem in ["し", "さ"]:
+            kunyomi_stems.add((suru_stem, "す.る"))
+            kunyomi_stem_and_okuris.append((suru_stem, "", "す.る"))
+            if furigana_is_katakana:
+                kunyomi_stems.add((to_katakana(suru_stem), "す.る"))
+                kunyomi_stem_and_okuris.append((to_katakana(suru_stem), "", "す.る"))
 
     okurigana = word_data.get("okurigana", "")
     # First check matches against the stem
@@ -1433,7 +1457,12 @@ def check_kunyomi_readings(
         if not kunyomi_stem:
             continue
         match_in_section, match_type = is_reading_in_furigana_section(
-            kunyomi_stem, target_furigana_section, okurigana, edge, logger=logger
+            kunyomi_stem,
+            target_furigana_section,
+            furigana_is_katakana,
+            okurigana,
+            edge,
+            logger=logger,
         )
         logger.debug(
             f"check_kunyomi_readings - kunyomi_stem: {kunyomi_stem}, in_section:"
@@ -1454,20 +1483,22 @@ def check_kunyomi_readings(
                 "matched_reading": full_reading,
             })
     kanji_to_match = highlight_args.get("kanji_to_match", "")
-    logger.debug(
-        f"check_kunyomi_readings - noun form: {kunyomi_stem}, kunyomi_dict_form_okuri:"
-        f" {kunyomi_dict_form_okuri}\nokurigana: {okurigana}, kanji_to_match:"
-        f" {kanji_to_match}"
-    )
 
     # Then also readings with okurigana included in the furigana, noun forms and others
     # In this case there should be no okurigana as it would be a reading where those are omitted
     # e.g. 曳舟--曳き舟, 取調--取り調べ, 書留--書き留め
     okuri_included_results: list[YomiMatchResult] = []
     for kunyomi_stem, kunyomi_dict_form_okuri, full_reading in kunyomi_stem_and_okuris:
+        logger.debug(
+            f"check_kunyomi_readings - noun form: {kunyomi_stem}, kunyomi_dict_form_okuri:"
+            f" {kunyomi_dict_form_okuri}\nokurigana: {okurigana}, kanji_to_match:"
+            f" {kanji_to_match}"
+        )
         noun_form_okuri = get_verb_noun_form_okuri(
             kunyomi_dict_form_okuri, kanji_to_match, kunyomi_reading
         )
+        if furigana_is_katakana:
+            noun_form_okuri = to_katakana(noun_form_okuri)
         okuris_in_furi = [kunyomi_dict_form_okuri, noun_form_okuri]
         for okuri_in_furi in okuris_in_furi:
             if (
@@ -1478,7 +1509,12 @@ def check_kunyomi_readings(
                 if okuri_in_furi:
                     okuri_included_reading = f"{kunyomi_stem}{okuri_in_furi}"
                 match_in_section, match_type = is_reading_in_furigana_section(
-                    okuri_included_reading, target_furigana_section, okurigana, edge, logger=logger
+                    okuri_included_reading,
+                    target_furigana_section,
+                    furigana_is_katakana,
+                    okurigana,
+                    edge,
+                    logger=logger,
                 )
                 logger.debug(
                     f"check_kunyomi_readings - okuri_included form: {okuri_included_reading},"
@@ -1573,6 +1609,7 @@ def handle_furigana_doubling(
     partial_result: YomiMatchResult,
     cur_furigana_section: str,
     matched_furigana: str,
+    check_in_katakana: bool,
     onyomi_to_katakana: bool = True,
     logger: Logger = Logger("error"),
 ) -> str:
@@ -1584,9 +1621,12 @@ def handle_furigana_doubling(
     # If this was a normal match, the furigana should be repeating
     # check if there's rendaku in the following furigana
     furigana_after_matched = cur_furigana_section[len(matched_furigana) :]
+    rendaku_conversion_dict = (
+        RENDAKU_CONVERSION_DICT_KATAKANA if check_in_katakana else RENDAKU_CONVERSION_DICT_HIRAGANA
+    )
     rendaku_matched_furigana = (
-        [f"{kana}{matched_furigana[1:]}" for kana in RENDAKU_CONVERSION_DICT[matched_furigana[0]]]
-        if matched_furigana[0] in RENDAKU_CONVERSION_DICT
+        [f"{kana}{matched_furigana[1:]}" for kana in rendaku_conversion_dict[matched_furigana[0]]]
+        if matched_furigana[0] in rendaku_conversion_dict
         else []
     )
     rendaku_matched_furigana.append(to_hiragana(matched_furigana))  # Add the original
@@ -1656,6 +1696,9 @@ def handle_jukujikun_case(
     furigana = word_data.get("furigana", "")
 
     # First split the word into mora
+    is_furigana_in_katakana = KATAKANA_REC.match(furigana) is not None
+    if is_furigana_in_katakana:
+        furigana = to_hiragana(furigana)
     mora_list = ALL_MORA_REC.findall(furigana)
     # Merge ん with the previous mora into a new list
     if "ん" in mora_list:
@@ -1737,6 +1780,8 @@ def handle_jukujikun_case(
         else:
             kanji_index += 1
     logger.debug(f"handle_jukujikun_case - new_furigana: {new_furigana}")
+    if is_furigana_in_katakana:
+        new_furigana = to_katakana(new_furigana)
     return {
         "text": new_furigana,
         "type": "jukujikun",
@@ -1874,6 +1919,7 @@ def handle_partial_word_case(
         "kanji_pos": kanji_pos,
         "kanji_count": len(word),
         "furigana": furigana,
+        "furigana_is_katakana": KATAKANA_REC.match(furigana) is not None,
         "edge": edge,
         "word": word,
         "okurigana": okurigana,
@@ -2049,6 +2095,7 @@ def kana_highlight(
         replace_num_kanji = None
         num_in_kanji_to_replace = None
         last_replaced_kanji_index = None
+        furigana_is_katakana = KATAKANA_REC.match(furigana) is not None
 
         def process_kanji_in_word(
             kanji: str,
@@ -2134,6 +2181,7 @@ def kana_highlight(
                     partial_result,
                     cur_furigana_section,
                     matched_furigana,
+                    check_in_katakana=furigana_is_katakana,
                     onyomi_to_katakana=with_tags_def.onyomi_to_katakana,
                     logger=logger,
                 )
@@ -2467,6 +2515,7 @@ def kana_highlight(
                     partial_result,
                     furigana_section_starting_from_matched,
                     matched_furigana,
+                    check_in_katakana=furigana_is_katakana,
                     onyomi_to_katakana=with_tags_def.onyomi_to_katakana,
                     logger=logger,
                 )
@@ -2538,6 +2587,7 @@ def kana_highlight(
                 "kanji_pos": kanji_pos,
                 "kanji_count": len(juku_word),
                 "furigana": juku_furigana,
+                "furigana_is_katakana": KATAKANA_REC.match(juku_furigana) is not None,
                 "edge": "whole",
                 "word": juku_word,
                 "okurigana": okurigana if juku_at_word_right_edge else "",

@@ -1959,6 +1959,34 @@ def main():
         expected_kana_only_with_tags_merged="<kun>はつ</kun><b><kun>もうで</kun></b>",
     )
     test(
+        test_name="Should be able match noun form okuriganaless kunyomi reading 4/",
+        kanji="語",
+        sentence="物語[ものがたり]",
+        expected_kana_only="もの<b>がたり</b>",
+        expected_furigana=" 物[もの]<b> 語[がたり]</b>",
+        expected_furikanji=" もの[物]<b> がたり[語]</b>",
+        expected_kana_only_with_tags_split="<kun>もの</kun><b><kun>がたり</kun></b>",
+        expected_furigana_with_tags_split="<kun> 物[もの]</kun><b><kun> 語[がたり]</kun></b>",
+        expected_furikanji_with_tags_split="<kun> もの[物]</kun><b><kun> がたり[語]</kun></b>",
+        expected_kana_only_with_tags_merged="<kun>もの</kun><b><kun>がたり</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 物[もの]</kun><b><kun> 語[がたり]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> もの[物]</kun><b><kun> がたり[語]</kun></b>",
+    )
+    test(
+        test_name="Preserve katakana in furigana /1",
+        kanji="",
+        sentence="物語[モノガタリ]",
+        expected_kana_only="モノガタリ",
+        expected_furigana=" 物語[モノガタリ]",
+        expected_furikanji=" モノガタリ[物語]",
+        expected_kana_only_with_tags_split="<kun>モノ</kun><kun>ガタリ</kun>",
+        expected_furigana_with_tags_split="<kun> 物[モノ]</kun><kun> 語[ガタリ]</kun>",
+        expected_furikanji_with_tags_split="<kun> モノ[物]</kun><kun> ガタリ[語]</kun>",
+        expected_kana_only_with_tags_merged="<kun>モノガタリ</kun>",
+        expected_furigana_with_tags_merged="<kun> 物語[モノガタリ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> モノガタリ[物語]</kun>",
+    )
+    test(
         test_name="Should be able to get okurigana of kunyomi reading 1/",
         kanji="置",
         sentence=" 風上[かざかみ]にも 置[お]けない",
