@@ -1716,8 +1716,9 @@ def handle_jukujikun_case(
     if is_furigana_in_katakana:
         furigana = to_hiragana(furigana)
     mora_list = ALL_MORA_REC.findall(furigana)
-    # Merge ん with the previous mora into a new list
-    if "ん" in mora_list:
+    # Merge ん with the previous mora into a new list except when it would result in less more than
+    # kanji
+    if "ん" in mora_list and len(mora_list) > kanji_count:
         new_list: list[str] = []
         new_list_index = 0
         for mora in mora_list:
