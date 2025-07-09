@@ -1039,6 +1039,11 @@ def get_across_target_notes(
     :param logger: Logger to use for errors and debug messages.
     :return: A list of notes to copy from
     """
+    logger.debug(
+        f"get_across_target_notes: copy_from_cards_query='{copy_from_cards_query}', "
+        f"select_card_by='{select_card_by}', deck_id={deck_id}, "
+        f"only_copy_into_decks='{only_copy_into_decks}', select_card_count='{select_card_count}'"
+    )
 
     if not select_card_by:
         logger.error("Error in copy fields: Required value 'select_card_by' was missing.")
@@ -1081,13 +1086,25 @@ def get_across_target_notes(
         else:
             for card in trigger_note.cards():
                 deck_ids.append(card.odid or card.did)
+        logger.debug(
+            f"get_across_target_notes: deck_ids={deck_ids},"
+            f" unique_whitelist_dids={unique_whitelist_dids}"
+        )
         if deck_ids and not any(deck_id in unique_whitelist_dids for deck_id in deck_ids):
+            logger.debug(
+                "get_across_target_notes: No deck id in whitelist, skipping copy for note"
+                f" {trigger_note.id}"
+            )
             return []
 
     interpolated_cards_query, invalid_fields = interpolate_from_text(
         copy_from_cards_query,
         source_note=trigger_note,
         variable_values_dict=variable_values_dict,
+    )
+    logger.debug(
+        f"get_across_target_notes: interpolated_cards_query='{interpolated_cards_query}',"
+        f" invalid_fields={invalid_fields}"
     )
     if not interpolated_cards_query:
         logger.error("Error in copy fields: Could not interpolate copy_from_cards_query")
