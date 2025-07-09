@@ -319,10 +319,12 @@ class CopyFieldToFileEditor(QWidget):
                 copy_field_inputs["copy_on_unfocus_trigger_field"]
             )
             copy_field_inputs["copy_from_text"].update_options(
-                self.state.post_query_menu_options_dict
+                self.state.post_query_menu_options_dict,
+                self.state.post_query_text_edit_validate_dict,
             )
             copy_field_inputs["copy_into_filename"].update_options(
-                self.state.post_query_menu_options_dict
+                self.state.post_query_menu_options_dict,
+                self.state.post_query_text_edit_validate_dict,
             )
 
     def update_direction_labels(self, _):
