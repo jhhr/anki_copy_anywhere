@@ -1,7 +1,5 @@
 from typing import Optional, Callable
-from .multi_combo_box import MultiComboBox
-from .required_text_input import RequiredLineEdit
-
+from dataclasses import dataclass
 
 from anki.decks import DeckDict, DeckId
 from anki.models import NotetypeDict
@@ -32,6 +30,20 @@ from .add_intersecting_model_field_options_to_dict import (
     add_intersecting_model_field_options_to_dict,
     get_intersecting_model_fields,
 )
+from .multi_combo_box import MultiComboBox
+from .required_text_input import RequiredLineEdit
+
+
+@dataclass
+class CallbackEntry:
+    """Holds a callback function and its visibility state"""
+
+    callback: Callable
+    is_visible: bool = False
+
+    def __call__(self, *args, **kwargs):
+        """Allow CallbackEntry to be called like a function"""
+        return self.callback(*args, **kwargs)
 
 
 def get_new_base_dict(copy_mode: CopyModeType) -> dict:
@@ -40,18 +52,25 @@ def get_new_base_dict(copy_mode: CopyModeType) -> dict:
     return DESTINATION_NOTE_MENU_DICT | BASE_NOTE_MENU_DICT
 
 
-def call_callbacks(callbacks: list[Callable[[None], None]], **args):
+def call_callbacks(callbacks: list[CallbackEntry], **args):
     """
-    Calls all callbacks in the list and removes any that raise an exception.
+    Calls all visible callbacks in the list and removes any that raise an exception.
     """
-    for callback in callbacks:
+    callbacks_to_remove = []
+    for callback_entry in callbacks:
+        if not callback_entry.is_visible:
+            continue
         try:
-            callback(**args)
+            callback_entry.callback(**args)
         except Exception as e:
             # Usually, this is because an element was deleted so the callback is trying to
             # access a property of a deleted object
             print("Error calling callback:", e)
-            callbacks.remove(callback)
+            callbacks_to_remove.append(callback_entry)
+
+    # Remove failed callbacks
+    for callback_entry in callbacks_to_remove:
+        callbacks.remove(callback_entry)
 
 
 class EditState:
@@ -91,9 +110,9 @@ class EditState:
                 self.copy_direction = (
                     copy_definition.get("across_mode_direction") or DIRECTION_DESTINATION_TO_SOURCES
                 )
-        self.selected_model_callbacks: list[Callable[[list[NotetypeDict]], None]] = []
-        self.copy_direction_callbacks: list[Callable[[DirectionType], None]] = []
-        self.variable_names_callbacks: list[Callable[[list[str]], None]] = []
+        self.selected_model_callbacks: list[CallbackEntry] = []
+        self.copy_direction_callbacks: list[CallbackEntry] = []
+        self.variable_names_callbacks: list[CallbackEntry] = []
 
         self.pre_query_menu_options_dict: dict = BASE_NOTE_MENU_DICT.copy()
         self.post_query_menu_options_dict: dict = get_new_base_dict(self.copy_mode)
@@ -171,8 +190,8 @@ class EditState:
             callback: Optional[Callable[[None], None]] = None,
         ):
             editors_list.append(line_edit)
-            if editor_callbacks is not None:
-                editor_callbacks.append(callback) if callback else None
+            if editor_callbacks is not None and callback is not None:
+                editor_callbacks.append(CallbackEntry(callback, is_visible=False))
 
             def update_state(text: str):
                 setattr(self, state_attr, text.strip())
@@ -208,14 +227,14 @@ class EditState:
             callback: Optional[Callable[[MultiComboBox], None]] = None,
         ):
             editors_list.append(combobox)
-            if editor_callbacks is not None:
-                editor_callbacks.append(callback) if callback else None
+            if editor_callbacks is not None and callback is not None:
+                editor_callbacks.append(CallbackEntry(callback, is_visible=False))
 
             def update_state(text: str):
                 setattr(self, state_attr, text.strip())
                 update_other_editors(combobox)
                 if editor_callbacks:
-                    call_callbacks(editor_callbacks, combobox=combobox)
+                    call_callbacks(editor_callbacks)
                 if state_attr_callback:
                     state_attr_callback()
 
@@ -244,14 +263,14 @@ class EditState:
             checkbox: QCheckBox, callback: Optional[Callable[[QCheckBox], None]] = None
         ):
             checkbox_editors.append(checkbox)
-            if editor_callbacks is not None:
-                editor_callbacks.append(callback) if callback else None
+            if editor_callbacks is not None and callback is not None:
+                editor_callbacks.append(CallbackEntry(callback, is_visible=False))
 
             def update_state(checked: bool):
                 setattr(self, state_attr, checked)
                 update_other_editors(checkbox)
                 if editor_callbacks:
-                    call_callbacks(editor_callbacks, checkbox=checkbox)
+                    call_callbacks(editor_callbacks)
 
             checkbox.toggled.connect(update_state)
 
@@ -266,7 +285,7 @@ class EditState:
                 None,
                 [
                     mw.col.models.by_name(name.strip('""'))
-                    for name in self.copy_into_note_types.split(",")
+                    for name in self.copy_into_note_types.split(", ")
                 ],
             )
         )
@@ -276,22 +295,42 @@ class EditState:
         self.update_decks()
         call_callbacks(
             self.selected_model_callbacks,
-            models=self.selected_models,
         )
 
-    def add_selected_model_callback(self, callback: Callable[[list[NotetypeDict]], None]):
+    def add_selected_model_callback(
+        self, callback: Callable[[list[NotetypeDict]], None], is_visible: bool = False
+    ) -> CallbackEntry:
         """
         Adds a callback to be called when the selected models change.
         The callback will receive the list of selected models.
+        Returns the CallbackEntry so the caller can control visibility.
         """
-        self.selected_model_callbacks.append(callback)
+        callback_entry = CallbackEntry(callback, is_visible)
+        self.selected_model_callbacks.append(callback_entry)
+        return callback_entry
 
-    def add_copy_direction_callback(self, callback: Callable[[DirectionType], None]):
+    def add_copy_direction_callback(
+        self, callback: Callable[[DirectionType], None], is_visible: bool = False
+    ) -> CallbackEntry:
         """
         Adds a callback to be called when the copy direction changes.
         The callback will receive the current copy direction.
+        Returns the CallbackEntry so the caller can control visibility.
         """
-        self.copy_direction_callbacks.append(callback)
+        callback_entry = CallbackEntry(callback, is_visible)
+        self.copy_direction_callbacks.append(callback_entry)
+        return callback_entry
+
+    def add_variable_names_callback(
+        self, callback: Callable[[list[str]], None], is_visible: bool = False
+    ) -> CallbackEntry:
+        """
+        Adds a callback to be called when variable names change.
+        Returns the CallbackEntry so the caller can control visibility.
+        """
+        callback_entry = CallbackEntry(callback, is_visible)
+        self.variable_names_callbacks.append(callback_entry)
+        return callback_entry
 
     def update_copy_direction(self, new_direction: DirectionType):
         """
@@ -299,8 +338,7 @@ class EditState:
         """
         if new_direction != self.copy_direction:
             self.copy_direction = new_direction
-            for callback in self.copy_direction_callbacks:
-                callback(self.copy_direction)
+            call_callbacks(self.copy_direction_callbacks)
             self.update_post_query_copy_from_options_dict()
 
     def update_decks(self):
@@ -407,8 +445,7 @@ class EditState:
         self.post_query_text_edit_validate_dict = make_validate_dict(
             self.post_query_menu_options_dict
         )
-        for callback in self.variable_names_callbacks:
-            callback(self.copy_into_variables)
+        call_callbacks(self.variable_names_callbacks)
 
     def update_pre_query_copy_from_options_dict(self):
         """

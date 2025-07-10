@@ -92,11 +92,20 @@ class CopyFieldToFieldEditor(QWidget):
             field_to_file_defs = copy_definition.get("field_to_file_defs", [])
         self.copy_definition = copy_definition
         self.copy_mode = copy_mode
-        state.add_selected_model_callback(self.update_all_field_target_cboxes)
-        state.add_copy_direction_callback(self.update_direction_labels)
-        state.add_copy_direction_callback(self.update_all_field_target_cboxes)
+
+        # Store callback entries for controlling visibility
+        self.selected_model_callback = state.add_selected_model_callback(
+            self.update_all_field_target_cboxes, is_visible=False
+        )
+        self.direction_callback1 = state.add_copy_direction_callback(
+            self.update_direction_labels, is_visible=False
+        )
+        self.direction_callback2 = state.add_copy_direction_callback(
+            self.update_all_field_target_cboxes, is_visible=False
+        )
 
         self.copy_definition = copy_definition
+        self.initialized = False
 
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
@@ -123,8 +132,28 @@ class CopyFieldToFieldEditor(QWidget):
             for index, copy_field_to_field_definition in enumerate(self.field_to_field_defs):
                 self.add_copy_field_row(index, copy_field_to_field_definition)
 
-        self.update_all_field_target_cboxes(None)
+    def enable_callbacks(self):
+        self.selected_model_callback.is_visible = True
+        self.direction_callback1.is_visible = True
+        self.direction_callback2.is_visible = True
+
+    def disable_callbacks(self):
+        self.selected_model_callback.is_visible = False
+        self.direction_callback1.is_visible = False
+        self.direction_callback2.is_visible = False
+
+    def initialize_ui_state(self):
+        """Perform expensive UI state initialization when component is first shown"""
+        if self.initialized:
+            return
+
+        self.enable_callbacks()
+
+        # Perform the expensive initialization
+        self.update_all_field_target_cboxes()
         self.update_direction_labels(self.state.copy_direction)
+
+        self.initialized = True
 
     def add_new_definition(self):
         new_definition: CopyFieldToField = {
@@ -341,7 +370,7 @@ class CopyFieldToFieldEditor(QWidget):
             field_to_field_defs.append(copy_field_definition)
         return field_to_field_defs
 
-    def update_all_field_target_cboxes(self, _):
+    def update_all_field_target_cboxes(self):
         for copy_field_inputs in self.copy_field_inputs:
             self.update_a_destination_field_target_cbox(copy_field_inputs["copy_into_note_field"])
             self.update_an_unfocus_trigger_field_cbox(

@@ -75,7 +75,12 @@ class CopyFieldToVariableEditor(QWidget):
 
         self.copy_field_inputs: list[VariableInputsDict] = []
 
-        state.add_selected_model_callback(self.update_variables_options_dicts)
+        # Store callback entry for controlling visibility
+        self.selected_model_callback = state.add_selected_model_callback(
+            self.update_variables_options_dicts, is_visible=False
+        )
+
+        self.initialized = False
 
         # There has to be at least one definition so initialize with one
         if len(self.fields_to_variable_defs) == 0:
@@ -85,8 +90,24 @@ class CopyFieldToVariableEditor(QWidget):
             for index, copy_field_to_variable_definition in enumerate(self.fields_to_variable_defs):
                 self.add_copy_field_row(index, copy_field_to_variable_definition)
 
-        self.update_variables_options_dicts(None)
+    def enable_callbacks(self):
+        self.selected_model_callback.is_visible = True
+
+    def disable_callbacks(self):
+        self.selected_model_callback.is_visible = False
+
+    def initialize_ui_state(self):
+        """Perform expensive UI state initialization when component is first shown"""
+        if self.initialized:
+            return
+
+        self.enable_callbacks()
+
+        # Perform the expensive initialization
+        self.update_variables_options_dicts()
         self.update_variable_names_in_state()
+
+        self.initialized = True
 
     def add_editor_layouts(self):
         self.vbox.addLayout(self.middle_grid)
@@ -226,7 +247,7 @@ class CopyFieldToVariableEditor(QWidget):
             field_to_field_defs.append(copy_variable_definition)
         return field_to_field_defs
 
-    def update_variables_options_dicts(self, _):
+    def update_variables_options_dicts(self):
         for copy_field_inputs in self.copy_field_inputs:
             copy_field_inputs["copy_from_text"].update_options(
                 self.state.pre_query_menu_options_dict,
