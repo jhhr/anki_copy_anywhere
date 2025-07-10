@@ -279,25 +279,20 @@ class TabEditorComponents(QTabWidget):
         basic_layout.addLayout(self.basic_editor_form_layout)
         self.addTab(self.basic_widget, "Basic Settings")
 
-        # Variables Tab (only for ACROSS_NOTES mode)
-        if copy_mode == COPY_MODE_ACROSS_NOTES:
-            self.variables_widget = QWidget()
-            variables_layout = QVBoxLayout(self.variables_widget)
-            variables_layout.setAlignment(QAlignTop)
+        # Variables Tab
+        self.variables_widget = QWidget()
+        variables_layout = QVBoxLayout(self.variables_widget)
+        variables_layout.setAlignment(QAlignTop)
 
-            variables_layout.addWidget(QLabel("""<h2>Variables to use in Search Query
-            <br><small>or in Field-to-Fields or Field-to-Files</small></h3>"""))
-            self.field_to_variable_editor = CopyFieldToVariableEditor(
-                parent, state, copy_definition
-            )
-            variables_layout.addWidget(self.field_to_variable_editor)
-            spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
-            variables_layout.addItem(spacer)
-            set_size_policy_for_all_widgets(
-                variables_layout, QSizePolicyPreferred, QSizePolicyFixed
-            )
+        variables_layout.addWidget(QLabel("""<h2>Variables to use in Search Query
+        <br><small>or in Field-to-Fields or Field-to-Files</small></h3>"""))
+        self.field_to_variable_editor = CopyFieldToVariableEditor(parent, state, copy_definition)
+        variables_layout.addWidget(self.field_to_variable_editor)
+        spacer = QSpacerItem(100, 40, QSizePolicyExpanding, QSizePolicyMinimum)
+        variables_layout.addItem(spacer)
+        set_size_policy_for_all_widgets(variables_layout, QSizePolicyPreferred, QSizePolicyFixed)
 
-            self.addTab(self.variables_widget, "Variables")
+        self.addTab(self.variables_widget, "Variables")
 
         # Field to Field Tab
         self.fields_widget = QWidget()
@@ -585,6 +580,9 @@ class WithinNoteCopyEditor(QWidget):
     def get_field_to_file_editor(self):
         return self.editor_tabs.get_field_to_file_editor()
 
+    def get_field_to_variable_editor(self):
+        return self.editor_tabs.get_field_to_variable_editor()
+
 
 class EditCopyDefinitionDialog(ScrollableQDialog):
     """
@@ -773,6 +771,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             }
             return across_copy_definition
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
+            field_to_variable_editor = self.within_note_editor_tab.get_field_to_variable_editor()
             field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             within_copy_definition: CopyDefinition = {
@@ -782,7 +781,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_on_sync": self.state.copy_on_sync,
                 "copy_on_add": self.state.copy_on_add,
                 "copy_on_review": self.state.copy_on_review,
-                "field_to_variable_defs": [],
+                "field_to_variable_defs": field_to_variable_editor.get_field_to_variable_defs(),
                 "field_to_field_defs": field_to_field_editor.get_field_to_field_defs(),
                 "field_to_file_defs": field_to_file_editor.get_field_to_file_defs(),
                 "copy_mode": COPY_MODE_WITHIN_NOTE,

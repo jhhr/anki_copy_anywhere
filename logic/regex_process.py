@@ -40,7 +40,13 @@ def regex_process(
 
     compiled_regex = re.compile(regex, piped_flags)
 
-    return compiled_regex.sub(replacement, text)
+    try:
+        return compiled_regex.sub(replacement, text)
+    except re.error as e:
+        logger.error(
+            f"Error in basic_regex_process: {e}, regex: {regex} | replacement: {replacement}"
+        )
+        return text
 
 
 def test(
