@@ -393,6 +393,7 @@ class AcrossNotesCopyEditor(QWidget):
             description=f"""<ul>
             <li>Use the same query syntax as in the card/note browser</li>
             <li>Reference the destination notes' fields with {intr_format('Field Name')}.</li>
+            <li>You can reference variables that you created in the Variables tab</li>
             <li>Right-click to select a {intr_format('Field Name')} or special values to paste</li>
             </ul>""",
             height=100,
@@ -518,6 +519,7 @@ class AcrossNotesCopyEditor(QWidget):
         else:
             # Shouldn't happen with the validator, but just in case
             self.card_select_count_right_label.setText("Invalid number")
+        self.state.card_select_count = count
 
     def wrap_in_widget(self, layout):
         widget = QWidget()
@@ -729,11 +731,13 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             self.active_field_to_field_editor = (
                 self.across_notes_editor_tab.get_field_to_field_editor()
             )
+            self.state.copy_mode = COPY_MODE_ACROSS_NOTES
         elif index == 1:
             self.selected_editor_type = COPY_MODE_WITHIN_NOTE
             self.active_field_to_field_editor = (
                 self.within_note_editor_tab.get_field_to_field_editor()
             )
+            self.state.copy_mode = COPY_MODE_WITHIN_NOTE
 
     def get_copy_mode(self) -> CopyModeType:
         return self.selected_editor_type or COPY_MODE_ACROSS_NOTES

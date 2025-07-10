@@ -604,7 +604,11 @@ def apply_process_chain(
         ]
     ],
     text: str,
-    destination_note: Note,
+    notes: list[Note],
+    dest_note: Note = None,
+    variable_values_dict: Optional[dict] = None,
+    multiple_note_types: bool = False,
+    progress_updater: Optional[ProgressUpdater] = None,
     logger: Logger = Logger("error"),
     file_cache: Optional[dict] = None,
 ) -> Union[str, None]:
@@ -612,7 +616,11 @@ def apply_process_chain(
     Apply a list of processes to a text
     :param process_chain: The list of processes to apply
     :param text: The text to apply the processes to
-    :param destination_note: The note to use for the processes
+    :param dest_note: The note to use for the processes that is the destination of the result value
+    :param notes: Other source notes to use for the processes, used for interpolation
+    :param variable_values_dict: A dictionary of variable values to use for interpolation
+    :param multiple_note_types: Whether the copy is across multiple note types
+    :param progress_updater: Optional object to update the progress bar
     :param logger: Logger to use for errors and debug messages
     :param file_cache: A dictionary to cache opened files' content
     :return: The text after the processes have been applied or None if there was an error
@@ -631,15 +639,36 @@ def apply_process_chain(
                         process.get("onyomi_to_katakana", False),
                         process.get("assume_dictionary_form", False),
                     ),
-                    note=destination_note,
+                    note=dest_note,
                     logger=logger,
                 )
 
             elif is_regex_process(process):
+                interpolated_regex = get_field_values_from_notes(
+                    copy_from_text=process.get("regex", ""),
+                    notes=notes,
+                    dest_note=dest_note,
+                    variable_values_dict=variable_values_dict,
+                    select_card_separator=process.get("regex_separator", ""),
+                    multiple_note_types=multiple_note_types,
+                    logger=logger,
+                    progress_updater=progress_updater,
+                )
+
+                interpolated_replacement = get_field_values_from_notes(
+                    copy_from_text=process.get("replacement", ""),
+                    notes=notes,
+                    dest_note=dest_note,
+                    variable_values_dict=variable_values_dict,
+                    select_card_separator=process.get("replacement_separator", ""),
+                    multiple_note_types=multiple_note_types,
+                    logger=logger,
+                    progress_updater=progress_updater,
+                )
                 text = regex_process(
                     text=text,
-                    regex=process.get("regex", None),
-                    replacement=process.get("replacement", None),
+                    regex=interpolated_regex,
+                    replacement=interpolated_replacement,
                     flags=process.get("flags", None),
                     logger=logger,
                 )
@@ -869,7 +898,11 @@ def copy_into_single_note(
             processed_val = apply_process_chain(
                 process_chain=process_chain,
                 text=result_val,
-                destination_note=destination_note,
+                notes=source_notes,
+                dest_note=destination_note_copy,
+                multiple_note_types=multiple_note_types,
+                variable_values_dict=variable_values_dict,
+                progress_updater=progress_updater,
                 logger=logger,
                 file_cache=file_cache,
             )
@@ -924,7 +957,11 @@ def copy_into_single_note(
             processed_val = apply_process_chain(
                 process_chain=process_chain,
                 text=result_val,
-                destination_note=destination_note_copy,
+                notes=source_notes,
+                dest_note=destination_note_copy,
+                multiple_note_types=multiple_note_types,
+                variable_values_dict=variable_values_dict,
+                progress_updater=progress_updater,
                 logger=logger,
                 file_cache=file_cache,
             )
@@ -983,7 +1020,9 @@ def get_variable_values_for_note(
             interpolated_value = apply_process_chain(
                 process_chain=process_chain,
                 text=interpolated_value,
-                destination_note=note,
+                dest_note=note,
+                notes=[note],
+                multiple_note_types=False,
                 logger=logger,
                 file_cache=file_cache,
             )
@@ -1208,10 +1247,10 @@ def get_field_values_from_notes(
     progress_updater: Optional[ProgressUpdater] = None,
 ) -> str:
     """
-    Get the value from the field in the selected notes gotten with get_notes_to_copy_from.
-    :param copy_from_text: Text defining the content to copy into the note's target field. Contains
-            text and field names and special values enclosed in double curly braces that need to be
-            replaced with the actual values from the notes.
+    Get the value from the field in the selected notes gotten with interpolation.
+    :param copy_from_text: Text defining the content to copy. Contains text and field names and
+            special values enclosed in double curly braces that need to be replaced with the actual
+            values from the notes.
     :param notes: The selected notes to get the value from. In the case of COPY_MODE_WITHIN_NOTE,
             this will be a list with only one note
     :param dest_note: The note to copy into, omitted in COPY_MODE_WITHIN_NOTE

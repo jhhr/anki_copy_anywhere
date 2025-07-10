@@ -25,7 +25,15 @@ from aqt.qt import (
 
 from aqt.utils import tooltip
 
+from .edit_state import EditState
+
 from .auto_resizing_text_edit import AutoResizingTextEdit
+from .interpolated_text_edit import InterpolatedTextEditLayout
+from ..logic.interpolate_fields import (
+    intr_format,
+)
+from .required_text_input import RequiredLineEdit
+
 from .list_input import ListInputWidget
 from .required_combobox import RequiredCombobox
 from ..configuration import CopyDefinition
@@ -57,7 +65,11 @@ from ..configuration import (
     FONTS_CHECK_PROCESS,
     KANA_HIGHLIGHT_PROCESS,
     MULTIPLE_ALLOWED_PROCESS_NAMES,
+    COPY_MODE_WITHIN_NOTE,
+    DIRECTION_SOURCE_TO_DESTINATIONS,
+    DIRECTION_DESTINATION_TO_SOURCES,
 )
+
 from ..logic.kana_highlight import FuriReconstruct
 
 
@@ -121,9 +133,14 @@ class KanjiumToJavdejongProcessDialog(QDialog):
         self.accept()
 
 
-def validate_regex(dialog):
+def validate_regex(dialog) -> bool:
     try:
-        re.compile(dialog.regex_field.toPlainText())
+        # Escape the interpolation syntax as a hack to let compiling the regex otherwise
+        # work as a way to validate it
+        validate_text = (
+            dialog.regex_field_layout.get_text().replace("{{", "\{\{").replace("}}", "\}\}")
+        )
+        re.compile(validate_text)
         dialog.regex_error_display.setText("")
     except re.error as e:
         dialog.regex_error_display.setText(f"Error: {e}")
@@ -141,7 +158,14 @@ DOTALL - S: Make . match any character, including newlines. Use to match across 
 
 
 class RegexProcessDialog(QDialog):
-    def __init__(self, parent, process: RegexProcess):
+
+    def __init__(
+        self,
+        parent,
+        process: RegexProcess,
+        state: EditState,
+        is_variable_extra_processing: bool = False,
+    ):
         super().__init__(parent)
         self.process = process
 
@@ -149,6 +173,10 @@ class RegexProcessDialog(QDialog):
         Basic regex processing step that replaces the text that matches the regex with the
         replacement.
         """
+        self.state = state
+        self.is_variable_extra_processing = is_variable_extra_processing
+        state.add_selected_model_callback(self.update_field_options)
+        state.variable_names_callbacks.append(self.update_field_options)
         self.form = QFormLayout()
         self.setWindowModality(WindowModal)
         self.setLayout(self.form)
@@ -156,18 +184,52 @@ class RegexProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
-        self.regex_field = AutoResizingTextEdit(is_required=True)
+        self.regex_field_layout = InterpolatedTextEditLayout(
+            label="Regex",
+            is_required=True,
+            description=f"""<ul>
+            <li>Reference the notes field and variables as you would in the main value</li>
+            <li>Right-click to select a {intr_format('Field Name')} or special values to paste</li>
+            </ul>""",
+        )
         # Since this is code, set a mono font
-        self.regex_field.setFont(QFixedFont)
-        self.form.addRow("Regex", self.regex_field)
-        self.regex_field.textChanged.connect(lambda: validate_regex(self))
+        self.regex_field_layout.text_edit.setFont(QFixedFont)
+        self.regex_field_widget = QWidget()
+        self.regex_field_widget.setLayout(self.regex_field_layout)
+        self.form.addRow(self.regex_field_widget)
+        self.regex_field_layout.text_edit.textChanged.connect(lambda: validate_regex(self))
+
+        self.regex_separator_edit = RequiredLineEdit()
+        self.regex_separator_edit.setPlaceholderText(
+            "Separator for multiple values in regex (optional)"
+        )
+        self.regex_separator_edit_label = QLabel("Regex separator")
+        self.form.addRow(
+            self.regex_separator_edit_label,
+            self.regex_separator_edit,
+        )
 
         self.regex_error_display = QLabel()
         self.regex_error_display.setStyleSheet("color: red;")
         self.form.addRow("", self.regex_error_display)
 
-        self.replacement_field = QLineEdit()
-        self.form.addRow("Replacement", self.replacement_field)
+        self.replacement_field_layout = InterpolatedTextEditLayout(
+            label="Replacement",
+            description="Field and variable names can be used in the replacement as well.",
+        )
+        self.replacement_field_widget = QWidget()
+        self.replacement_field_widget.setLayout(self.replacement_field_layout)
+        self.form.addRow(self.replacement_field_widget)
+
+        self.replacement_separator_edit = RequiredLineEdit()
+        self.replacement_separator_edit.setPlaceholderText(
+            "Separator for multiple values in replacement (optional)"
+        )
+        self.replacement_separator_label = QLabel("Replacement separator")
+        self.form.addRow(
+            self.replacement_separator_label,
+            self.replacement_separator_edit,
+        )
 
         self.flags_field = MultiComboBox(placeholder_text="Select flags (optional)")
         self.flags_field.addItems([
@@ -181,9 +243,9 @@ class RegexProcessDialog(QDialog):
         self.form.addRow(regex_label, self.flags_field)
 
         with suppress(KeyError):
-            self.regex_field.setPlainText(self.process["regex"])
+            self.regex_field_layout.text_edit.setPlainText(self.process["regex"])
         with suppress(KeyError):
-            self.replacement_field.setText(self.process["replacement"])
+            self.replacement_field_layout.set_text(self.process["replacement"])
         with suppress(KeyError):
             flags = self.process["flags"]
             if flags:
@@ -205,14 +267,71 @@ class RegexProcessDialog(QDialog):
         self.bottom_grid.addWidget(self.ok_button, 0, 0)
         self.bottom_grid.addWidget(self.close_button, 0, 2)
 
+        self.update_field_options(None)
+
+        if not self.should_enable_separators():
+            self.hide_separators()
+
     def save_process(self):
         self.process = {
             "name": REGEX_PROCESS,
-            "regex": self.regex_field.toPlainText(),
-            "replacement": self.replacement_field.text(),
+            "regex": self.regex_field_layout.get_text(),
+            "replacement": self.replacement_field_layout.get_text(),
+            "regex_separator": self.regex_separator_edit.text(),
+            "replacement_separator": self.replacement_separator_edit.text(),
             "flags": self.flags_field.currentText(),
         }
         self.accept()
+
+    def update_field_options(self, _):
+        options_dict = {}
+        validate_dict = {}
+        if self.is_variable_extra_processing:
+            # If this is a variable extra processing, variables_dict can't be used since this is
+            # making it!
+            options_dict = self.state.pre_query_menu_options_dict.copy()
+            validate_dict = self.state.pre_query_text_edit_validate_dict.copy()
+        elif self.state.copy_mode == COPY_MODE_WITHIN_NOTE:
+            options_dict = self.state.pre_query_menu_options_dict.copy()
+            options_dict.update(self.state.variables_dict)
+            validate_dict = self.state.pre_query_text_edit_validate_dict.copy()
+            validate_dict.update(self.state.variables_dict)
+        else:
+            options_dict = self.state.post_query_menu_options_dict
+            validate_dict = self.state.post_query_text_edit_validate_dict
+
+        self.regex_field_layout.update_options(options_dict, validate_dict)
+        self.replacement_field_layout.update_options(options_dict, validate_dict)
+
+    def hide_separators(self):
+        """
+        Hides the separator fields if the copy mode and direction do not require them.
+        """
+        self.regex_separator_edit.hide()
+        self.regex_separator_edit_label.hide()
+        self.regex_separator_edit.setMinimumHeight(0)
+        self.regex_separator_edit_label.setMinimumHeight(0)
+        self.replacement_separator_edit.hide()
+        self.replacement_separator_label.hide()
+        self.replacement_separator_edit.setMinimumHeight(0)
+        self.replacement_separator_label.setMinimumHeight(0)
+
+    def should_enable_separators(self) -> bool:
+        """
+        Determines if the regex process should enable the separator fields based on the copy mode
+        and direction.
+        """
+        if self.is_variable_extra_processing:
+            return False
+        if self.state.copy_mode == COPY_MODE_WITHIN_NOTE:
+            return False
+        if self.state.copy_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+            return False
+        if self.state.copy_direction == DIRECTION_DESTINATION_TO_SOURCES and (
+            self.state.card_select_count > 1 or self.state.card_select_count == 0
+        ):
+            return True
+        return False
 
 
 class FontsCheckProcessDialog(QDialog):
@@ -432,11 +551,15 @@ class EditExtraProcessingWidget(QWidget):
         copy_definition: Optional[CopyDefinition],
         field_to_x_def: Union[CopyFieldToField, CopyFieldToVariable, CopyFieldToFile],
         allowed_process_names: list[str],
+        state: EditState,
+        is_variable_extra_processing: bool = False,
     ):
         super().__init__(parent)
         self.field_to_x_def = field_to_x_def
         self.allowed_process_names = allowed_process_names
         self.copy_definition = copy_definition
+        self.state = state
+        self.is_variable_extra_processing = is_variable_extra_processing
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
         self.process_dialogs: list[QDialog] = []
@@ -591,7 +714,10 @@ class EditExtraProcessingWidget(QWidget):
                 lambda _: KANA_HIGHLIGHT_PROCESS,
             )
         if process_name == REGEX_PROCESS:
-            return RegexProcessDialog(self, process), get_regex_process_label
+            return (
+                RegexProcessDialog(self, process, self.state, self.is_variable_extra_processing),
+                get_regex_process_label,
+            )
         if process_name == FONTS_CHECK_PROCESS:
             return FontsCheckProcessDialog(self, process), get_fonts_check_process_label
         if process_name == KANJIUM_TO_JAVDEJONG_PROCESS:

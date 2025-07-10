@@ -40,6 +40,20 @@ def get_new_base_dict(copy_mode: CopyModeType) -> dict:
     return DESTINATION_NOTE_MENU_DICT | BASE_NOTE_MENU_DICT
 
 
+def call_callbacks(callbacks: list[Callable[[None], None]], **args):
+    """
+    Calls all callbacks in the list and removes any that raise an exception.
+    """
+    for callback in callbacks:
+        try:
+            callback(**args)
+        except Exception as e:
+            # Usually, this is because an element was deleted so the callback is trying to
+            # access a property of a deleted object
+            print("Error calling callback:", e)
+            callbacks.remove(callback)
+
+
 class EditState:
     """
     Class to hold the shared state of the editors
@@ -64,6 +78,7 @@ class EditState:
         self.copy_on_review: bool = False
         self.copy_mode: CopyModeType = COPY_MODE_WITHIN_NOTE
         self.copy_direction: DirectionType = DIRECTION_DESTINATION_TO_SOURCES
+        self.card_select_count: int = 1
         if copy_definition is not None:
             self.copy_mode = copy_definition.get("copy_mode", COPY_MODE_WITHIN_NOTE)
             self.definition_name = copy_definition.get("definition_name", "")
@@ -163,8 +178,7 @@ class EditState:
                 setattr(self, state_attr, text.strip())
                 update_other_editors(line_edit)
                 if editor_callbacks:
-                    for callback in editor_callbacks:
-                        callback()
+                    call_callbacks(editor_callbacks)
 
             line_edit.textChanged.connect(update_state)
 
@@ -201,8 +215,7 @@ class EditState:
                 setattr(self, state_attr, text.strip())
                 update_other_editors(combobox)
                 if editor_callbacks:
-                    for callback in editor_callbacks:
-                        callback(combobox)
+                    call_callbacks(editor_callbacks, combobox=combobox)
                 if state_attr_callback:
                     state_attr_callback()
 
@@ -238,8 +251,7 @@ class EditState:
                 setattr(self, state_attr, checked)
                 update_other_editors(checkbox)
                 if editor_callbacks:
-                    for callback in editor_callbacks:
-                        callback(checkbox)
+                    call_callbacks(editor_callbacks, checkbox=checkbox)
 
             checkbox.toggled.connect(update_state)
 
@@ -262,8 +274,10 @@ class EditState:
         self.update_post_query_copy_from_options_dict()
         self.update_pre_query_copy_from_options_dict()
         self.update_decks()
-        for callback in self.selected_model_callbacks:
-            callback(self.selected_models)
+        call_callbacks(
+            self.selected_model_callbacks,
+            models=self.selected_models,
+        )
 
     def add_selected_model_callback(self, callback: Callable[[list[NotetypeDict]], None]):
         """

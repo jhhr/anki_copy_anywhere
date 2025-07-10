@@ -16,6 +16,7 @@ from anki.notes import Note
 
 from aqt import mw
 
+
 from ..utils.to_lowercase_dict import to_lowercase_dict
 
 # PREFIX_SEPARATOR = ">>"

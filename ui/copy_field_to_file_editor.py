@@ -241,6 +241,7 @@ class CopyFieldToFileEditor(QWidget):
             self.copy_definition,
             copy_field_to_field_definition,
             ALL_FIELD_TO_FIELD_PROCESS_NAMES,
+            state=self.state,
         )
         copy_field_inputs_dict: FieldInputsDict = {
             "copy_into_filename": filename_text_layout,

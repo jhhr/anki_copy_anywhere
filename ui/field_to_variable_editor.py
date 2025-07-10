@@ -168,6 +168,8 @@ class CopyFieldToVariableEditor(QWidget):
             self.copy_definition,
             copy_field_to_variable_definition,
             ALL_FIELD_TO_VARIABLE_PROCESS_NAMES,
+            state=self.state,
+            is_variable_extra_processing=True,
         )
         row_form.addRow(process_chain_widget)
 

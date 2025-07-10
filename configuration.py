@@ -41,6 +41,9 @@ class RegexProcess(TypedDict):
     name: str
     regex: str
     replacement: str
+    # Separators used when interpolation uses multiple notes
+    regex_separator: str
+    replacement_separator: str
     flags: Optional[str]
 
 
