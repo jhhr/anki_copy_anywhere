@@ -38,13 +38,21 @@ def regex_process(
         for f in int_flags[1:]:
             piped_flags |= f
 
-    compiled_regex = re.compile(regex, piped_flags)
+    try:
+        compiled_regex = re.compile(regex, piped_flags)
+    except re.error as e:
+        logger.error(
+            f"Error in basic_regex_process: {e}\n---\ntext:"
+            f" {text}\n---\nregex:\n{regex}\n---\nreplacement: {replacement}"
+        )
+        return text
 
     try:
         return compiled_regex.sub(replacement, text)
     except re.error as e:
         logger.error(
-            f"Error in basic_regex_process: {e}, regex: {regex} | replacement: {replacement}"
+            f"Error in basic_regex_process: {e}\n---\ntext:"
+            f" {text}\n---\nregex:\n{regex}\n---\nreplacement: {replacement}"
         )
         return text
 
