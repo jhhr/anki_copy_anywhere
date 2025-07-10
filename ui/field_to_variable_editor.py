@@ -85,6 +85,9 @@ class CopyFieldToVariableEditor(QWidget):
             for index, copy_field_to_variable_definition in enumerate(self.fields_to_variable_defs):
                 self.add_copy_field_row(index, copy_field_to_variable_definition)
 
+        self.update_variables_options_dicts(None)
+        self.update_variable_names_in_state()
+
     def add_editor_layouts(self):
         self.vbox.addLayout(self.middle_grid)
         self.vbox.addLayout(self.bottom_form)

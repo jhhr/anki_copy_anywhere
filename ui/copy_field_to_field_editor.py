@@ -123,6 +123,9 @@ class CopyFieldToFieldEditor(QWidget):
             for index, copy_field_to_field_definition in enumerate(self.field_to_field_defs):
                 self.add_copy_field_row(index, copy_field_to_field_definition)
 
+        self.update_all_field_target_cboxes(None)
+        self.update_direction_labels(self.state.copy_direction)
+
     def add_new_definition(self):
         new_definition: CopyFieldToField = {
             "copy_into_note_field": "",

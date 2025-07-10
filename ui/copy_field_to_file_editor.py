@@ -114,6 +114,9 @@ class CopyFieldToFileEditor(QWidget):
             for index, copy_field_to_file_def in enumerate(self.field_to_file_defs):
                 self.add_copy_field_row(index, copy_field_to_file_def)
 
+        self.update_all_field_target_cboxes(None)
+        self.update_direction_labels(self.state.copy_direction)
+
     def add_new_definition(self):
         new_definition: CopyFieldToFile = {
             "copy_into_filename": "",

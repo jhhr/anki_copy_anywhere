@@ -407,6 +407,7 @@ class AcrossNotesCopyEditor(QWidget):
         self.card_query_widget.setSizePolicy(QSizePolicyPreferred, QSizePolicyFixed)
         state.add_selected_model_callback(self.update_fields_by_target_note_type)
         state.variable_names_callbacks.append(self.update_fields_by_target_note_type)
+        self.update_fields_by_target_note_type(None)
 
         query_form.addRow(self.card_query_text_label)
         query_form.addRow(self.card_query_widget)
