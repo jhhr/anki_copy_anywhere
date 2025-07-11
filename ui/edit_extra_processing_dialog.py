@@ -133,13 +133,24 @@ class KanjiumToJavdejongProcessDialog(QDialog):
         self.accept()
 
 
-def validate_regex(dialog) -> bool:
+def validate_interpolatable_regex(dialog) -> bool:
     try:
         # Escape the interpolation syntax as a hack to let compiling the regex otherwise
         # work as a way to validate it
         validate_text = (
-            dialog.regex_field_layout.get_text().replace("{{", "\{\{").replace("}}", "\}\}")
+            dialog.regex_field_layout.get_text().replace("{{", r"\{\{").replace("}}", r"\}\}")
         )
+        re.compile(validate_text)
+        dialog.regex_error_display.setText("")
+    except re.error as e:
+        dialog.regex_error_display.setText(f"Error: {e}")
+        return False
+    return True
+
+
+def validate_plain_regex(dialog) -> bool:
+    try:
+        validate_text = dialog.regex_field.toPlainText()
         re.compile(validate_text)
         dialog.regex_error_display.setText("")
     except re.error as e:
@@ -205,7 +216,9 @@ class RegexProcessDialog(QDialog):
         self.regex_field_widget = QWidget()
         self.regex_field_widget.setLayout(self.regex_field_layout)
         self.form.addRow(self.regex_field_widget)
-        self.regex_field_layout.text_edit.textChanged.connect(lambda: validate_regex(self))
+        self.regex_field_layout.text_edit.textChanged.connect(
+            lambda: validate_interpolatable_regex(self)
+        )
 
         self.regex_separator_edit = RequiredLineEdit()
         self.regex_separator_edit.setPlaceholderText(
@@ -413,7 +426,7 @@ class FontsCheckProcessDialog(QDialog):
         self.regex_field = AutoResizingTextEdit()
         self.regex_field.setFont(QFixedFont)
         self.form.addRow("Char limit", self.regex_field)
-        self.regex_field.textChanged.connect(lambda: validate_regex(self))
+        self.regex_field.textChanged.connect(lambda: validate_plain_regex(self))
         self.form.addRow(
             "",
             QLabel("""<small>(Optional) Regex used to limit the characters checked.
