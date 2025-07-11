@@ -14,6 +14,9 @@ from aqt.qt import (
     QWidget,
     Qt,
     qtmajor,
+    QDrag,
+    QMimeData,
+    QApplication,
 )
 
 from .edit_copy_definition_dialog import EditCopyDefinitionDialog
@@ -29,10 +32,211 @@ from ..utils.make_query_string import make_query_string
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
+    QAlignCenter = Qt.AlignmentFlag.AlignCenter
+    QMouseLeftButton = Qt.MouseButton.LeftButton
+    QMoveAction = Qt.DropAction.MoveAction
+    QCursorOpenHandCursor = Qt.CursorShape.OpenHandCursor
+    QCursorClosedHandCursor = Qt.CursorShape.ClosedHandCursor
 else:
     WindowModal = Qt.WindowModal  # type: ignore
+    QAlignCenter = Qt.AlignCenter  # type: ignore
+    QMouseLeftButton = Qt.LeftButton  # type: ignore
+    QMoveAction = Qt.MoveAction  # type: ignore
+    QCursorOpenHandCursor = Qt.Cursor.OpenHandCursor  # type: ignore
+    QCursorClosedHandCursor = Qt.Cursor.ClosedHandCursor  # type: ignore
 
 DEFAULT_CARDS_SELECTED_LABEL = "Select some copy definitions to show what notes would apply."
+
+DRAG_HANDLE_BASE_STYLE = """
+        QLabel {
+            color: #141414;
+            border: 1px solid #141414;
+            border-radius: 3px;
+            background: transparent;
+            font-size: 10px;
+        }
+        QLabel:hover {
+            color: #020202;
+            border-color: #020202;
+            border-width: 2px;
+        }
+    """
+
+
+class DragHandle(QLabel):
+    """A drag handle widget for reordering definitions"""
+
+    def __init__(self, parent_widget, definition_guid):
+        super().__init__()
+        self.parent_widget = parent_widget
+        self.definition_guid = definition_guid
+        self.setText("☰")  # Unicode hamburger menu symbol
+        self.setFixedSize(17, 17)
+        self.setAlignment(QAlignCenter)
+        self.setStyleSheet(DRAG_HANDLE_BASE_STYLE)
+        self.setCursor(QCursorOpenHandCursor)
+        self.setToolTip("Drag to reorder")
+
+    def mousePressEvent(self, event):
+        if event.button() == QMouseLeftButton:
+            if qtmajor > 5:
+                self.drag_start_position = event.position()
+            else:
+                self.drag_start_position = event.pos()
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & QMouseLeftButton):
+            return
+
+        if not hasattr(self, "drag_start_position"):
+            return
+
+        if qtmajor > 5:
+            current_pos = event.position()
+        else:
+            current_pos = event.pos()
+
+        if (
+            current_pos - self.drag_start_position
+        ).manhattanLength() < QApplication.startDragDistance():
+            return
+
+        # Start drag operation
+        drag = QDrag(self)
+        mimeData = QMimeData()
+        mimeData.setText(self.definition_guid)
+        drag.setMimeData(mimeData)
+
+        self.set_drag_started_style()
+        # Execute drag
+        if qtmajor > 5:
+            drag.exec(QMoveAction)
+        else:
+            drag.exec_(QMoveAction)
+
+    def set_drag_started_style(self):
+        self.setCursor(QCursorClosedHandCursor)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: green;
+                border-radius: 3px;
+                width: 14px;
+                height: 14px;
+            }
+        """)
+
+    def set_drag_ended_style(self):
+        self.setCursor(QCursorOpenHandCursor)
+        self.setText("☰")
+        self.setStyleSheet(DRAG_HANDLE_BASE_STYLE)
+
+
+class DefinitionRow(QWidget):
+    """A widget that represents a single definition row with drag and drop support"""
+
+    def __init__(self, parent_dialog, definition, index):
+        super().__init__()
+        self.parent_dialog = parent_dialog
+        self.definition = definition
+        self.definition_guid = definition["guid"]
+        self.index = index
+
+        # Enable drop events
+        self.setAcceptDrops(True)
+
+        # Create layout
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(5, 2, 5, 2)
+
+        # Add drag handle
+        self.drag_handle = DragHandle(self, self.definition_guid)
+        self.layout.addWidget(self.drag_handle)
+
+        # Add checkbox with definition name
+        self.checkbox = QCheckBox(definition["definition_name"])
+        self.layout.addWidget(self.checkbox)
+
+        # Add stretch to push buttons to the right
+        self.layout.addStretch()
+
+        # Add buttons
+        self.edit_button = QPushButton("Edit")
+        self.duplicate_button = QPushButton("Duplicate")
+        self.remove_button = QPushButton("Delete")
+
+        self.layout.addWidget(self.edit_button)
+        self.layout.addWidget(self.duplicate_button)
+        self.layout.addWidget(self.remove_button)
+
+        # Connect signals
+        self.edit_button.clicked.connect(
+            lambda: parent_dialog.edit_definition_by_guid(self.definition_guid)
+        )
+        self.duplicate_button.clicked.connect(
+            lambda: parent_dialog.duplicate_definition_by_guid(self.definition_guid)
+        )
+        self.remove_button.clicked.connect(
+            lambda: parent_dialog.remove_definition_by_guid(self.definition_guid)
+        )
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            self._updateDropIndicator(event)
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasText():
+            self._updateDropIndicator(event)
+            event.acceptProposedAction()
+
+    def _updateDropIndicator(self, event):
+        """Update the drop indicator based on mouse position"""
+        if qtmajor > 5:
+            drop_pos = event.position()
+        else:
+            drop_pos = event.pos()
+
+        drop_below = drop_pos.y() > self.height() / 2
+
+        if drop_below:
+            # Highlight bottom border - drop will happen below this element
+            self.setStyleSheet("""
+                QWidget {
+                    padding-bottom: 4px;
+                    border-bottom: 4px dotted #020202;
+                }
+            """)
+        else:
+            # Highlight top border - drop will happen above this element
+            self.setStyleSheet("""
+                QWidget {
+                    padding-top: 4px;
+                    border-top: 4px dotted #020202;
+                }
+            """)
+
+    def dragLeaveEvent(self, event):
+        # Remove visual feedback when drag leaves
+        self.setStyleSheet("")
+
+    def dropEvent(self, event):
+        # Remove visual feedback
+        self.setStyleSheet("")
+        self.drag_handle.set_drag_ended_style()
+
+        source_guid = event.mimeData().text()
+        target_guid = self.definition_guid
+
+        if source_guid != target_guid:
+            # Determine drop position based on mouse position
+            if qtmajor > 5:
+                drop_pos = event.position()
+            else:
+                drop_pos = event.pos()
+            drop_below = drop_pos.y() > self.height() / 2
+            self.parent_dialog.reorder_definitions(source_guid, target_guid, drop_below)
+
+        event.acceptProposedAction()
 
 
 class PickCopyDefinitionDialog(ScrollableQDialog):
@@ -144,66 +348,39 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
 
         definition_guid = definition["guid"]
 
-        # Create a widget to contain this definition row
-        definition_widget = QWidget()
-        definition_layout = QHBoxLayout(definition_widget)
-        definition_layout.setContentsMargins(5, 0, 5, 0)
+        # Create a definition row widget
+        definition_row = DefinitionRow(self, definition, index)
 
-        # Checkbox with definition name
-        checkbox = QCheckBox(definition["definition_name"])
-        definition_layout.addWidget(checkbox)
-        self.checkboxes.append(checkbox)
+        # Add to checkboxes list and connect events
+        self.checkboxes.append(definition_row.checkbox)
         self.definition_note_ids.append([])
-        checkbox.stateChanged.connect(self.update_card_counts_for_all_cards)
-
-        # Add stretch to push buttons to the right
-        definition_layout.addStretch()
-
-        # Edit button
-        edit_button = QPushButton("Edit")
-        edit_button.clicked.connect(lambda: self.edit_definition_by_guid(definition_guid))
-        definition_layout.addWidget(edit_button)
-
-        # Duplicate button
-        duplicate_button = QPushButton("Duplicate")
-        duplicate_button.clicked.connect(lambda: self.duplicate_definition_by_guid(definition_guid))
-        definition_layout.addWidget(duplicate_button)
-
-        # Remove button
-        remove_button = QPushButton("Delete")
+        definition_row.checkbox.stateChanged.connect(self.update_card_counts_for_all_cards)
 
         def remove_row_ui():
-            # Remove the entire definition widget from the layout
-            self.definitions_layout.removeWidget(definition_widget)
-            definition_widget.deleteLater()
+            # Remove the entire definition row from the layout
+            self.definitions_layout.removeWidget(definition_row)
+            definition_row.deleteLater()
 
             # Remove from checkboxes list
-            if checkbox in self.checkboxes:
-                checkbox_index = self.checkboxes.index(checkbox)
-                self.checkboxes.remove(checkbox)
+            if definition_row.checkbox in self.checkboxes:
+                checkbox_index = self.checkboxes.index(definition_row.checkbox)
+                self.checkboxes.remove(definition_row.checkbox)
                 if checkbox_index < len(self.definition_note_ids):
                     self.definition_note_ids.pop(checkbox_index)
 
         # Store UI components for this definition GUID
         self.definition_ui_components[definition_guid] = {
-            "widget": definition_widget,
-            "checkbox": checkbox,
-            "edit_button": edit_button,
-            "duplicate_button": duplicate_button,
-            "remove_button": remove_button,
+            "widget": definition_row,
+            "checkbox": definition_row.checkbox,
+            "edit_button": definition_row.edit_button,
+            "duplicate_button": definition_row.duplicate_button,
+            "remove_button": definition_row.remove_button,
             "remove_ui_func": remove_row_ui,
             "index": index,
         }
 
-        def remove_row():
-            # Use targeted removal without needing to rebuild entire UI
-            self.remove_definition_by_guid(definition_guid)
-
-        remove_button.clicked.connect(remove_row)
-        definition_layout.addWidget(remove_button)
-
-        # Add the definition widget to the definitions layout
-        self.definitions_layout.addWidget(definition_widget)
+        # Add the definition row to the definitions layout
+        self.definitions_layout.addWidget(definition_row)
 
     def remove_definition_by_guid(self, definition_guid: str):
         """Remove a specific definition and its UI components by GUID without rebuilding the entire UI."""
@@ -270,6 +447,38 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
         # Reload config to stay in sync
         config.load()
         self.copy_definitions = config.copy_definitions
+
+    def reorder_definitions(self, source_guid: str, target_guid: str, drop_below: bool):
+        """Reorder definitions by moving source before or after target"""
+        # Update configuration
+        config = Config()
+        config.load()
+        config.reorder_definition(source_guid, target_guid, drop_below)
+
+        # Update local copy
+        config.load()  # Reload to get the updated order
+        self.copy_definitions = config.copy_definitions
+
+        # Rebuild the UI to reflect the new order
+        self.rebuild_definitions_ui()
+
+    def rebuild_definitions_ui(self):
+        """Rebuild the definitions UI from scratch"""
+        # Clear existing widgets
+        for guid, components in self.definition_ui_components.items():
+            components["remove_ui_func"]()
+
+        # Clear tracking
+        self.definition_ui_components.clear()
+        self.checkboxes.clear()
+        self.definition_note_ids.clear()
+
+        # Rebuild all rows
+        for index, definition in enumerate(self.copy_definitions):
+            self.add_definition_row(index, definition)
+
+        # Update card counts
+        self.update_card_counts_for_all_cards()
 
     def edit_definition_by_guid(self, definition_guid: str):
         """Edit a specific definition by GUID."""

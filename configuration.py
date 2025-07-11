@@ -445,3 +445,31 @@ class Config:
                 self.update_definition_by_index(index, new_definition)
                 return index
         return None
+
+    def reorder_definition(self, source_guid: str, target_guid: str, drop_below: bool):
+        """Reorder definitions by moving source before or after target"""
+        # Find source and target indices
+        source_index = None
+        target_index = None
+
+        for i, definition in enumerate(self.data["copy_definitions"]):
+            if definition["guid"] == source_guid:
+                source_index = i
+            elif definition["guid"] == target_guid:
+                target_index = i
+
+        if source_index is None or target_index is None:
+            return
+
+        # Remove the source definition
+        source_definition = self.data["copy_definitions"].pop(source_index)
+
+        # Adjust target index if source was before target
+        if source_index < target_index:
+            target_index -= 1
+
+        # Insert at the new position
+        new_index = target_index + 1 if drop_below else target_index
+        self.data["copy_definitions"].insert(new_index, source_definition)
+
+        self.save()
