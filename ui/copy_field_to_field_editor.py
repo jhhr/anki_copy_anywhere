@@ -1,4 +1,5 @@
 from contextlib import suppress
+import uuid
 from typing import Optional, TypedDict, cast
 from aqt import mw
 
@@ -9,7 +10,6 @@ from aqt.qt import (
     QLabel,
     QFormLayout,
     QPushButton,
-    QGridLayout,
     QCheckBox,
     qtmajor,
 )
@@ -110,10 +110,14 @@ class CopyFieldToFieldEditor(QWidget):
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
 
-        self.middle_grid = QGridLayout()
-        self.middle_grid.setColumnMinimumWidth(0, 400)
-        self.middle_grid.setColumnMinimumWidth(1, 50)
-        self.vbox.addLayout(self.middle_grid)
+        # GUID-based field UI tracking
+        self.field_ui_components: dict[str, dict] = {}  # Maps field GUID to its UI components
+
+        # Create fields container with vertical layout instead of grid
+        self.fields_container_widget = QWidget()
+        self.fields_layout = QVBoxLayout(self.fields_container_widget)
+        self.fields_layout.setContentsMargins(0, 0, 0, 0)
+        self.vbox.addWidget(self.fields_container_widget)
 
         self.bottom_form = QFormLayout()
         self.vbox.addLayout(self.bottom_form)
@@ -157,6 +161,7 @@ class CopyFieldToFieldEditor(QWidget):
 
     def add_new_definition(self):
         new_definition: CopyFieldToField = {
+            "guid": str(uuid.uuid4()),
             "copy_into_note_field": "",
             "copy_from_text": "",
             "copy_if_empty": False,
@@ -186,6 +191,15 @@ class CopyFieldToFieldEditor(QWidget):
         return handler
 
     def add_copy_field_row(self, index, copy_field_to_field_definition: CopyFieldToField):
+        # Generate GUID for this field definition
+        field_guid = str(uuid.uuid4())
+
+        # Add GUID to the definition if it doesn't exist
+        if "guid" not in copy_field_to_field_definition:
+            copy_field_to_field_definition["guid"] = field_guid
+        else:
+            field_guid = copy_field_to_field_definition["guid"]
+
         # Create a QFrame
         frame = QFrame(self)
         frame.setFrameShape(QFrameStyledPanel)
@@ -194,8 +208,8 @@ class CopyFieldToFieldEditor(QWidget):
         # Create a layout for the frame
         frame_layout = QVBoxLayout(frame)
 
-        # Add the frame to the main layout
-        self.middle_grid.addWidget(frame, index, 0)
+        # Add the frame to the fields container layout
+        self.fields_layout.addWidget(frame)
         row_form = QFormLayout()
         frame_layout.addLayout(row_form)
 
@@ -307,6 +321,13 @@ class CopyFieldToFieldEditor(QWidget):
             "process_chain": process_chain_widget,
         }
 
+        # Store UI components for GUID-based removal
+        self.field_ui_components[field_guid] = {
+            "frame": frame,
+            "inputs_dict": copy_field_inputs_dict,
+            "definition": copy_field_to_field_definition,
+        }
+
         row_form.addRow(process_chain_widget)
 
         # Remove
@@ -315,26 +336,33 @@ class CopyFieldToFieldEditor(QWidget):
         self.copy_field_inputs.append(copy_field_inputs_dict)
 
         def remove_row():
-            for widget in [
-                field_target_cbox,
-                copy_if_empty,
-                copy_on_unfocus_when_edit,
-                remove_button,
-                process_chain_widget,
-            ]:
-                widget.deleteLater()
-                row_form.removeWidget(widget)
-            for layout in [copy_from_text_layout]:
-                for i in range(0, layout.count()):
-                    item = layout.itemAt(i)
-                    if item and (item_widget := item.widget()):
-                        item_widget.deleteLater()
-                layout.deleteLater()
-            self.middle_grid.removeWidget(frame)
-            self.remove_definition(copy_field_to_field_definition, copy_field_inputs_dict)
+            self.remove_definition_by_guid(field_guid)
 
         remove_button.clicked.connect(remove_row)
         row_form.addRow("", remove_button)
+
+    def remove_definition_by_guid(self, field_guid: str):
+        """Remove a field definition by its GUID without rebuilding the entire UI"""
+        if field_guid not in self.field_ui_components:
+            return
+
+        components = self.field_ui_components[field_guid]
+        frame = components["frame"]
+        inputs_dict = components["inputs_dict"]
+        definition = components["definition"]
+
+        # Remove from layouts and delete widgets
+        self.fields_layout.removeWidget(frame)
+        frame.deleteLater()
+
+        # Remove from data structures
+        if definition in self.field_to_field_defs:
+            self.field_to_field_defs.remove(definition)
+        if inputs_dict in self.copy_field_inputs:
+            self.copy_field_inputs.remove(inputs_dict)
+
+        # Remove from GUID tracking
+        del self.field_ui_components[field_guid]
 
     def remove_definition(self, definition, inputs_dict):
         """

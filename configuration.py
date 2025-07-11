@@ -1,4 +1,5 @@
 import html
+import uuid
 from typing import TypedDict, Optional, Union, Literal, Sequence
 from typing_extensions import TypeGuard
 
@@ -30,6 +31,7 @@ KANJIUM_TO_JAVDEJONG_PROCESS = "Pitch accent conversion: Kanjium to Javdejong"
 
 
 class KanjiumToJavdejongProcess(TypedDict):
+    guid: str
     name: str
     delimiter: str
 
@@ -38,6 +40,7 @@ REGEX_PROCESS = "Regex replace"
 
 
 class RegexProcess(TypedDict):
+    guid: str
     name: str
     regex: str
     replacement: str
@@ -58,6 +61,7 @@ FONTS_CHECK_PROCESS = "Fonts check"
 
 
 class FontsCheckProcess(TypedDict):
+    guid: str
     name: str
     fonts_dict_file: str
     limit_to_fonts: Optional[list[str]]
@@ -77,6 +81,7 @@ KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
 
 
 class KanaHighlightProcess(TypedDict):
+    guid: str
     name: str
     kanji_field: str
     return_type: FuriReconstruct
@@ -150,6 +155,7 @@ MULTIPLE_ALLOWED_PROCESS_NAMES = [
 
 
 class CopyFieldToField(TypedDict):
+    guid: str
     copy_into_note_field: str
     copy_from_text: str
     copy_if_empty: bool
@@ -160,6 +166,7 @@ class CopyFieldToField(TypedDict):
 
 
 class CopyFieldToFile(TypedDict):
+    guid: str
     copy_into_filename: str
     copy_from_text: str
     copy_if_empty: bool
@@ -198,6 +205,7 @@ def get_triggered_field_to_field_def_for_field(
 
 
 class CopyFieldToVariable(TypedDict):
+    guid: str
     copy_into_variable: str
     copy_from_text: str
     process_chain: Sequence[AnyProcess]
@@ -216,6 +224,7 @@ SelectCardByType = Literal["None", "Random", "Least_reps"]
 
 
 class CopyDefinition(TypedDict):
+    guid: str
     definition_name: str
     copy_on_sync: bool
     copy_on_add: bool
@@ -232,6 +241,83 @@ class CopyDefinition(TypedDict):
     select_card_by: SelectCardByType
     select_card_count: Optional[str]
     select_card_separator: Optional[str]
+
+
+def compare_versions(version1: str, version2: str) -> int:
+    """
+    Compare two version strings.
+    Returns:
+        -1 if version1 < version2
+         0 if version1 == version2
+         1 if version1 > version2
+    """
+    v1_parts = list(map(int, version1.split(".")))
+    v2_parts = list(map(int, version2.split(".")))
+
+    # Pad the shorter list with zeros
+    while len(v1_parts) < len(v2_parts):
+        v1_parts.append(0)
+    while len(v2_parts) < len(v1_parts):
+        v2_parts.append(0)
+
+    return (v1_parts > v2_parts) - (v1_parts < v2_parts)
+
+
+def migrate_config():
+    """
+    Migrates old copy definitions to newer formats going through all
+    version migrations.
+    """
+    config = Config()
+    config.load()
+    if compare_versions(config.version, "0.2.0") < 0:
+
+        updated_definitions = []
+        for definition in config.copy_definitions:
+            if "guid" not in definition:
+                definition["guid"] = str(uuid.uuid4())
+            new_field_to_fields = []
+            for field_to_field in definition.get("field_to_field_defs", []):
+                if "guid" not in field_to_field:
+                    field_to_field["guid"] = str(uuid.uuid4())
+                new_processes = []
+                for process in field_to_field.get("process_chain", []):
+                    if "guid" not in process:
+                        process["guid"] = str(uuid.uuid4())
+                    new_processes.append(process)
+                field_to_field["process_chain"] = new_processes
+                new_field_to_fields.append(field_to_field)
+            definition["field_to_field_defs"] = new_field_to_fields
+            new_field_to_files = []
+            for field_to_file in definition.get("field_to_file_defs", []):
+                if "guid" not in field_to_file:
+                    field_to_file["guid"] = str(uuid.uuid4())
+                new_processes = []
+                for process in field_to_file.get("process_chain", []):
+                    if "guid" not in process:
+                        process["guid"] = str(uuid.uuid4())
+                    new_processes.append(process)
+                field_to_file["process_chain"] = new_processes
+                new_field_to_files.append(field_to_file)
+            definition["field_to_file_defs"] = new_field_to_files
+            new_field_to_variables = []
+            for field_to_variable in definition.get("field_to_variable_defs", []):
+                if "guid" not in field_to_variable:
+                    field_to_variable["guid"] = str(uuid.uuid4())
+                new_processes = []
+                for process in field_to_variable.get("process_chain", []):
+                    if "guid" not in process:
+                        process["guid"] = str(uuid.uuid4())
+                    new_processes.append(process)
+                field_to_variable["process_chain"] = new_processes
+                new_field_to_variables.append(field_to_variable)
+            definition["field_to_variable_defs"] = new_field_to_variables
+            updated_definitions.append(definition)
+        config.data["copy_definitions"] = updated_definitions
+
+    # Finished, set the version to latest
+    config.data["version"] = "0.2.0"
+    config.save()
 
 
 def get_variables_dict_from_variable_defs(
@@ -287,6 +373,10 @@ class Config:
         save_config(self.data)
 
     @property
+    def version(self) -> str:
+        return self.data.get("version", "0.1.0")
+
+    @property
     def log_level(self) -> LogLevel:
         return self.data.get("log_level", "error")
 
@@ -311,6 +401,8 @@ class Config:
         return None
 
     def add_definition(self, definition: CopyDefinition):
+        if "guid" not in definition:
+            definition["guid"] = str(uuid.uuid4())
         self.data["copy_definitions"].append(definition)
         self.save()
 
@@ -326,6 +418,12 @@ class Config:
         self.data["copy_definitions"].pop(index)
         self.save()
 
+    def remove_definition_by_guid(self, guid: str):
+        for index, definition in enumerate(self.data["copy_definitions"]):
+            if definition["guid"] == guid:
+                self.remove_definition_by_index(index)
+                return
+
     def update_definition_by_name(
         self, name: str, new_definition: CopyDefinition
     ) -> Union[int, None]:
@@ -338,3 +436,12 @@ class Config:
     def update_definition_by_index(self, index: int, definition: CopyDefinition):
         self.data["copy_definitions"][index] = definition
         self.save()
+
+    def update_definition_by_guid(
+        self, guid: str, new_definition: CopyDefinition
+    ) -> Union[int, None]:
+        for index, definition in enumerate(self.data["copy_definitions"]):
+            if definition["guid"] == guid:
+                self.update_definition_by_index(index, new_definition)
+                return index
+        return None

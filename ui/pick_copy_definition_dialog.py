@@ -1,20 +1,23 @@
-from typing import Optional, Callable, Union, Sequence
+from typing import Optional, Union, Sequence
+import uuid
+import copy as copy_module
 from anki.notes import NoteId
 from aqt import mw
 
 from aqt.qt import (
-    QDialog,
     QVBoxLayout,
     QGridLayout,
     QLabel,
     QCheckBox,
     QPushButton,
     QHBoxLayout,
+    QWidget,
     Qt,
     qtmajor,
 )
 
 from .edit_copy_definition_dialog import EditCopyDefinitionDialog
+from .scrollable_dialog import ScrollableQDialog
 from ..configuration import (
     Config,
     CopyDefinition,
@@ -32,7 +35,7 @@ else:
 DEFAULT_CARDS_SELECTED_LABEL = "Select some copy definitions to show what notes would apply."
 
 
-class PickCopyDefinitionDialog(QDialog):
+class PickCopyDefinitionDialog(ScrollableQDialog):
     """
     Class for the dialog box to choose which copy definition to apply now, edit or remove.
     Includes a button start the edit dialog for a new copy definition.
@@ -50,17 +53,27 @@ class PickCopyDefinitionDialog(QDialog):
         self.copy_definitions = copy_definitions
         self.selected_definitions_applicable_notes: set[int] = set()
         self.selected_copy_definitions: list[CopyDefinition] = []
-        self.remove_row_funcs: list[Callable[[], None]] = []
         self.applicable_note_type_names: list[str] = []
         self.checkboxes: list[QCheckBox] = []
         self.definition_note_ids: list[Sequence[Union[int, NoteId]]] = []
         self.browser_note_ids = browser_note_ids
         self.browser_search = browser_search
 
+        # GUID-based definition UI tracking
+        self.definition_ui_components: dict[str, dict] = (
+            {}
+        )  # Maps definition GUID to its UI components
+
+        # Ensure all definitions have GUIDs
+        for definition in self.copy_definitions:
+            if "guid" not in definition:
+                definition["guid"] = str(uuid.uuid4())
+
         # Build textbox
         self.setWindowModality(WindowModal)
-        self.vbox = QVBoxLayout()
-        self.setLayout(self.vbox)
+
+        # ScrollableQDialog already creates the main layout, we need to set up the inner content
+        self.vbox = QVBoxLayout(self.inner_widget)
 
         self.use_browser_selection_button = QPushButton(
             f"Use selected notes ({len(browser_note_ids or [])})"
@@ -86,10 +99,16 @@ class PickCopyDefinitionDialog(QDialog):
         self.add_new_button.clicked.connect(lambda: self.edit_definition(None))
         self.top_grid.addWidget(self.add_new_button, 1, 3, 1, 1)
 
-        self.middle_grid = self.make_grid()
+        # Create definitions container with vertical layout instead of grid
+        definitions_container_widget = QWidget()
+        self.definitions_layout = QVBoxLayout(definitions_container_widget)
+        self.definitions_layout.setContentsMargins(0, 0, 0, 0)
+        self.vbox.addWidget(definitions_container_widget)
+
         self.add_all_definition_rows()
 
-        self.bottom_grid = self.make_grid()
+        # Create footer layout for bottom buttons
+        footer_layout = QHBoxLayout()
         self.apply_button = QPushButton("Apply")
         self.apply_button.setEnabled(False)
         self.close_button = QPushButton("Close")
@@ -97,8 +116,12 @@ class PickCopyDefinitionDialog(QDialog):
         self.apply_button.clicked.connect(self.accept)
         self.close_button.clicked.connect(self.reject)
 
-        self.bottom_grid.addWidget(self.apply_button, 0, 0)
-        self.bottom_grid.addWidget(self.close_button, 0, 4, 0, -1)
+        footer_layout.addWidget(self.apply_button)
+        footer_layout.addStretch()
+        footer_layout.addWidget(self.close_button)
+
+        # Add footer to the main layout (this will be outside the scroll area)
+        self.main_layout.addLayout(footer_layout)
 
     def add_all_definition_rows(self):
         for index, definition in enumerate(self.copy_definitions):
@@ -115,86 +138,154 @@ class PickCopyDefinitionDialog(QDialog):
         return grid
 
     def add_definition_row(self, index, definition):
-        # By setting the name into a box layout where we'll allow it to expand
-        # its empty space rightward also pushing the buttons there to the edge
-        hbox = QHBoxLayout()
-        self.middle_grid.addLayout(hbox, index, 1)
+        # Ensure definition has GUID
+        if "guid" not in definition:
+            definition["guid"] = str(uuid.uuid4())
+
+        definition_guid = definition["guid"]
+
+        # Create a widget to contain this definition row
+        definition_widget = QWidget()
+        definition_layout = QHBoxLayout(definition_widget)
+        definition_layout.setContentsMargins(5, 0, 5, 0)
+
+        # Checkbox with definition name
         checkbox = QCheckBox(definition["definition_name"])
-        hbox.addWidget(checkbox, index)
+        definition_layout.addWidget(checkbox)
         self.checkboxes.append(checkbox)
         self.definition_note_ids.append([])
         checkbox.stateChanged.connect(self.update_card_counts_for_all_cards)
 
-        hbox.addStretch(1)
+        # Add stretch to push buttons to the right
+        definition_layout.addStretch()
 
-        # Edit
+        # Edit button
         edit_button = QPushButton("Edit")
-        edit_button.clicked.connect(lambda: self.edit_definition(index))
-        self.middle_grid.addWidget(edit_button, index, 2)
+        edit_button.clicked.connect(lambda: self.edit_definition_by_guid(definition_guid))
+        definition_layout.addWidget(edit_button)
 
-        # Duplicate
+        # Duplicate button
         duplicate_button = QPushButton("Duplicate")
-        duplicate_button.clicked.connect(lambda: self.duplicate_definition(index))
-        self.middle_grid.addWidget(duplicate_button, index, 3)
+        duplicate_button.clicked.connect(lambda: self.duplicate_definition_by_guid(definition_guid))
+        definition_layout.addWidget(duplicate_button)
 
-        # Remove
+        # Remove button
         remove_button = QPushButton("Delete")
 
         def remove_row_ui():
-            self.checkboxes.remove(checkbox)
-            self.definition_note_ids.pop(0)
-            for widget in [checkbox, edit_button, duplicate_button, remove_button]:
-                widget.deleteLater()
-                self.middle_grid.removeWidget(widget)
+            # Remove the entire definition widget from the layout
+            self.definitions_layout.removeWidget(definition_widget)
+            definition_widget.deleteLater()
 
-        self.remove_row_funcs.append(remove_row_ui)
+            # Remove from checkboxes list
+            if checkbox in self.checkboxes:
+                checkbox_index = self.checkboxes.index(checkbox)
+                self.checkboxes.remove(checkbox)
+                if checkbox_index < len(self.definition_note_ids):
+                    self.definition_note_ids.pop(checkbox_index)
+
+        # Store UI components for this definition GUID
+        self.definition_ui_components[definition_guid] = {
+            "widget": definition_widget,
+            "checkbox": checkbox,
+            "edit_button": edit_button,
+            "duplicate_button": duplicate_button,
+            "remove_button": remove_button,
+            "remove_ui_func": remove_row_ui,
+            "index": index,
+        }
 
         def remove_row():
-            # When removing a definition, we in fact remake the whole grid
-            # Thus we remove all definition's UI, remove the one definition
-            # and then add the remaining definitions back
-            for func in self.remove_row_funcs:
-                func()
-            self.remove_row_funcs = []
-            self.remove_definition(index)
+            # Use targeted removal without needing to rebuild entire UI
+            self.remove_definition_by_guid(definition_guid)
 
         remove_button.clicked.connect(remove_row)
-        self.middle_grid.addWidget(remove_button, index, 4)
+        definition_layout.addWidget(remove_button)
 
-    def remove_definition(self, index: int):
-        """
-        Removes the selected copy definition
-        """
+        # Add the definition widget to the definitions layout
+        self.definitions_layout.addWidget(definition_widget)
+
+    def remove_definition_by_guid(self, definition_guid: str):
+        """Remove a specific definition and its UI components by GUID without rebuilding the entire UI."""
+        # Find and remove the definition from the list
+        definition_to_remove = None
+        for i, definition in enumerate(self.copy_definitions):
+            if definition.get("guid") == definition_guid:
+                definition_to_remove = definition
+                self.copy_definitions.pop(i)
+                break
+
+        if definition_to_remove is None:
+            return
+
+        # Remove from configuration
         config = Config()
         config.load()
         try:
-            config.remove_definition_by_index(index)
-        except IndexError:
-            # Sometimes when removing things quickly a pop index out of range
-            # error can occur. Things seem to work ok despite it, just
-            # ignoring it for now.
+            # Find the definition in config by GUID and remove it
+            for i, config_def in enumerate(config.copy_definitions):
+                if config_def.get("guid") == definition_guid:
+                    config.remove_definition_by_index(i)
+                    break
+        except (IndexError, KeyError):
+            # Sometimes when removing things quickly an error can occur
             pass
-        config.load()
-        self.copy_definitions = config.copy_definitions
-        self.add_all_definition_rows()
+
+        # Remove UI components
+        if definition_guid in self.definition_ui_components:
+            ui_components = self.definition_ui_components[definition_guid]
+            ui_components["remove_ui_func"]()
+
+            # Remove from tracking
+            del self.definition_ui_components[definition_guid]
+
+        # Update card counts
         self.update_card_counts_for_all_cards()
 
-    def duplicate_definition(self, index: int):
-        """
-        Duplicates the selected copy definition
-        """
+    def duplicate_definition_by_guid(self, definition_guid: str):
+        """Duplicate a specific definition by GUID."""
+        # Find the definition to duplicate
+        definition_to_duplicate = None
+        for definition in self.copy_definitions:
+            if definition.get("guid") == definition_guid:
+                definition_to_duplicate = definition
+                break
+
+        if definition_to_duplicate is None:
+            return
+
+        # Create a copy and assign new GUID
         config = Config()
         config.load()
-        copy_definition = config.copy_definitions[index]
-        # Make a copy of the definition
-        copy_definition = copy_definition.copy()
+        copy_definition = copy_module.deepcopy(definition_to_duplicate)
         copy_definition["definition_name"] += " (copy)"
+        copy_definition["guid"] = str(uuid.uuid4())
+
         config.add_definition(copy_definition)
-        self.add_definition_row(len(self.copy_definitions), copy_definition)
+
+        # Add to local list and UI
+        self.copy_definitions.append(copy_definition)
+        self.add_definition_row(len(self.copy_definitions) - 1, copy_definition)
+
+        # Reload config to stay in sync
         config.load()
         self.copy_definitions = config.copy_definitions
-        # Since we're creating an identical copy of an existing definition,
-        # the applicable cards aren't changing this time
+
+    def edit_definition_by_guid(self, definition_guid: str):
+        """Edit a specific definition by GUID."""
+        # Find the definition to edit
+        definition_to_edit = None
+        definition_index = None
+        for i, definition in enumerate(self.copy_definitions):
+            if definition.get("guid") == definition_guid:
+                definition_to_edit = definition
+                definition_index = i
+                break
+
+        if definition_to_edit is None:
+            return
+
+        return self.edit_definition(definition_index, definition_to_edit)
 
     def edit_definition(
         self, index: Optional[int] = None, copy_definition: Optional[CopyDefinition] = None
@@ -216,23 +307,42 @@ class PickCopyDefinitionDialog(QDialog):
         if dialog.exec():
             copy_definition = dialog.get_copy_definition()
             if index is None and copy_definition is not None:
+                # Adding new definition
+                if "guid" not in copy_definition:
+                    copy_definition["guid"] = str(uuid.uuid4())
                 config.add_definition(copy_definition)
+
+                # Add to local list and UI
+                self.copy_definitions.append(copy_definition)
+                self.add_definition_row(len(self.copy_definitions) - 1, copy_definition)
+
             elif index is not None and copy_definition is not None:
+                # Updating existing definition
+                old_definition = self.copy_definitions[index]
+                old_guid = old_definition.get("guid")
+
+                # Preserve GUID if it exists
+                if old_guid:
+                    copy_definition["guid"] = old_guid
+                elif "guid" not in copy_definition:
+                    copy_definition["guid"] = str(uuid.uuid4())
+
                 config.update_definition_by_index(index, copy_definition)
+
+                # Update local list
+                self.copy_definitions[index] = copy_definition
+
+                # Update UI component text if GUID exists in tracking
+                if old_guid and old_guid in self.definition_ui_components:
+                    ui_components = self.definition_ui_components[old_guid]
+                    checkbox = ui_components["checkbox"]
+                    checkbox.setText(copy_definition["definition_name"])
 
             # Always reload configuration to ensure we have the latest definitions
             config.load()
             self.copy_definitions = config.copy_definitions
 
-            # Clear existing UI before rebuilding
-            for func in self.remove_row_funcs:
-                func()
-            self.remove_row_funcs = []
-            self.checkboxes = []
-            self.definition_note_ids = []
-
-            # Rebuild the UI with the updated definitions
-            self.add_all_definition_rows()
+            # Update card counts without rebuilding UI
             self.update_card_counts_for_all_cards()
             return 0
         else:

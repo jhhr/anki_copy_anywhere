@@ -1,6 +1,8 @@
 import re
+import uuid
+import copy
 from contextlib import suppress
-from typing import Union, Optional, Callable, cast, Sequence
+from typing import Union, Optional, cast, Sequence
 
 from aqt import mw
 
@@ -611,26 +613,29 @@ class EditExtraProcessingWidget(QWidget):
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
         self.process_dialogs: list[QDialog] = []
-        self.remove_row_funcs: list[Callable[[], None]] = []
+        # GUID-based process UI tracking
+        self.process_ui_components: dict[str, dict] = {}  # Maps process GUID to its UI components
         try:
             self.process_chain = cast(list[AnyProcess], field_to_x_def["process_chain"])
         except KeyError:
             self.process_chain = []
 
-        def make_grid():
-            grid = QGridLayout()
-            grid.setColumnMinimumWidth(0, 200)
-            grid.setColumnMinimumWidth(1, 200)
-            grid.setColumnMinimumWidth(2, 50)
-            grid.setColumnMinimumWidth(3, 50)
-            grid.setColumnMinimumWidth(4, 50)
-            self.vbox.addLayout(grid)
-            return grid
+        def make_processes_container():
+            processes_widget = QWidget()
+            processes_layout = QVBoxLayout(processes_widget)
+            processes_layout.setContentsMargins(0, 0, 0, 0)
+            self.vbox.addWidget(processes_widget)
+            return processes_layout
 
-        left_vbox = QVBoxLayout()
-        self.middle_grid = make_grid()
-        self.middle_grid.addLayout(left_vbox, 0, 0, 1, 1, QAlignLeft)
-        left_vbox.addWidget(QLabel("<h4>Extra processing</h4>"))
+        self.processes_layout = make_processes_container()
+
+        # Add header above the processes container
+        header_widget = QWidget()
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.addWidget(QLabel("<h4>Extra processing</h4>"))
+        header_layout.addStretch()
+        self.vbox.insertWidget(0, header_widget)  # Insert at top, before processes container
 
         for index, process in enumerate(self.process_chain):
             self.add_process_row(index, process)
@@ -639,8 +644,11 @@ class EditExtraProcessingWidget(QWidget):
             placeholder_text="Select process to add (optional)",
         )
         self.add_process_chain_button.setMaximumWidth(250)
+
+        # Initialize field definition and combobox
+        self.field_to_x_def["process_chain"] = cast(Sequence[AnyProcess], self.process_chain)
         self.init_options_to_process_combobox()
-        left_vbox.addWidget(self.add_process_chain_button)
+        self.vbox.addWidget(self.add_process_chain_button)
 
     def init_options_to_process_combobox(self):
         currently_active_processes = [process["name"] for process in self.process_chain]
@@ -656,29 +664,15 @@ class EditExtraProcessingWidget(QWidget):
         # Reconnect signal now that we're done calling addItem
         self.add_process_chain_button.currentTextChanged.connect(self.add_process)
 
-    def remove_process(self, process, process_dialog):
-        self.process_chain.remove(process)
-        process_dialog.deleteLater()
-        self.process_dialogs.remove(process_dialog)
-        self.update_process_chain()
-
-    def update_process_chain(
-        self,
-    ):
-        # Disconnect signal to avoid calling add_process in an infinite loop
-        # because init_options_to_process_combobox calls addItem which
-        # triggers the currentTextChanged signal in the PlaceholderCombobox
-        self.add_process_chain_button.currentTextChanged.disconnect(self.add_process)
-        self.field_to_x_def["process_chain"] = cast(Sequence[AnyProcess], self.process_chain)
-        self.init_options_to_process_combobox()
-
-        for index, process in enumerate(self.process_chain):
-            self.add_process_row(index, process)
-
     def get_process_chain(self):
         return self.process_chain
 
     def add_process_row(self, index, process):
+        # Ensure process has GUID
+        if "guid" not in process:
+            process["guid"] = str(uuid.uuid4())
+
+        process_guid = process["guid"]
         process_dialog, get_process_name = self.get_process_dialog_and_name(process)
 
         if process_dialog is None:
@@ -686,65 +680,121 @@ class EditExtraProcessingWidget(QWidget):
 
         self.process_dialogs.append(process_dialog)
 
-        # By setting the name into a box layout where we'll allow it expand
-        # its empty space rightward also pushing the buttons there to the
-        # edge
-        hbox = QHBoxLayout()
-        self.middle_grid.addLayout(hbox, index, 1)
+        # Create a widget to contain this process row
+        process_widget = QWidget()
+        process_layout = QHBoxLayout(process_widget)
+        process_layout.setContentsMargins(5, 5, 5, 5)
 
+        # Add the process label
         process_label = ClickableLabel(get_process_name(process), process_dialog.description, self)
-        hbox.addStretch(1)
-        hbox.addWidget(process_label)
+        process_layout.addStretch()  # Push buttons to the right
+        process_layout.addWidget(process_label)
 
         def process_dialog_exec():
             if process_dialog.exec():
                 for i, cur_process in enumerate(self.process_chain):
-                    if cur_process == process:
+                    if cur_process["guid"] == process_guid:
                         self.process_chain[i] = process_dialog.process
-                # Remake the whole grid
-                for func in self.remove_row_funcs:
-                    func()
-                self.remove_row_funcs = []
-                self.update_process_chain()
+                        # Update the GUID tracking since process object may have changed
+                        if "guid" not in process_dialog.process:
+                            process_dialog.process["guid"] = process_guid
+                        else:
+                            # Update the tracking dict key if GUID changed
+                            if process_dialog.process["guid"] != process_guid:
+                                self.process_ui_components[process_dialog.process["guid"]] = (
+                                    self.process_ui_components.pop(process_guid)
+                                )
+                # Instead of remaking the whole grid, just update the label
+                process_label.setText(get_process_name(process_dialog.process))
                 return 0
             return -1
 
-        # Edit
+        # Edit button
         edit_button = QPushButton("Edit")
         edit_button.clicked.connect(lambda: process_dialog_exec())
-        self.middle_grid.addWidget(edit_button, index, 2)
+        process_layout.addWidget(edit_button)
 
-        # Remove
+        # Remove button
         remove_button = QPushButton("Delete")
 
         def remove_row_ui():
-            for widget in [process_label, edit_button, remove_button]:
-                widget.deleteLater()
-                self.middle_grid.removeWidget(widget)
+            # Remove the entire process widget from the layout
+            self.processes_layout.removeWidget(process_widget)
+            process_widget.deleteLater()
 
-        self.remove_row_funcs.append(remove_row_ui)
+        # Store UI components for this process GUID
+        self.process_ui_components[process_guid] = {
+            "widget": process_widget,
+            "label": process_label,
+            "edit_button": edit_button,
+            "remove_button": remove_button,
+            "remove_ui_func": remove_row_ui,
+            "dialog": process_dialog,
+        }
 
         def remove_row():
-            # Remake the whole grid
-            for func in self.remove_row_funcs:
-                func()
-            self.remove_row_funcs = []
-            self.remove_process(process, process_dialog)
+            # Use targeted removal without needing reindexing
+            self.remove_process_by_guid(process_guid)
 
         remove_button.clicked.connect(remove_row)
-        self.middle_grid.addWidget(remove_button, index, 4)
+        process_layout.addWidget(remove_button)
 
-    def add_process(self, process_name):
+        # Add the process widget to the processes layout
+        self.processes_layout.addWidget(process_widget)
+
+    def remove_process_by_guid(self, process_guid: str):
+        """Remove a specific process and its UI components by GUID without rebuilding the entire UI."""
+        # Find and remove the process from the chain
+        process_to_remove = None
+        for i, process in enumerate(self.process_chain):
+            if process.get("guid") == process_guid:
+                process_to_remove = process
+                self.process_chain.pop(i)
+                break
+
+        if process_to_remove is None:
+            return
+
+        # Remove UI components
+        if process_guid in self.process_ui_components:
+            ui_components = self.process_ui_components[process_guid]
+            ui_components["remove_ui_func"]()
+
+            # Remove dialog from dialogs list
+            if ui_components["dialog"] in self.process_dialogs:
+                self.process_dialogs.remove(ui_components["dialog"])
+                ui_components["dialog"].deleteLater()
+
+            # Remove from tracking
+            del self.process_ui_components[process_guid]
+
+        # Update process chain and combobox (no reindexing needed with vertical layout)
+        self.field_to_x_def["process_chain"] = cast(Sequence[AnyProcess], self.process_chain)
+        # Disconnect signal to avoid calling add_process in an infinite loop
+        self.add_process_chain_button.currentTextChanged.disconnect(self.add_process)
+        self.init_options_to_process_combobox()
+
+    def add_process(self, index, process_name):
         self.add_process_chain_button.hidePopup()
         if not process_name:
             return
-        new_process: AnyProcess = NEW_PROCESS_DEFAULTS[process_name]
+        # Create a copy of the default process and assign GUID
+        new_process: AnyProcess = copy.deepcopy(NEW_PROCESS_DEFAULTS[process_name])
         if new_process is None:
             return
-        self.add_process_row(len(self.process_chain), new_process)
-        # Append after calling add row, since this increases the length of the process chain!
+        new_process["guid"] = str(uuid.uuid4())
+
+        # Append to process chain first
         self.process_chain.append(new_process)
-        self.update_process_chain()
+
+        # Add the UI row (index is not needed since we use vertical layout)
+        self.add_process_row(len(self.process_chain) - 1, new_process)
+
+        # Update field def and combobox without full UI rebuild
+        self.field_to_x_def["process_chain"] = cast(Sequence[AnyProcess], self.process_chain)
+        # Disconnect signal to avoid calling add_process in an infinite loop
+        self.add_process_chain_button.currentTextChanged.disconnect(self.add_process)
+        self.init_options_to_process_combobox()
 
     def get_process_dialog_and_name(self, process):
         try:

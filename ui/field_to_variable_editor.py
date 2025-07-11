@@ -1,4 +1,5 @@
 from contextlib import suppress
+import uuid
 from typing import Optional, TypedDict
 
 from aqt.qt import (
@@ -7,7 +8,6 @@ from aqt.qt import (
     QFrame,
     QFormLayout,
     QPushButton,
-    QGridLayout,
     qtmajor,
 )
 
@@ -64,9 +64,13 @@ class CopyFieldToVariableEditor(QWidget):
         self.vbox = QVBoxLayout()
         self.setLayout(self.vbox)
 
-        self.middle_grid = QGridLayout()
-        self.middle_grid.setColumnMinimumWidth(0, 400)
-        self.middle_grid.setColumnMinimumWidth(1, 50)
+        # GUID-based variable UI tracking
+        self.variable_ui_components: dict[str, dict] = {}  # Maps variable GUID to its UI components
+
+        # Create variables container with vertical layout instead of grid
+        self.variables_container_widget = QWidget()
+        self.variables_layout = QVBoxLayout(self.variables_container_widget)
+        self.variables_layout.setContentsMargins(0, 0, 0, 0)
 
         self.bottom_form = QFormLayout()
 
@@ -110,7 +114,7 @@ class CopyFieldToVariableEditor(QWidget):
         self.initialized = True
 
     def add_editor_layouts(self):
-        self.vbox.addLayout(self.middle_grid)
+        self.vbox.addWidget(self.variables_container_widget)
         self.vbox.addLayout(self.bottom_form)
         self.add_new_button = QPushButton("Add another fields-to-variable definition")
         self.bottom_form.addRow("", self.add_new_button)
@@ -124,6 +128,7 @@ class CopyFieldToVariableEditor(QWidget):
 
     def add_new_definition(self):
         new_definition: CopyFieldToVariable = {
+            "guid": str(uuid.uuid4()),
             "copy_into_variable": "",
             "copy_from_text": "",
             "process_chain": [],
@@ -137,6 +142,12 @@ class CopyFieldToVariableEditor(QWidget):
         )
 
     def add_copy_field_row(self, index, copy_field_to_variable_definition):
+        # Ensure definition has GUID
+        if "guid" not in copy_field_to_variable_definition:
+            copy_field_to_variable_definition["guid"] = str(uuid.uuid4())
+
+        variable_guid = copy_field_to_variable_definition["guid"]
+
         # Create a QFrame
         frame = QFrame(self)
         frame.setFrameShape(QFrameStyledPanel)
@@ -145,8 +156,8 @@ class CopyFieldToVariableEditor(QWidget):
         # Create a layout for the frame
         frame_layout = QVBoxLayout(frame)
 
-        # Add the frame to the main layout
-        self.middle_grid.addWidget(frame, index, 0)
+        # Add the frame to the variables layout
+        self.variables_layout.addWidget(frame)
         row_form = QFormLayout()
         frame_layout.addLayout(row_form)
 
@@ -205,25 +216,59 @@ class CopyFieldToVariableEditor(QWidget):
 
         self.copy_field_inputs.append(copy_field_inputs_dict)
 
+        def remove_row_ui():
+            # Remove the entire variable widget from the layout
+            self.variables_layout.removeWidget(frame)
+            frame.deleteLater()
+
+        # Store UI components for this variable GUID
+        self.variable_ui_components[variable_guid] = {
+            "widget": frame,
+            "variable_name_field": variable_name_field,
+            "copy_from_text": copy_from_text_layout,
+            "process_chain": process_chain_widget,
+            "remove_button": remove_button,
+            "remove_ui_func": remove_row_ui,
+        }
+
         def remove_row():
-            for widget in [
-                variable_name_field,
-                remove_button,
-                process_chain_widget,
-            ]:
-                widget.deleteLater()
-                row_form.removeWidget(widget)
-            for layout in [copy_from_text_layout]:
-                for i in range(0, layout.count()):
-                    item = layout.itemAt(i)
-                    if item is not None and (item_widget := item.widget()):
-                        item_widget.deleteLater()
-                layout.deleteLater()
-            self.middle_grid.removeWidget(frame)
-            self.remove_definition(copy_field_to_variable_definition, copy_field_inputs_dict)
+            # Use targeted removal without needing to rebuild entire UI
+            self.remove_definition_by_guid(variable_guid)
 
         remove_button.clicked.connect(remove_row)
         row_form.addRow("", remove_button)
+
+    def remove_definition_by_guid(self, variable_guid: str):
+        """Remove a specific variable definition and its UI components by GUID without rebuilding the entire UI."""
+        # Find and remove the definition from the list
+        definition_to_remove = None
+        for i, definition in enumerate(self.fields_to_variable_defs):
+            if definition.get("guid") == variable_guid:
+                definition_to_remove = definition
+                self.fields_to_variable_defs.pop(i)
+                break
+
+        if definition_to_remove is None:
+            return
+
+        # Remove UI components
+        if variable_guid in self.variable_ui_components:
+            ui_components = self.variable_ui_components[variable_guid]
+            ui_components["remove_ui_func"]()
+
+            # Remove from tracking
+            del self.variable_ui_components[variable_guid]
+
+        # Remove from copy_field_inputs list
+        for i, copy_field_inputs in enumerate(self.copy_field_inputs):
+            if copy_field_inputs.get("copy_into_variable") == ui_components.get(
+                "variable_name_field"
+            ):
+                self.copy_field_inputs.pop(i)
+                break
+
+        # Update variable names in state
+        self.update_variable_names_in_state()
 
     def remove_definition(self, definition, inputs_dict):
         """
