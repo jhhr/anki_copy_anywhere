@@ -17,6 +17,7 @@ from aqt.qt import (
     QDrag,
     QMimeData,
     QApplication,
+    QSizePolicy,
 )
 
 from .edit_copy_definition_dialog import EditCopyDefinitionDialog
@@ -32,6 +33,8 @@ from ..utils.make_query_string import make_query_string
 
 if qtmajor > 5:
     WindowModal = Qt.WindowModality.WindowModal
+    QSizePolicyFixed = QSizePolicy.Policy.Fixed
+    QSizePolicyExpanding = QSizePolicy.Policy.Expanding
     QAlignCenter = Qt.AlignmentFlag.AlignCenter
     QMouseLeftButton = Qt.MouseButton.LeftButton
     QMoveAction = Qt.DropAction.MoveAction
@@ -39,6 +42,8 @@ if qtmajor > 5:
     QCursorClosedHandCursor = Qt.CursorShape.ClosedHandCursor
 else:
     WindowModal = Qt.WindowModal  # type: ignore
+    QSizePolicyFixed = QSizePolicy.Fixed  # type: ignore
+    QSizePolicyExpanding = QSizePolicy.Expanding  # type: ignore
     QAlignCenter = Qt.AlignCenter  # type: ignore
     QMouseLeftButton = Qt.LeftButton  # type: ignore
     QMoveAction = Qt.MoveAction  # type: ignore
@@ -152,8 +157,15 @@ class DefinitionRow(QWidget):
         self.drag_handle = DragHandle(self, self.definition_guid)
         self.layout.addWidget(self.drag_handle)
 
+        # Get parent dialog width and set fixed width accordingly
+        parent_dialog_width = parent_dialog.width()
+        if parent_dialog_width:
+            self.setFixedWidth(parent_dialog_width - 50)
+
         # Add checkbox with definition name
         self.checkbox = QCheckBox(definition["definition_name"])
+        # Set size policy to allow the checkbox to shrink
+        self.checkbox.setSizePolicy(QSizePolicyFixed, QSizePolicyFixed)
         self.layout.addWidget(self.checkbox)
 
         # Add stretch to push buttons to the right
