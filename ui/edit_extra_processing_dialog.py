@@ -774,7 +774,7 @@ class EditExtraProcessingWidget(QWidget):
         self.add_process_chain_button.currentTextChanged.disconnect(self.add_process)
         self.init_options_to_process_combobox()
 
-    def add_process(self, index, process_name):
+    def add_process(self, process_name):
         self.add_process_chain_button.hidePopup()
         if not process_name:
             return

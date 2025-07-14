@@ -461,7 +461,6 @@ def copy_fields_in_background(
         cards of the notes that were copied into
     :param copied_into_notes: An initially empty list of notes that will be appended to with the
         notes that were copied into
-    :param undo_entry: The undo entry to merge the changes into
     :param results: The results object to update with the final result text
     :param note_ids: The note ids to copy into, if None, all notes of the note type are copied into
     :param field_only: Optional field to limit copying to. Used when copying is applied
