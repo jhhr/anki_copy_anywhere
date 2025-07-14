@@ -4,11 +4,18 @@ from aqt.qt import (
     QVBoxLayout,
     QDialog,
     QGuiApplication,
+    QLayout,
 )
 
 
 class ScrollableQDialog(QDialog):
-    def __init__(self, parent=None, footer_layout=None):
+
+    def __init__(
+        self,
+        parent=None,
+        footer_layout: QLayout = None,
+        no_fixed_size: bool = False,
+    ):
         super().__init__(parent)
         self.main_layout = QVBoxLayout(self)
 
@@ -21,7 +28,7 @@ class ScrollableQDialog(QDialog):
 
         # Get the screen size
         screen = QGuiApplication.primaryScreen()
-        if screen:
+        if screen and not no_fixed_size:
             geometry = screen.availableGeometry()
             # Set the initial size to a percentage of the screen size
             self.resize(int(geometry.width() * 0.6), int(geometry.height() * 0.95))

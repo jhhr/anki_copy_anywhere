@@ -309,6 +309,9 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
         self.definitions_layout.setContentsMargins(0, 0, 0, 0)
         self.vbox.addWidget(definitions_container_widget)
 
+        # Add a spacer to push the definitions to the top
+        self.vbox.addStretch(1)
+
         self.add_all_definition_rows()
 
         # Create footer layout for bottom buttons
