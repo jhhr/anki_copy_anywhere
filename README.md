@@ -15,7 +15,19 @@ In the card browser main menu Edit --> Copy Anywhere or hotkey Alt+Shift+C
 
 <img width="392" height="339" alt="image" src="https://github.com/user-attachments/assets/426620da-fd6e-4049-b98f-7f460eed491d" />
 
-### Making copy definitions
+### Making and running copy definitions
+
+Creating, editing and removing definitions is done through the dialog.
+
+<img width="1151" height="302" alt="image" src="https://github.com/user-attachments/assets/a6579f91-3f03-47f2-8573-307b766c8f1f" />
+
+ The dialog additionally allows running copy definitions for the selected notes in the browser, or the entire search result. This is useful for running multiple definitions at once for a selection of notes. Otherwise, to run a single definition for a selection of notes in the browser, you can use the right-click menu.
+
+#### Run multiple copy definitions in dialog
+<img width="1158" height="1022" alt="image" src="https://github.com/user-attachments/assets/839b86fb-acae-474d-9d84-3f32cc688ff2" />
+
+#### Run a single copy definitions through browser right-click menu
+<img width="999" height="934" alt="image" src="https://github.com/user-attachments/assets/f37f2d2e-eabe-4dbb-9d8c-e24ffaf3d074" />
 
 #### Select main mode
 
@@ -24,7 +36,7 @@ In the card browser main menu Edit --> Copy Anywhere or hotkey Alt+Shift+C
   - **Source to destinations**: Search for other notes with data from a note, then edit *that one note* with data from the found notes
   - **Destination to sources**: Search for other notes with data from a note, then edit *each of the found notes* with data from the one note
 
-<img width="1151" height="302" alt="image" src="https://github.com/user-attachments/assets/a6579f91-3f03-47f2-8573-307b766c8f1f" />
+<img width="1536" height="914" alt="image" src="https://github.com/user-attachments/assets/a222910e-57d3-4602-a052-0bd0a0962526" />
 
 #### Basic settings
 
