@@ -29,6 +29,8 @@ from .jpn_text_processing.regex import (
     FURIGANA_REC,
     KATAKANA_REC,
     ALL_MORA_REC,
+    RENDAKU_CONVERSION_DICT_HIRAGANA,
+    RENDAKU_CONVERSION_DICT_KATAKANA,
 )
 
 try:
@@ -51,34 +53,6 @@ all_kanji_data: dict[str, KanjiData] = {}
 with open(json_file_path, "r", encoding="utf-8") as f:
     all_kanji_data = json.load(f)
 
-RENDAKU_CONVERSION_DICT_HIRAGANA = {
-    "か": ["が"],
-    "き": ["ぎ"],
-    "く": ["ぐ"],
-    "け": ["げ"],
-    "こ": ["ご"],
-    "さ": ["ざ"],
-    "し": ["じ"],
-    "す": ["ず"],
-    "せ": ["ぜ"],
-    "そ": ["ぞ"],
-    "た": ["だ"],
-    "ち": ["ぢ"],
-    "つ": ["づ"],
-    "て": ["で"],
-    "と": ["ど"],
-    "は": ["ば", "ぱ"],
-    "ひ": ["び", "ぴ"],
-    "ふ": ["ぶ", "ぷ"],
-    "へ": ["べ", "ぺ"],
-    "ほ": ["ぼ", "ぽ"],
-    "う": ["ぬ"],
-}
-# Convert HIRAGANA_CONVERSION_DICT to katakana with to_katakana
-RENDAKU_CONVERSION_DICT_KATAKANA = {
-    to_katakana(k): [to_katakana(v) for v in vs]
-    for k, vs in RENDAKU_CONVERSION_DICT_HIRAGANA.items()
-}
 
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
 SMALL_TSU_POSSIBLE_KATAKANA = [to_katakana(k) for k in SMALL_TSU_POSSIBLE_HIRAGANA]

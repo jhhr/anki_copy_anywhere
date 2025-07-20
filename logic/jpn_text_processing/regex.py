@@ -1,5 +1,7 @@
 import re
 
+from .kana_conv import to_katakana
+
 # Regex matching any kanji characters
 # Include the kanji repeater punctuation as something that will be cleaned off
 # Also include numbers as they are sometimes used in furigana
@@ -212,3 +214,33 @@ ALL_MORA = (
 # Add the small tsu versions of all mora to be matched first
 ALL_MORA_RE = "|".join([m + "っ" for m in ALL_MORA] + ALL_MORA)
 ALL_MORA_REC = re.compile(rf"({ALL_MORA_RE})")
+
+
+RENDAKU_CONVERSION_DICT_HIRAGANA = {
+    "か": ["が"],
+    "き": ["ぎ"],
+    "く": ["ぐ"],
+    "け": ["げ"],
+    "こ": ["ご"],
+    "さ": ["ざ"],
+    "し": ["じ"],
+    "す": ["ず"],
+    "せ": ["ぜ"],
+    "そ": ["ぞ"],
+    "た": ["だ"],
+    "ち": ["ぢ"],
+    "つ": ["づ"],
+    "て": ["で"],
+    "と": ["ど"],
+    "は": ["ば", "ぱ"],
+    "ひ": ["び", "ぴ"],
+    "ふ": ["ぶ", "ぷ"],
+    "へ": ["べ", "ぺ"],
+    "ほ": ["ぼ", "ぽ"],
+    "う": ["ぬ"],
+}
+# Convert HIRAGANA_CONVERSION_DICT to katakana with to_katakana
+RENDAKU_CONVERSION_DICT_KATAKANA = {
+    to_katakana(k): [to_katakana(v) for v in vs]
+    for k, vs in RENDAKU_CONVERSION_DICT_HIRAGANA.items()
+}

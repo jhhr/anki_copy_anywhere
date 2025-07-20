@@ -5,6 +5,8 @@ try:
 except ImportError:
     from utils.logger import Logger
 
+from .regex import RENDAKU_CONVERSION_DICT_HIRAGANA
+
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.
 PART_OF_SPEECH_NUM: dict[int, list[str]] = {
@@ -58,6 +60,11 @@ E_I_ENDING_KANA: set[str] = {
     "り",
     "れ",
 }
+
+# Add rendaku forms of E/I ending kana
+for k, vs in RENDAKU_CONVERSION_DICT_HIRAGANA.items():
+    if k in E_I_ENDING_KANA:
+        E_I_ENDING_KANA.update(vs)
 
 GODAN_ENDINGS: dict[str, str] = {
     "う": "u",

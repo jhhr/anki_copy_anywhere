@@ -2944,6 +2944,18 @@ def main():
         sentence="話[はな]させろ!",
         expected_kana_only_with_tags_split="<kun>はな</kun><oku>させろ</oku>!",
     )
+    test(
+        test_name="matches okuri for causative imperative godan ru verb",
+        kanji="",
+        sentence="食[た]べさせろ!",
+        expected_kana_only_with_tags_split="<kun>た</kun><oku>べさせろ</oku>!",
+    )
+    test(
+        test_name="matches okuri for causative imperative godan aru verb",
+        kanji="",
+        sentence="有[あ]らせろ!",
+        expected_kana_only_with_tags_split="<kun>あ</kun><oku>らせろ</oku>!",
+    )
     print("\n\033[92mTests passed\033[0m")
 
 
