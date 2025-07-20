@@ -2926,6 +2926,24 @@ def main():
         expected_furigana_with_tags_merged="<b><on> 不[フ]</on></b><on> 都合[ツゴウ]</on>",
         expected_furikanji_with_tags_merged="<b><on> フ[不]</on></b><on> ツゴウ[都合]</on>",
     )
+    test(
+        test_name="matches okuri for causative imperative godan gu verb",
+        kanji="",
+        sentence="嗅[か]がせろって",
+        expected_kana_only_with_tags_split="<kun>か</kun><oku>がせろ</oku>って",
+    )
+    test(
+        test_name="matches okuri for causative imperative godan mu verb",
+        kanji="",
+        sentence="飲[の]ませろ!",
+        expected_kana_only_with_tags_split="<kun>の</kun><oku>ませろ</oku>!",
+    )
+    test(
+        test_name="matches okuri for causative imperative godan su verb",
+        kanji="",
+        sentence="話[はな]させろ!",
+        expected_kana_only_with_tags_split="<kun>はな</kun><oku>させろ</oku>!",
+    )
     print("\n\033[92mTests passed\033[0m")
 
 

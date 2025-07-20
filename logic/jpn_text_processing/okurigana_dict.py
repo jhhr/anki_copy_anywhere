@@ -1,5 +1,10 @@
 from typing import Union, Tuple
 
+try:
+    from ...utils.logger import Logger
+except ImportError:
+    from utils.logger import Logger
+
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.
 PART_OF_SPEECH_NUM: dict[int, list[str]] = {
@@ -115,20 +120,13 @@ def get_verb_noun_form_okuri(dict_form_verb_okuri: str, kanji: str, kanji_readin
     return ""
 
 
-LOG = False
-
-
-def log(msg: str) -> None:
-    if LOG:
-        print(msg)
-
-
 # For getting the conjugation dict in POSSIBLE_OKURIGANA_PROGRESSION_DICT
 # we need to determine the word's part of speech.
 def get_part_of_speech(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
+    logger: Logger = Logger("error"),
 ) -> Union[str, None]:
     """
     Get the part of speech key for POSSIBLE_OKURIGANA_PROGRESSION_DICT for a word.
@@ -178,7 +176,7 @@ def get_part_of_speech(
 
     # Godan verb endings
     godan_type = GODAN_ENDINGS.get(okurigana[-1])
-    log(f"last char: {okurigana[-1]}")
+    logger.debug(f"last char: {okurigana[-1]}")
     if godan_type:
         return f"v5{godan_type}"
 
@@ -189,6 +187,7 @@ def get_okuri_dict_for_okurigana(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
+    logger: Logger = Logger("error"),
 ) -> Union[dict, None]:
     """
     Get the okurigana progression dict for a dictionary form word.
@@ -202,8 +201,12 @@ def get_okuri_dict_for_okurigana(
         okurigana=okurigana,
         kanji=kanji,
         kanji_reading=kanji_reading,
+        logger=logger,
     )
-    log(f"part_of_speech: {part_of_speech}")
+    logger.debug(
+        f"part_of_speech: {part_of_speech}, okurigana: {okurigana}, kanji: {kanji}, kanji_reading:"
+        f" {kanji_reading}"
+    )
     if part_of_speech is None:
         return None
     return POSSIBLE_OKURIGANA_PROGRESSION_DICT[part_of_speech]
@@ -266,6 +269,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (28, "られない"),
     (28, "られません"),
     (28, "させる"),
+    (28, "させろ"),
     (28, "さす"),
     (28, "させます"),
     (28, "さします"),
@@ -321,6 +325,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (29, "られない"),
     (29, "られません"),
     (29, "させる"),
+    (29, "させろ"),
     (29, "さす"),
     (29, "させます"),
     (29, "さします"),
@@ -371,6 +376,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (30, "られない"),
     (30, "られません"),
     (30, "らせる"),
+    (30, "らせろ"),
     (30, "らす"),
     (30, "らせます"),
     (30, "らします"),
@@ -427,6 +433,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (31, "ばれない"),
     (31, "ばれません"),
     (31, "ばせる"),
+    (31, "ばせろ"),
     (31, "ばす"),
     (31, "ばせます"),
     (31, "ばします"),
@@ -483,6 +490,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (32, "がれない"),
     (32, "がれません"),
     (32, "がせる"),
+    (32, "がせろ"),
     (32, "がす"),
     (32, "がせます"),
     (32, "がします"),
@@ -539,6 +547,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (33, "かれない"),
     (33, "かれません"),
     (33, "かせる"),
+    (33, "かせろ"),
     (33, "かす"),
     (33, "かせます"),
     (33, "かします"),
@@ -595,6 +604,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (34, "かれない"),
     (34, "かれません"),
     (34, "かせる"),
+    (34, "かせろ"),
     (34, "かす"),
     (34, "かせます"),
     (34, "かします"),
@@ -652,6 +662,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (35, "まれない"),
     (35, "まれません"),
     (35, "ませる"),
+    (35, "ませろ"),
     (35, "ます"),
     (35, "ませます"),
     (35, "まします"),
@@ -708,6 +719,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (36, "なれない"),
     (36, "なれません"),
     (36, "なせる"),
+    (36, "なせろ"),
     (36, "なす"),
     (36, "なせます"),
     (36, "なします"),
@@ -764,6 +776,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (37, "られない"),
     (37, "られません"),
     (37, "らせる"),
+    (37, "らせろ"),
     (37, "らす"),
     (37, "らせます"),
     (37, "らします"),
@@ -820,6 +833,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (38, "られない"),
     (38, "られません"),
     (38, "らせる"),
+    (38, "らせろ"),
     (38, "らす"),
     (38, "らせます"),
     (38, "らします"),
@@ -868,6 +882,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (39, "せば"),
     (39, "さなければ"),
     (39, "せる"),
+    (39, "せろ"),
     (39, "せます"),
     (39, "せない"),
     (39, "せません"),
@@ -876,6 +891,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (39, "されない"),
     (39, "されません"),
     (39, "させる"),
+    (39, "させろ"),
     (39, "さす"),
     (39, "させます"),
     (39, "さします"),
@@ -928,6 +944,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (40, "たれない"),
     (40, "たれません"),
     (40, "たせる"),
+    (40, "たせろ"),
     (40, "たす"),
     (40, "たせます"),
     (40, "たします"),
@@ -984,6 +1001,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (41, "われない"),
     (41, "われません"),
     (41, "わせる"),
+    (41, "わせろ"),
     (41, "わす"),
     (41, "わせます"),
     (41, "わします"),
@@ -1040,6 +1058,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (42, "われない"),
     (42, "われません"),
     (42, "わせる"),
+    (42, "わせろ"),
     (42, "わす"),
     (42, "わせます"),
     (42, "わします"),

@@ -1120,6 +1120,7 @@ def check_okurigana_for_kunyomi_inflection(
         kunyomi_okurigana,
         highlight_args["kanji_to_match"],
         kunyomi_reading,
+        logger=logger,
     )
     logger.debug(
         f"check okurigana 6 - conjugated_okuri: {conjugated_okuri}, rest: {rest},"
