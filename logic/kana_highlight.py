@@ -18,6 +18,18 @@ from .jpn_text_processing.construct_wrapped_furi_word import (
     FuriReconstruct,
 )
 from .jpn_text_processing.okurigana_dict import get_verb_noun_form_okuri
+from .jpn_text_processing.okurigana_mix_cleaning_replacer import (
+    OKURIGANA_MIX_CLEANING_REC,
+    okurigana_mix_cleaning_replacer,
+)
+from .jpn_text_processing.regex import (
+    KANJI_REC,
+    DOUBLE_KANJI_REC,
+    KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
+    FURIGANA_REC,
+    KATAKANA_REC,
+    ALL_MORA_REC,
+)
 
 try:
     from ..utils.logger import Logger
@@ -71,191 +83,6 @@ RENDAKU_CONVERSION_DICT_KATAKANA = {
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
 SMALL_TSU_POSSIBLE_KATAKANA = [to_katakana(k) for k in SMALL_TSU_POSSIBLE_HIRAGANA]
 
-HIRAGANA_RE = "([ぁ-ん])"
-KATAKANA_RE = "([ァ-ン])"
-KATAKANA_REC = re.compile(KATAKANA_RE)
-
-# Palatilized (拗音) mora and other non-straight mora
-PALATALIZED_MORA = [
-    "くぃ",
-    "きゃ",
-    "きゅ",
-    "きぇ",
-    "きょ",
-    "ぐぃ",
-    "ぎゃ",
-    "ぎゅ",
-    "ぎぇ",
-    "ぎょ",
-    "すぃ",
-    "しゃ",
-    "しゅ",
-    "しぇ",
-    "しょ",
-    "ずぃ",
-    "じゃ",
-    "じゅ",
-    "じぇ",
-    "じょ",
-    "てぃ",
-    "とぅ",
-    "ちゃ",
-    "ちゅ",
-    "ちぇ",
-    "ちょ",
-    "でぃ",
-    "どぅ",
-    "ぢゃ",
-    "でゅ",
-    "ぢゅ",
-    "ぢぇ",
-    "ぢょ",
-    "つぁ",
-    "つぃ",
-    "つぇ",
-    "つぉ",
-    "づぁ",
-    "づぃ",
-    "づぇ",
-    "づぉ",
-    "ひぃ",
-    "ほぅ",
-    "ひゃ",
-    "ひゅ",
-    "ひぇ",
-    "ひょ",
-    "びぃ",
-    "びゃ",
-    "びゅ",
-    "びぇ",
-    "びょ",
-    "ぴぃ",
-    "ぴゃ",
-    "ぴゅ",
-    "ぴぇ",
-    "ぴょ",
-    "ふぁ",
-    "ふぃ",
-    "ふぇ",
-    "ふぉ",
-    "ゔぁ",
-    "ゔぃ",
-    "ゔぇ",
-    "ゔぉ",
-    "ぬぃ",
-    "にゃ",
-    "にゅ",
-    "にぇ",
-    "にょ",
-    "むぃ",
-    "みゃ",
-    "みゅ",
-    "みぇ",
-    "みょ",
-    "るぃ",
-    "りゃ",
-    "りゅ",
-    "りぇ",
-    "りょ",
-    "いぇ",
-]
-
-SINGLE_KANA_MORA = [
-    "か",
-    "く",
-    "け",
-    "こ",
-    "き",
-    "が",
-    "ぐ",
-    "げ",
-    "ご",
-    "ぎ",
-    "さ",
-    "す",
-    "せ",
-    "そ",
-    "し",
-    "ざ",
-    "ず",
-    "づ",
-    "ぜ",
-    "ぞ",
-    "じ",
-    "ぢ",
-    "た",
-    "と",
-    "て",
-    "と",
-    "ち",
-    "だ",
-    "で",
-    "ど",
-    "ぢ",
-    "つ",
-    "づ",
-    "は",
-    "へ",
-    "ほ",
-    "ひ",
-    "ば",
-    "ぶ",
-    "べ",
-    "ぼ",
-    "ぼ",
-    "び",
-    "ぱ",
-    "ぷ",
-    "べ",
-    "ぽ",
-    "ぴ",
-    "ふ",
-    "ゔ",
-    "な",
-    "ぬ",
-    "ね",
-    "の",
-    "に",
-    "ま",
-    "む",
-    "め",
-    "も",
-    "み",
-    "ら",
-    "る",
-    "れ",
-    "ろ",
-    "り",
-    "あ",
-    "い",
-    "う",
-    "え",
-    "お",
-    "や",
-    "ゆ",
-    "よ",
-    "わ",
-    "ゐ",
-    "ゑ",
-    "を",
-]
-
-# Elongated vowels of the single kana mora (直音)
-LONG_STRAIGHT_MORA = [f"{kana}ー" for kana in SINGLE_KANA_MORA]
-
-# First all two kana more, so they get matched first, then the single kana mora
-ALL_MORA = (
-    PALATALIZED_MORA
-    + LONG_STRAIGHT_MORA
-    + SINGLE_KANA_MORA
-    + [
-        "ん",
-    ]
-)
-
-# Add the small tsu versions of all mora to be matched first
-ALL_MORA_RE = "|".join([m + "っ" for m in ALL_MORA] + ALL_MORA)
-ALL_MORA_REC = re.compile(rf"({ALL_MORA_RE})")
 
 VOWEL_CHANGE_DICT_HIRAGANA = {
     "お": ["よ", "ょ"],
@@ -266,28 +93,6 @@ VOWEL_CHANGE_DICT_KATAKANA = {
     to_katakana(k): [to_katakana(v) for v in vs] for k, vs in VOWEL_CHANGE_DICT_HIRAGANA.items()
 }
 
-# Regex matching any kanji characters
-# Include the kanji repeater punctuation as something that will be cleaned off
-# Also include numbers as they are sometimes used in furigana
-KANJI_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)"
-KANJI_REC = re.compile(KANJI_RE)
-# Same as above but allows for being empty
-KANJI_RE_OPT = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]*)"
-
-# Regex matching any furigana
-FURIGANA_RE = r" ?([^ >]+?)\[(.+?)\]"
-FURIGANA_REC = re.compile(FURIGANA_RE)
-
-# Text that contains any kanji repeated, to be replaced by the kanji+々
-DOUBLE_KANJI_RE = r"([\u4e00-\u9faf\u3400-\u4dbf])\1"
-DOUBLE_KANJI_REC = re.compile(DOUBLE_KANJI_RE)
-
-KANJI_AND_REPEATER_RE = r"([\u4e00-\u9faf\u3400-\u4dbf]々)"
-KANJI_AND_REPEATER_REC = re.compile(KANJI_AND_REPEATER_RE)
-
-# Regex matching any kanji and furigana + hiragana after the furigana
-KANJI_AND_FURIGANA_AND_OKURIGANA_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]([ぁ-ん]*)"
-KANJI_AND_FURIGANA_AND_OKURIGANA_REC = re.compile(KANJI_AND_FURIGANA_AND_OKURIGANA_RE)
 
 # Exceptions for words where the first kanji has a kunyomi reading that is the same as the
 # the whole reading for the jukujikun compound. This is used to avoid matching the kunyomi
@@ -298,52 +103,6 @@ JUKUJIKUN_KUNYOMI_OVERLAP: dict[str, str] = {
     "真面": "まじ",
     "蕎麦": "そば",
 }
-
-# Regex for lone kanji with some hiragana to their right, then some kanji,
-# then furigana that includes the hiragana in the middle
-# This is used to match cases of furigana used for　kunyomi compound words with
-# okurigana in the middle. For example
-# (1) 消え去[きえさ]る
-# (2) 隣り合わせ[となりあわせ]
-# (3) 歯止め[はどめ]
-OKURIGANA_MIX_CLEANING_RE = re.compile(
-    rf"""
-{KANJI_RE}  # match group 1, kanji                          (1)消　(2)隣 (3)歯止
-([ぁ-ん]+)   # match group 2, hiragana                       (1)え　(2)り (3)め
-{KANJI_RE_OPT}  # match group 3, potential kanji            (1)去　(2)合　(3)nothing
-([ぁ-ん]*)   # match group 4, potential hiragana             (1)nothing　(2)わせ (3)nothing
-\[          # opening bracket of furigana
-(.+?)       # match group 5, furigana for kanji in group 1  (1)きえ　(2)となり (3)はど
-\2          # group 2 occuring again                        (1)え　(2)り (3)め
-(.*?)       # match group 6, furigana for kanji in group 3  (1)さ　(2)あわせ　(3)nothing
-\4          # group 4 occuring again (if present)           (1)nothing　(2)わせ (3)nothing
-]          # closing bracket of furigana
-""",
-    re.VERBOSE,
-)
-
-
-def okurigana_mix_cleaning_replacer(match):
-    """
-    re.sub replacer function for OKURIGANA_MIX_CLEANING_RE when it's only needed to
-    clean the kanji and leave the furigana. The objective is to turn the hard to process
-    case into a normal case. For example:
-    (1) 消え去る[きえさ]る becomes 消[き]え去[さ]る
-    (2) 隣り合わせ[となりあわせ] becomes 隣[とな]り合[あ]わせ
-    (3) 歯止め[はどめ] becomes 歯[は]止[ど]め
-    """
-    kanji1 = match.group(1)  # first kanji
-    furigana1 = match.group(5)  # furigana for first kanji
-    hiragana1 = match.group(2)  # hiragana in the middle, after the first kanji
-    kanji2 = match.group(3)  # second kanji
-    furigana2 = match.group(6)  # furigana for second kanji
-    hiragana2 = match.group(4)  # potential hiragana at the end, after the second kanji
-
-    # Return the cleaned and restructured string
-    result = f"{kanji1}[{furigana1}]{hiragana1}"
-    if furigana2:
-        result += f"{kanji2}[{furigana2}]{hiragana2}"
-    return result
 
 
 def re_match_from_right(text):
@@ -415,7 +174,7 @@ def furigana_reverser(text):
         furigana = match.group(2)
         return f"{furigana}[{kanji}]"
 
-    return re.sub(FURIGANA_RE, bracket_reverser, text.replace("&nbsp;", " "))
+    return re.sub(FURIGANA_REC, bracket_reverser, text.replace("&nbsp;", " "))
 
 
 class WithTagsDef(NamedTuple):
@@ -2738,7 +2497,7 @@ def kana_highlight(
         return reconstructed_result
 
     # Clean any potential mixed okurigana cases, turning them normal
-    clean_text = OKURIGANA_MIX_CLEANING_RE.sub(okurigana_mix_cleaning_replacer, text)
+    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, text)
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
     logger.debug(f"processed_text: {processed_text}")
     # Clean any double spaces that might have been created by the furigana reconstruction
