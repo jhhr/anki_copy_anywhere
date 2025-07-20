@@ -38,6 +38,10 @@ def regex_process(
         for f in int_flags[1:]:
             piped_flags |= f
 
+    logger.debug(
+        f"Running regex:\n---\nregex:\n{regex}\n---\nreplacement: {replacement}\n---\ntext:\n"
+        f" {text}"
+    )
     try:
         compiled_regex = re.compile(regex, piped_flags)
     except re.error as e:
