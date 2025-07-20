@@ -38,14 +38,14 @@ def starts_with_okurigana_conjugation(
         return OkuriResults("", kana_text, "no_okuri")
 
     # Get the okurigana dict for the kanji
-    okuri_dict = get_okuri_dict_for_okurigana(kanji_okurigana, kanji, kanji_reading)
+    okuri_dict = get_okuri_dict_for_okurigana(kanji_okurigana, kanji, kanji_reading, logger=logger)
 
     if not okuri_dict:
         return OkuriResults("", kana_text, "no_okuri")
 
     logger.debug(
         f"kana_text: {kana_text}, kanji_okurigana: {kanji_okurigana}, kanji: {kanji},"
-        f" kanji_reading: {kanji_reading}, okuri_dict: {okuri_dict}"
+        f" kanji_reading: {kanji_reading}"
     )
 
     if not kana_text[0] in okuri_dict and not okuri_dict[""]:
@@ -91,22 +91,21 @@ def test(text, okurigana, kanji, kanji_reading, expected):
         text, okurigana, kanji, kanji_reading
     )
     try:
-        global LOG
         assert okurigana == expected[0], f"okurigana: '{okurigana}' != '{expected[0]}'"
         assert rest == expected[1], f"rest: '{rest}' != '{expected[1]}'"
         assert return_type == expected[2], f"return_type: '{return_type}' != '{expected[2]}'"
     except AssertionError as e:
         # Re-run with logging enabled
-        LOG = True
-        starts_with_okurigana_conjugation(text, okurigana, kanji, kanji_reading)
+        starts_with_okurigana_conjugation(
+            text, okurigana, kanji, kanji_reading, logger=Logger("debug")
+        )
         print(f"\033[91mTest failed for '{text}' -- {e}\033[0m")
         # Stop the testing here
-        sys.exit(1)
-    finally:
-        LOG = False
+        sys.exit(0)
 
 
 def main():
+    # full okuri tests
     test(
         text="かったら",
         okurigana="い",
@@ -191,12 +190,21 @@ def main():
         kanji_reading="き",
         expected=("いて", "たか", "full_okuri"),
     )
+    # empty okuri tests
     test(
         text="げな",
         okurigana="ずかしい",
         kanji="恥",
         kanji_reading="は",
         expected=("", "げな", "empty_okuri"),
+    )
+    # partial okuri tests
+    test(
+        text="った",
+        okurigana="る",
+        kanji="去",
+        kanji_reading="さ",
+        expected=("った", "", "partial_okuri"),
     )
     print("\033[92mTests passed\033[0m")
 

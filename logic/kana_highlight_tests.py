@@ -16,6 +16,7 @@ def test(
     ignore_fail: bool = False,
     assume_dictionary_form: bool = False,
     onyomi_to_katakana: bool = True,
+    include_suru_okuri: bool = False,
     debug: bool = False,
     expected_furigana: Optional[str] = None,
     expected_furigana_with_tags_split: Optional[str] = None,
@@ -33,47 +34,59 @@ def test(
     cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
         (
             "furigana",
-            WithTagsDef(False, False, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(
+                False, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
+            ),
             expected_furigana,
         ),
         (
             "furigana",
-            WithTagsDef(True, False, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(
+                True, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
+            ),
             expected_furigana_with_tags_split,
         ),
         (
             "furigana",
-            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri),
             expected_furigana_with_tags_merged,
         ),
         (
             "furikanji",
-            WithTagsDef(False, False, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(
+                False, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
+            ),
             expected_furikanji,
         ),
         (
             "furikanji",
-            WithTagsDef(True, False, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(
+                True, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
+            ),
             expected_furikanji_with_tags_split,
         ),
         (
             "furikanji",
-            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri),
             expected_furikanji_with_tags_merged,
         ),
         (
             "kana_only",
-            WithTagsDef(False, False, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(
+                False, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
+            ),
             expected_kana_only,
         ),
         (
             "kana_only",
-            WithTagsDef(True, False, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(
+                True, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
+            ),
             expected_kana_only_with_tags_split,
         ),
         (
             "kana_only",
-            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form),
+            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri),
             expected_kana_only_with_tags_merged,
         ),
     ]
@@ -482,15 +495,19 @@ def main():
         expected_kana_only="<b>コッコク</b>と ヘンカする。",
         expected_furigana="<b> 刻々[コッコク]</b>と 変化[ヘンカ]する。",
         expected_furikanji="<b> コッコク[刻々]</b>と ヘンカ[変化]する。",
-        expected_kana_only_with_tags_split="<b><on>コッコク</on></b>と <on>ヘン</on><on>カ</on>する。",
+        expected_kana_only_with_tags_split=(
+            "<b><on>コッコク</on></b>と <on>ヘン</on><on>カ</on><oku>する</oku>。"
+        ),
         expected_furigana_with_tags_split=(
-            "<b><on> 刻々[コッコク]</on></b>と<on> 変[ヘン]</on><on> 化[カ]</on>する。"
+            "<b><on> 刻々[コッコク]</on></b>と<on> 変[ヘン]</on><on> 化[カ]</on><oku>する</oku>。"
         ),
         expected_furikanji_with_tags_split=(
-            "<b><on> コッコク[刻々]</on></b>と<on> ヘン[変]</on><on> カ[化]</on>する。"
+            "<b><on> コッコク[刻々]</on></b>と<on> ヘン[変]</on><on> カ[化]</on><oku>する</oku>。"
         ),
-        expected_kana_only_with_tags_merged="<b><on>コッコク</on></b>と <on>ヘンカ</on>する。",
-        expected_furigana_with_tags_merged="<b><on> 刻々[コッコク]</on></b>と<on> 変化[ヘンカ]</on>する。",
+        expected_kana_only_with_tags_merged="<b><on>コッコク</on></b>と <on>ヘンカ</on><oku>する</oku>。",
+        expected_furigana_with_tags_merged=(
+            "<b><on> 刻々[コッコク]</on></b>と<on> 変化[ヘンカ]</on><oku>する</oku>。"
+        ),
     )
     test(
         test_name="Matches repeater adjective 瑞々しい - with highlight",
@@ -664,26 +681,27 @@ def main():
         expected_furikanji="その2<b> コク[国]</b>は<b> コッ[国]</b> コウ[交]を ダンゼツ[断絶]した。",
         expected_kana_only_with_tags_split=(
             "その2 <b><on>コク</on></b>は <b><on>コッ</on></b><on>コウ</on>を"
-            " <on>ダン</on><on>ゼツ</on>した。"
+            " <on>ダン</on><on>ゼツ</on><oku>した</oku>。"
         ),
         expected_furigana_with_tags_split=(
             "その2<b><on> 国[コク]</on></b>は<b><on> 国[コッ]</on></b><on> 交[コウ]</on>を<on>"
-            " 断[ダン]</on><on> 絶[ゼツ]</on>した。"
+            " 断[ダン]</on><on> 絶[ゼツ]</on><oku>した</oku>。"
         ),
         expected_furikanji_with_tags_split=(
             "その2<b><on> コク[国]</on></b>は<b><on> コッ[国]</on></b><on> コウ[交]</on>を<on>"
-            " ダン[断]</on><on> ゼツ[絶]</on>した。"
+            " ダン[断]</on><on> ゼツ[絶]</on><oku>した</oku>。"
         ),
         expected_kana_only_with_tags_merged=(
-            "その2 <b><on>コク</on></b>は <b><on>コッ</on></b><on>コウ</on>を <on>ダンゼツ</on>した。"
+            "その2 <b><on>コク</on></b>は <b><on>コッ</on></b><on>コウ</on>を"
+            " <on>ダンゼツ</on><oku>した</oku>。"
         ),
         expected_furigana_with_tags_merged=(
             "その2<b><on> 国[コク]</on></b>は<b><on> 国[コッ]</on></b><on> 交[コウ]</on>を<on>"
-            " 断絶[ダンゼツ]</on>した。"
+            " 断絶[ダンゼツ]</on><oku>した</oku>。"
         ),
         expected_furikanji_with_tags_merged=(
             "その2<b><on> コク[国]</on></b>は<b><on> コッ[国]</on></b><on> コウ[交]</on>を<on>"
-            " ダンゼツ[断絶]</on>した。"
+            " ダンゼツ[断絶]</on><oku>した</oku>。"
         ),
     )
     test(
@@ -825,31 +843,31 @@ def main():
         expected_furikanji=" カイ[海]<b> ゾク[賊]</b>たちは なな[７]つの うみ[海]を コウカイ[航海]した。",
         expected_kana_only_with_tags_split=(
             "<on>カイ</on><b><on>ゾク</on></b>たちは <kun>なな</kun><oku>つ</oku>の <kun>うみ</kun>を"
-            " <on>コウ</on><on>カイ</on>した。"
+            " <on>コウ</on><on>カイ</on><oku>した</oku>。"
         ),
         expected_furigana_with_tags_split=(
             "<on> 海[カイ]</on><b><on> 賊[ゾク]</on></b>たちは<kun> ７[なな]</kun><oku>つ</oku>の"
             "<kun>"
-            " 海[うみ]</kun>を<on> 航[コウ]</on><on> 海[カイ]</on>した。"
+            " 海[うみ]</kun>を<on> 航[コウ]</on><on> 海[カイ]</on><oku>した</oku>。"
         ),
         expected_furikanji_with_tags_split=(
             "<on> カイ[海]</on><b><on> ゾク[賊]</on></b>たちは<kun> なな[７]</kun><oku>つ</oku>の"
             "<kun>"
-            " うみ[海]</kun>を<on> コウ[航]</on><on> カイ[海]</on>した。"
+            " うみ[海]</kun>を<on> コウ[航]</on><on> カイ[海]</on><oku>した</oku>。"
         ),
         expected_kana_only_with_tags_merged=(
             "<on>カイ</on><b><on>ゾク</on></b>たちは <kun>なな</kun><oku>つ</oku>の <kun>うみ</kun>を"
-            " <on>コウカイ</on>した。"
+            " <on>コウカイ</on><oku>した</oku>。"
         ),
         expected_furigana_with_tags_merged=(
             "<on> 海[カイ]</on><b><on> 賊[ゾク]</on></b>たちは<kun> ７[なな]</kun><oku>つ</oku>の"
             "<kun>"
-            " 海[うみ]</kun>を<on> 航海[コウカイ]</on>した。"
+            " 海[うみ]</kun>を<on> 航海[コウカイ]</on><oku>した</oku>。"
         ),
         expected_furikanji_with_tags_merged=(
             "<on> カイ[海]</on><b><on> ゾク[賊]</on></b>たちは<kun> なな[７]</kun><oku>つ</oku>の"
             "<kun>"
-            " うみ[海]</kun>を<on> コウカイ[航海]</on>した。"
+            " うみ[海]</kun>を<on> コウカイ[航海]</on><oku>した</oku>。"
         ),
     )
     test(
@@ -2945,7 +2963,7 @@ def main():
         expected_kana_only_with_tags_split="<kun>はな</kun><oku>させろ</oku>!",
     )
     test(
-        test_name="matches okuri for causative imperative godan ru verb",
+        test_name="matches okuri for causative imperative ichidan verb",
         kanji="",
         sentence="食[た]べさせろ!",
         expected_kana_only_with_tags_split="<kun>た</kun><oku>べさせろ</oku>!",
@@ -2955,6 +2973,71 @@ def main():
         kanji="",
         sentence="有[あ]らせろ!",
         expected_kana_only_with_tags_split="<kun>あ</kun><oku>らせろ</oku>!",
+    )
+    test(
+        test_name="matches single-kanji onyomi す/する verbs okuri /1",
+        kanji="",
+        onyomi_to_katakana=False,
+        sentence="博[はく]している",
+        expected_kana_only_with_tags_split="<on>はく</on><oku>して</oku>いる",
+    )
+    test(
+        test_name="matches single-kanji onyomi す/する verbs okuri /2",
+        kanji="愛",
+        onyomi_to_katakana=False,
+        sentence="愛[あい]せるか？",
+        expected_kana_only_with_tags_split="<b><on>あい</on><oku>せる</oku></b>か？",
+    )
+    test(
+        test_name="matches single-kanjionyomi す/する verbs okuri /3",
+        kanji="",
+        onyomi_to_katakana=False,
+        sentence="化[か]させない",
+        expected_kana_only_with_tags_split="<on>か</on><oku>させない</oku>",
+    )
+    test(
+        test_name="matches single-kanji onyomi す/する verbs okuri /4",
+        kanji="呈",
+        onyomi_to_katakana=False,
+        sentence="呈[てい]さなかった",
+        expected_kana_only="<b>ていさなかった</b>",
+        expected_furigana="<b> 呈[てい]さなかった</b>",
+        expected_furikanji="<b> てい[呈]さなかった</b>",
+        expected_kana_only_with_tags_split="<b><on>てい</on><oku>さなかった</oku></b>",
+        expected_furigana_with_tags_split="<b><on> 呈[てい]</on><oku>さなかった</oku></b>",
+        expected_furikanji_with_tags_split="<b><on> てい[呈]</on><oku>さなかった</oku></b>",
+    )
+    test(
+        test_name="should not include suru okuri in multi-kanji suru verb highlight /!",
+        kanji="強",
+        onyomi_to_katakana=False,
+        sentence="勉強[べんきょう]しません！",
+        expected_kana_only="べん<b>きょう</b>しません！",
+        expected_furigana=" 勉[べん]<b> 強[きょう]</b>しません！",
+        expected_furikanji=" べん[勉]<b> きょう[強]</b>しません！",
+        expected_kana_only_with_tags_split="<on>べん</on><b><on>きょう</on></b><oku>しません</oku>！",
+        expected_furigana_with_tags_split=(
+            "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>しません</oku>！"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>しません</oku>！"
+        ),
+    )
+    test(
+        test_name="should not include suru okuri in multi-kanji suru verb highlight /2",
+        kanji="強",
+        onyomi_to_katakana=False,
+        sentence="勉強[べんきょう]していません！",
+        expected_kana_only="べん<b>きょう</b>していません！",
+        expected_furigana=" 勉[べん]<b> 強[きょう]</b>していません！",
+        expected_furikanji=" べん[勉]<b> きょう[強]</b>していません！",
+        expected_kana_only_with_tags_split="<on>べん</on><b><on>きょう</on></b><oku>していません</oku>！",
+        expected_furigana_with_tags_split=(
+            "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>していません</oku>！"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>していません</oku>！"
+        ),
     )
     print("\n\033[92mTests passed\033[0m")
 

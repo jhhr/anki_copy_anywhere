@@ -91,6 +91,13 @@ GODAN_FORM_VERB_ENDINGS: dict[str, str] = {
     "る": "り",
 }
 
+ONYOMI_GODAN_SU_FIRST_KANA: set[str] = {
+    "す",
+    "し",
+    "せ",
+    "さ",
+}
+
 
 def get_verb_noun_form_okuri(dict_form_verb_okuri: str, kanji: str, kanji_reading: str) -> str:
     """

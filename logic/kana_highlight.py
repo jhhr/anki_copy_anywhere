@@ -13,6 +13,10 @@ from .jpn_text_processing.starts_with_okurigana_conjugation import (
     starts_with_okurigana_conjugation,
     OkuriResults,
 )
+from .jpn_text_processing.okurigana_dict import (
+    ONYOMI_GODAN_SU_FIRST_KANA,
+)
+
 from .jpn_text_processing.construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
     FuriReconstruct,
@@ -156,13 +160,16 @@ class WithTagsDef(NamedTuple):
     NamedTuple for the definition of the tags to wrap the furigana in
     :param with_tags
     :param merge_consecutive
+    :param onyomi_to_katakana
     :param assume_dictionary_form
+    :param include_suru_okuri
     """
 
     with_tags: bool
     merge_consecutive: bool
     onyomi_to_katakana: bool
     assume_dictionary_form: bool
+    include_suru_okuri: bool
 
 
 Edge = Literal["left", "right", "middle", "whole", "none"]
@@ -257,6 +264,7 @@ class FinalResult(TypedDict):
     :param middle_word
     :param right_word
     :param edge
+    :param match_type
     """
 
     furigana: str
@@ -266,6 +274,7 @@ class FinalResult(TypedDict):
     middle_word: str
     right_word: str
     edge: Edge
+    match_type: MatchType
 
 
 REPLACED_FURIGANA_MIDDLE_RE = re.compile(r"^(.+)<b>(.+)</b>(.+)$")
@@ -364,6 +373,14 @@ def reconstruct_furigana(
     middle_word = furi_okuri_result.get("middle_word", "")
     right_word = furi_okuri_result.get("right_word", "")
     edge = furi_okuri_result.get("edge")
+    highlight_match_type = furi_okuri_result.get("highlight_match_type", "none")
+
+    # Keep okuri out of the highlight if it is not supposed to be included
+    okuri_out_of_highlight = (
+        not with_tags_def.include_suru_okuri
+        and highlight_match_type == "onyomi"
+        and (len(f"{left_word}{middle_word}{right_word}") > 1 or okurigana == "する")
+    )
     if not edge:
         raise ValueError("reconstruct_furigana: edge missing in final_result")
 
@@ -452,7 +469,13 @@ def reconstruct_furigana(
                 whole_word, furigana, reconstruct_type, with_tags_def.merge_consecutive
             )
             okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
+            if okuri_out_of_highlight:
+                return f"<b>{wrapped_word}</b>{okurigana}{rest_kana}"
             return f"<b>{wrapped_word}{okurigana}</b>{rest_kana}"
+
+        if okuri_out_of_highlight:
+            rest_kana = okurigana + rest_kana
+            okurigana = ""
         if reconstruct_type == "kana_only":
             return f"<b>{furigana}{okurigana}</b>{rest_kana}"
         if reconstruct_type == "furikanji":
@@ -489,10 +512,19 @@ def reconstruct_furigana(
             part = re.sub(r"<b>|</b>", "", part)
             if word_edge == "right":
                 # If we're at the end, add the okurigana
-                if with_tags_def.with_tags:
-                    part += f"<oku>{okurigana}</oku>" if okurigana else ""
+                if not okuri_out_of_highlight:
+                    if with_tags_def.with_tags:
+                        part += f"<oku>{okurigana}</oku>" if okurigana else ""
+                    else:
+                        part += okurigana
                 else:
-                    part += okurigana
+                    # If we're not supposed to add する okuri, and the part ends with </on>,
+                    # then we know the okurigana contains する inflections, if it's non-empty
+                    # In any case, just add okuri to rest kana so we don't highlight it
+                    if with_tags_def.with_tags:
+                        rest_kana += f"<oku>{okurigana}</oku>" if okurigana else ""
+                    else:
+                        rest_kana += okurigana
             if edge == word_edge:
                 # Finally, add the highlighting if this is the edge that was matched
                 part = f"<b>{part}</b>"
@@ -557,7 +589,38 @@ def process_readings(
     )
     onyomi_process_result = None
     if onyomi_match["type"] == "onyomi":
-        onyomi_process_result = ReadingProcessResult(onyomi_match, "", maybe_okuri)
+        # Check for godan su verbs that have okurigana
+        if maybe_okuri and maybe_okuri[0] in ONYOMI_GODAN_SU_FIRST_KANA:
+            if with_tags_def.assume_dictionary_form:
+                # No need to check okurigana for inflection if we assume dictionary form
+                onyomi_process_result = ReadingProcessResult(onyomi_match, "", maybe_okuri)
+            elif maybe_okuri.startswith("する"):
+                # If this is just a straight up suru verb, we can take okurigana up to する
+                onyomi_process_result = ReadingProcessResult(onyomi_match, "する", maybe_okuri[2:])
+            else:
+                logger.debug(
+                    "process_readings - onyomi match found, checking for okurigana:"
+                    f" {onyomi_match}, word_data: {word_data}, maybe_okuri: {maybe_okuri}"
+                )
+                res = check_okurigana_for_inflection(
+                    # onyomi godan verbs are always す verbs, e.g 呈す, 博す so we know the
+                    # reading okuri, however する verbs have
+                    "す",
+                    onyomi_match["matched_reading"],
+                    word_data,
+                    highlight_args,
+                    logger,
+                )
+                logger.debug(f"process_readings - check_okurigana_for_inflection result: {res}")
+                if res.result != "no_okuri":
+                    onyomi_process_result = ReadingProcessResult(
+                        onyomi_match, res.okurigana, res.rest_kana
+                    )
+                else:
+                    # If there is no okurigana, we just return the onyomi match as is
+                    onyomi_process_result = ReadingProcessResult(onyomi_match, "", maybe_okuri)
+        else:
+            onyomi_process_result = ReadingProcessResult(onyomi_match, "", maybe_okuri)
 
     logger.debug(
         f"onyomi_process_result: {onyomi_process_result}, word_data: {word_data},"
@@ -595,15 +658,15 @@ def process_readings(
         )
     ):
         kunyomi = highlight_args.get("kunyomi", "")
-        okurigana_to_highlight = ""
+        kun_okuri_to_highlight = ""
         partial_okuri_results: list[OkuriResults] = []
-        rest_kana = maybe_okuri
+        kun_rest_kana = maybe_okuri
         kunyomi_readings = iter(kunyomi.split("、"))
         matched_kunyomi_stem = kunyomi_results["matched_reading"].split(".")[0]
         logger.debug(f"check_kunyomi_readings - matched_kunyomi_stem: {matched_kunyomi_stem}")
-        while not okurigana_to_highlight and (next_kunyomi := next(kunyomi_readings, None)):
+        while not kun_okuri_to_highlight and (next_kunyomi := next(kunyomi_readings, None)):
             logger.debug(
-                f"check_kunyomi_readings - okurigana: {not okurigana_to_highlight},"
+                f"check_kunyomi_readings - okurigana: {not kun_okuri_to_highlight},"
                 f" next_kunyomi: {next_kunyomi}"
             )
             try:
@@ -616,7 +679,7 @@ def process_readings(
             if kunyomi_reading != matched_kunyomi_stem:
                 logger.debug(f"check_kunyomi_readings while - non-matching stem: {kunyomi_reading}")
                 continue
-            res = check_okurigana_for_kunyomi_inflection(
+            res = check_okurigana_for_inflection(
                 kunyomi_okurigana, kunyomi_reading, word_data, highlight_args, logger
             )
             logger.debug(f"check_kunyomi_readings while - check_okurigana result: {res}")
@@ -634,10 +697,10 @@ def process_readings(
                     f"check_kunyomi_readings while got a full_okuri: {res.okurigana},"
                     f" rest_kana: {res.rest_kana}"
                 )
-                okurigana_to_highlight = res.okurigana
-                rest_kana = res.rest_kana
+                kun_okuri_to_highlight = res.okurigana
+                kun_rest_kana = res.rest_kana
         # If multiple partial okuri results were found, use the one that matches the most
-        if partial_okuri_results and not okurigana_to_highlight:
+        if partial_okuri_results and not kun_okuri_to_highlight:
             logger.debug(
                 f"check_kunyomi_readings while got {len(partial_okuri_results)} partial results"
             )
@@ -646,14 +709,14 @@ def process_readings(
                 f"check_kunyomi_readings while final partial_okuri: {best_res.okurigana},"
                 f" rest_kana: {best_res.rest_kana}, type: {best_res.result}"
             )
-            okurigana_to_highlight = best_res.okurigana
-            rest_kana = best_res.rest_kana
+            kun_okuri_to_highlight = best_res.okurigana
+            kun_rest_kana = best_res.rest_kana
         logger.debug(
             "\ncheck_kunyomi_readings while result - okurigana:"
-            f" {okurigana_to_highlight}, rest_kana: {rest_kana}"
+            f" {kun_okuri_to_highlight}, rest_kana: {kun_rest_kana}"
         )
         kunyomi_process_result = ReadingProcessResult(
-            kunyomi_results, okurigana_to_highlight, rest_kana
+            kunyomi_results, kun_okuri_to_highlight, kun_rest_kana
         )
     elif kunyomi_results["type"] == "kunyomi":
         if with_tags_def.assume_dictionary_form:
@@ -1036,9 +1099,9 @@ def process_onyomi_match(
     return re.sub(reg, replacer, furigana)
 
 
-def check_okurigana_for_kunyomi_inflection(
-    kunyomi_okurigana: str,
-    kunyomi_reading: str,
+def check_okurigana_for_inflection(
+    reading_okurigana: str,
+    reading: str,
     word_data: WordData,
     highlight_args: HighlightArgs,
     logger: Logger = Logger("error"),
@@ -1052,19 +1115,19 @@ def check_okurigana_for_kunyomi_inflection(
     # contain other kana after the okurigana
     maybe_okuri_text = word_data.get("okurigana")
     logger.debug(
-        f"check okurigana 0 - kunyomi_okurigana: {kunyomi_okurigana},"
+        f"check okurigana 0 - kunyomi_okurigana: {reading_okurigana},"
         f" maybe_okurigana: {maybe_okuri_text}"
     )
 
-    if not kunyomi_okurigana or not maybe_okuri_text:
+    if not reading_okurigana or not maybe_okuri_text:
         return OkuriResults("", "", "no_okuri")
 
     # Simple case, exact match, no need to check conjugations
-    if kunyomi_okurigana == maybe_okuri_text:
-        return OkuriResults(kunyomi_okurigana, "", "full_okuri")
+    if reading_okurigana == maybe_okuri_text:
+        return OkuriResults(reading_okurigana, "", "full_okuri")
 
     # Check what kind of inflections we should be looking for from the kunyomi okurigana
-    conjugatable_stem = get_conjugatable_okurigana_stem(kunyomi_okurigana)
+    conjugatable_stem = get_conjugatable_okurigana_stem(reading_okurigana)
 
     # Another simple case, stem is the same as the okurigana, no need to check conjugations
     if conjugatable_stem == maybe_okuri_text:
@@ -1074,11 +1137,11 @@ def check_okurigana_for_kunyomi_inflection(
     if conjugatable_stem is None or not maybe_okuri_text.startswith(conjugatable_stem):
         logger.debug("\ncheck okurigana 2 - no conjugatable_stem or no match")
         # Not a verb or i-adjective, so just check for an exact match within the okurigana
-        if maybe_okuri_text.startswith(kunyomi_okurigana):
+        if maybe_okuri_text.startswith(reading_okurigana):
             logger.debug(f"check okurigana 3 - maybe_okuri_text: {maybe_okuri_text}")
             return OkuriResults(
-                kunyomi_okurigana,
-                maybe_okuri_text[len(kunyomi_okurigana) :],
+                reading_okurigana,
+                maybe_okuri_text[len(reading_okurigana) :],
                 "full_okuri",
             )
         logger.debug("\ncheck okurigana 4 - no match")
@@ -1091,9 +1154,9 @@ def check_okurigana_for_kunyomi_inflection(
     # Then check if that contains a conjugation for what we're looking for
     conjugated_okuri, rest, return_type = starts_with_okurigana_conjugation(
         trimmed_maybe_okuri,
-        kunyomi_okurigana,
+        reading_okurigana,
         highlight_args["kanji_to_match"],
-        kunyomi_reading,
+        reading,
         logger=logger,
     )
     logger.debug(
@@ -1620,6 +1683,7 @@ def handle_whole_word_case(
         "middle_word": word,
         "right_word": "",
         "edge": "whole",
+        "highlight_match_type": result["type"],
     }
 
 
@@ -1752,10 +1816,11 @@ def kana_highlight(
 ) -> str:
     if with_tags_def is None:
         with_tags_def = WithTagsDef(
-            True,
-            True,
-            True,
-            False,  # with_tags, merge_consecutive, onyomi_to_katakana, assume dictionary form
+            True,  # with_tags
+            True,  # merge_consecutive
+            True,  # onyomi_to_katakana
+            False,  # assume_dictionary_form
+            False,  # include_suru_okuri
         )
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
@@ -1849,6 +1914,7 @@ def kana_highlight(
         final_middle_word = ""
         final_right_word = ""
         force_merge = False
+        highlight_match_type = "none"
 
         juku_word_start = None
         juku_word_end = None
@@ -1872,7 +1938,7 @@ def kana_highlight(
             nonlocal final_okurigana, juku_word_start, juku_word_end, juku_furigana
             nonlocal juku_word_start_edge, juku_word_pos_to_highlight, replace_num_kanji
             nonlocal num_in_kanji_to_replace, last_replaced_kanji_index, is_last_kanji
-            nonlocal kanji_to_highlight_passed
+            nonlocal kanji_to_highlight_passed, highlight_match_type
 
             is_first_kanji = index == 0
             is_last_kanji = index >= max(len(cur_word), len(word)) - 1
@@ -1934,6 +2000,10 @@ def kana_highlight(
                 if kanji_to_highlight_passed:
                     juku_word_pos_to_highlight = "right"
                 return False
+
+            if is_kanji_to_highlight and partial_result["match_type"] != "none":
+                highlight_match_type = partial_result["match_type"]
+
             matched_furigana = partial_result["matched_furigana"]
             wrapped_furigana = matched_furigana
 
@@ -2288,6 +2358,8 @@ def kana_highlight(
             else:
                 rep_kanji = ""
 
+            if partial_result["match_type"] != "none" and is_kanji_to_highlight:
+                highlight_match_type = partial_result["match_type"]
             if with_tags_def.with_tags:
                 if partial_result["match_type"] == "onyomi":
                     wrapped_furigana = f"<on>{matched_furigana}</on>"
@@ -2379,6 +2451,9 @@ def kana_highlight(
                 f" {juku_at_word_right_edge}, juku_at_word_left_edge: {juku_at_word_left_edge},"
                 f" kanji_pos: {kanji_pos}, kanji_to_highlight: {kanji_to_highlight}"
             )
+            # get match_type from juku_result
+            if juku_word_pos_to_highlight:
+                highlight_match_type = juku_result["type"]
             reverse_final_furigana = juku_result["text"] + reverse_final_furigana
             kanji_to_left = juku_word[:kanji_pos]
             kanji_to_right = juku_word[kanji_pos + 1 :]
@@ -2462,6 +2537,7 @@ def kana_highlight(
             "middle_word": final_middle_word + reverse_final_middle_word,
             "right_word": final_right_word + reverse_final_right_word,
             "edge": final_edge,
+            "highlight_match_type": highlight_match_type,
         }
         reconstructed_result = reconstruct_furigana(
             final_result,
