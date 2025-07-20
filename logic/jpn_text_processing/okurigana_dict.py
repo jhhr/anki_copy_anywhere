@@ -155,7 +155,7 @@ def get_part_of_speech(
     # Handle vs-s vs vs-i for special suru verbs
     if okurigana in ["する", "す"] and kanji_reading.endswith("っ"):
         return "vs-s"
-    if okurigana in ["する", "す"]:
+    if okurigana in ["する"]:
         return "vs-i"
 
     # Adjective patterns
