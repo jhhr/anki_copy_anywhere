@@ -1928,6 +1928,26 @@ def main():
         ),
     )
     test(
+        test_name="correct juk for 菠薐草",
+        kanji="",
+        onyomi_to_katakana=False,
+        # 菠 has onyomi reading ほ which should no match in this case
+        sentence="<k> 菠薐[ほうれん]</k> 草[そう]",
+        expected_kana_only="<k> ほうれん</k> そう",
+        expected_furigana="<k> 菠薐[ほうれん]</k> 草[そう]",
+        expected_furikanji="<k> ほうれん[菠薐]</k> そう[草]",
+        expected_kana_only_with_tags_split="<k> <juk>ほう</juk><juk>れん</juk></k> <on>そう</on>",
+        expected_furigana_with_tags_split=(
+            "<k><juk> 菠[ほう]</juk><juk> 薐[れん]</juk></k><on> 草[そう]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<k><juk> ほう[菠]</juk><juk> れん[薐]</juk></k><on> そう[草]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<k> <juk>ほうれん</juk></k> <on>そう</on>",
+        expected_furigana_with_tags_merged="<k><juk> 菠薐[ほうれん]</juk></k><on> 草[そう]</on>",
+        expected_furikanji_with_tags_merged="<k><juk> ほうれん[菠薐]</juk></k><on> そう[草]</on>",
+    )
+    test(
         test_name="ん should be combined with previous mora in jukujikun",
         kanji="麻",
         sentence="麻雀[まーじゃん]",

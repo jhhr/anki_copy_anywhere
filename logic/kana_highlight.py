@@ -573,6 +573,7 @@ def process_readings(
         highlight_args.get("onyomi", ""),
         furigana,
         word_data,
+        highlight_args,
         target_furigana_section,
         edge,
         process_type=process_type,
@@ -914,6 +915,7 @@ def check_onyomi_readings(
     onyomi: str,
     furigana: str,
     word_data: WordData,
+    highlight_args: HighlightArgs,
     target_furigana_section: str,
     edge: Edge,
     wrap_readings_with_tags: bool = True,
@@ -947,6 +949,17 @@ def check_onyomi_readings(
     # Exception for 麻雀[まーじゃん] where 麻[まー] should be a jukujikun, and we don't want to
     # match ま as a onyomi
     if furigana == "まーじゃん":
+        return {
+            "text": "",
+            "type": "none",
+            "match_edge": "none",
+            "actual_match": "",
+            "matched_reading": "",
+        }
+
+    # Exception for 菠薐草[ほうれんそう] where ほうれん should be a jukujikun, but 菠 has the onyomi
+    # ほ which would get incorrectly matched here
+    if furigana.startswith("ほうれん") and highlight_args.get("kanji_to_match") == "菠":
         return {
             "text": "",
             "type": "none",
