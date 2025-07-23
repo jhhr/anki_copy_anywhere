@@ -24,7 +24,8 @@ Creating, editing and removing definitions is done through the dialog.
  The dialog additionally allows running copy definitions for the selected notes in the browser, or the entire search result. This is useful for running multiple definitions at once for a selection of notes. Otherwise, to run a single definition for a selection of notes in the browser, you can use the right-click menu.
 
 #### Run multiple copy definitions in dialog
-<img width="1158" height="1022" alt="image" src="https://github.com/user-attachments/assets/839b86fb-acae-474d-9d84-3f32cc688ff2" />
+<img width="1155" height="1024" alt="image" src="https://github.com/user-attachments/assets/26c73519-29f7-43e9-85ed-495b1cf2cc6a" />
+
 
 #### Run a single copy definitions through browser right-click menu
 <img width="999" height="934" alt="image" src="https://github.com/user-attachments/assets/f37f2d2e-eabe-4dbb-9d8c-e24ffaf3d074" />
