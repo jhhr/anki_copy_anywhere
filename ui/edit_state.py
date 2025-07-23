@@ -182,7 +182,11 @@ class EditState:
             for editor in editors_list:
                 if editor is triggering_editor:
                     continue
+                # Preserve cursor position when updating text, because calling setText() always
+                # resets the cursor position in Qt, causing it to jump to the end,
+                cursor_position = editor.cursorPosition()
                 editor.setText(getattr(self, state_attr))
+                editor.setCursorPosition(cursor_position)
                 editor.update_required_style()
 
         def connect_func(
