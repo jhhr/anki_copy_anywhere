@@ -291,6 +291,7 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
         # ScrollableQDialog already creates the main layout, we need to set up the inner content
         self.vbox = QVBoxLayout(self.inner_widget)
 
+        # Create note selection buttons (will be moved to footer later)
         self.use_browser_selection_button = QPushButton(
             f"Use selected notes ({len(browser_note_ids or [])})"
         )
@@ -301,11 +302,9 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
         self.use_all_cards_button.clicked.connect(
             lambda: self.toggle_card_selected_button(self.use_all_cards_button)
         )
-        self.vbox.addWidget(self.use_browser_selection_button)
-        self.vbox.addWidget(self.use_all_cards_button)
 
+        # Create notes selected label (will be moved to footer later)
         self.notes_selected_label = QLabel(DEFAULT_CARDS_SELECTED_LABEL)
-        self.vbox.addWidget(self.notes_selected_label)
         self.toggle_card_selected_button(self.use_browser_selection_button)
 
         self.select_label = QLabel("Select copy definitions to apply")
@@ -326,8 +325,14 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
 
         self.add_all_definition_rows()
 
-        # Create footer layout for bottom buttons
-        footer_layout = QHBoxLayout()
+        # Create footer layout for bottom buttons and label
+        footer_layout = QVBoxLayout()
+
+        # Add the notes selected label at the top of footer
+        footer_layout.addWidget(self.notes_selected_label)
+
+        # Create horizontal layout for buttons
+        buttons_layout = QHBoxLayout()
         self.apply_button = QPushButton("Apply")
         self.apply_button.setEnabled(False)
         self.close_button = QPushButton("Close")
@@ -335,9 +340,14 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
         self.apply_button.clicked.connect(self.accept)
         self.close_button.clicked.connect(self.reject)
 
-        footer_layout.addWidget(self.apply_button)
-        footer_layout.addStretch()
-        footer_layout.addWidget(self.close_button)
+        buttons_layout.addWidget(self.apply_button)
+        buttons_layout.addWidget(self.use_browser_selection_button)
+        buttons_layout.addWidget(self.use_all_cards_button)
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(self.close_button)
+
+        # Add the buttons layout to the footer
+        footer_layout.addLayout(buttons_layout)
 
         # Add footer to the main layout (this will be outside the scroll area)
         self.main_layout.addLayout(footer_layout)
@@ -636,7 +646,7 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
                 f"{len(self.selected_definitions_applicable_notes)} notes apply over"
                 f" {len(self.applicable_note_type_names)} different note types."
                 f"<br>Total copy operations to be done: {len(total_applicable_notes)}."
-                "Click apply to run the selected copy definitions on these notes."
+                " Click apply to run the selected copy definitions on these notes."
             )
             self.apply_button.setEnabled(True)
         else:
