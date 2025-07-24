@@ -3000,7 +3000,7 @@ def main():
         expected_kana_only_with_tags_split="<b><on>あい</on><oku>せる</oku></b>か？",
     )
     test(
-        test_name="matches single-kanjionyomi す/する verbs okuri /3",
+        test_name="matches single-kanji onyomi す/する verbs okuri /3",
         kanji="",
         onyomi_to_katakana=False,
         sentence="化[か]させない",
@@ -3019,7 +3019,54 @@ def main():
         expected_furikanji_with_tags_split="<b><on> てい[呈]</on><oku>さなかった</oku></b>",
     )
     test(
-        test_name="should not include suru okuri in multi-kanji suru verb highlight /!",
+        test_name="matches single-kanji onyomi small tsu す verbs okuri /1",
+        kanji="察",
+        onyomi_to_katakana=False,
+        sentence="察[さっ]していなかった",
+        expected_kana_only="<b>さっして</b>いなかった",
+        expected_furigana="<b> 察[さっ]して</b>いなかった",
+        expected_furikanji="<b> さっ[察]して</b>いなかった",
+        expected_kana_only_with_tags_split="<b><on>さっ</on><oku>して</oku></b>いなかった",
+        expected_furigana_with_tags_split="<b><on> 察[さっ]</on><oku>して</oku></b>いなかった",
+        expected_furikanji_with_tags_split="<b><on> さっ[察]</on><oku>して</oku></b>いなかった",
+    )
+    test(
+        test_name="matches single-kanji onyomi small tsu す verbs okuri /2",
+        kanji="察",
+        onyomi_to_katakana=False,
+        sentence="察[さっ]されるかも",
+        expected_kana_only="<b>さっされる</b>かも",
+        expected_furigana="<b> 察[さっ]される</b>かも",
+        expected_furikanji="<b> さっ[察]される</b>かも",
+        expected_kana_only_with_tags_split="<b><on>さっ</on><oku>される</oku></b>かも",
+        expected_furigana_with_tags_split="<b><on> 察[さっ]</on><oku>される</oku></b>かも",
+        expected_furikanji_with_tags_split="<b><on> さっ[察]</on><oku>される</oku></b>かも",
+    )
+    test(
+        test_name="matches single-kanji small tsu す verbs okuri /3",
+        kanji="欲",
+        onyomi_to_katakana=False,
+        sentence="欲[ほっ]すれば、欲[ほ]しがれば、呉[く]れましょう",
+        expected_kana_only="<b>ほっすれば</b>、<b>ほしがれば</b>、くれましょう",
+        expected_furigana="<b> 欲[ほっ]すれば</b>、<b> 欲[ほ]しがれば</b>、 呉[く]れましょう",
+        expected_furikanji="<b> ほっ[欲]すれば</b>、<b> ほ[欲]しがれば</b>、 く[呉]れましょう",
+        expected_kana_only_with_tags_split=(
+            "<b><kun>ほっ</kun><oku>すれば</oku></b>、<b><kun>ほ</kun><oku>しがれば</oku></b>、"
+            "<kun>く</kun><oku>れましょう</oku>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<b><kun> 欲[ほっ]</kun><oku>すれば</oku></b>、<b><kun>"
+            " 欲[ほ]</kun><oku>しがれば</oku></b>"
+            "、<kun> 呉[く]</kun><oku>れましょう</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><kun> ほっ[欲]</kun><oku>すれば</oku></b>、<b><kun>"
+            " ほ[欲]</kun><oku>しがれば</oku></b>"
+            "、<kun> く[呉]</kun><oku>れましょう</oku>"
+        ),
+    )
+    test(
+        test_name="should not include suru okuri in multi-kanji suru verb highlight /1",
         kanji="強",
         onyomi_to_katakana=False,
         sentence="勉強[べんきょう]しません！",
@@ -3042,13 +3089,28 @@ def main():
         expected_kana_only="べん<b>きょう</b>していません！",
         expected_furigana=" 勉[べん]<b> 強[きょう]</b>していません！",
         expected_furikanji=" べん[勉]<b> きょう[強]</b>していません！",
-        expected_kana_only_with_tags_split="<on>べん</on><b><on>きょう</on></b><oku>していません</oku>！",
+        expected_kana_only_with_tags_split="<on>べん</on><b><on>きょう</on></b><oku>して</oku>いません！",
         expected_furigana_with_tags_split=(
-            "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>していません</oku>！"
+            "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>して</oku>いません！"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>していません</oku>！"
+            "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>して</oku>いません！"
         ),
+    )
+    test(
+        test_name="should not include できる okuri in suru verb okuri /1",
+        kanji="",
+        onyomi_to_katakana=False,
+        sentence="勉強[べんきょう]できるかい？",
+        expected_kana_only="べんきょうできるかい？",
+        expected_furigana=" 勉強[べんきょう]できるかい？",
+        expected_furikanji=" べんきょう[勉強]できるかい？",
+        expected_kana_only_with_tags_split="<on>べん</on><on>きょう</on>できるかい？",
+        expected_furigana_with_tags_split="<on> 勉[べん]</on><on> 強[きょう]</on>できるかい？",
+        expected_furikanji_with_tags_split="<on> べん[勉]</on><on> きょう[強]</on>できるかい？",
+        expected_kana_only_with_tags_merged="<on>べんきょう</on>できるかい？",
+        expected_furigana_with_tags_merged="<on> 勉強[べんきょう]</on>できるかい？",
+        expected_furikanji_with_tags_merged="<on> べんきょう[勉強]</on>できるかい？",
     )
     print("\n\033[92mTests passed\033[0m")
 

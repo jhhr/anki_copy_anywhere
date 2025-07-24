@@ -15,6 +15,7 @@ from .jpn_text_processing.starts_with_okurigana_conjugation import (
 )
 from .jpn_text_processing.okurigana_dict import (
     ONYOMI_GODAN_SU_FIRST_KANA,
+    PartOfSpeech,
 )
 
 from .jpn_text_processing.construct_wrapped_furi_word import (
@@ -617,15 +618,33 @@ def process_readings(
                     "process_readings - onyomi match found, checking for okurigana:"
                     f" {onyomi_match}, word_data: {word_data}, maybe_okuri: {maybe_okuri}"
                 )
-                res = check_okurigana_for_inflection(
-                    # onyomi godan verbs are always す verbs, e.g 呈す, 博す so we know the
-                    # reading okuri, however する verbs have
-                    "す",
-                    onyomi_match["matched_reading"],
-                    word_data,
-                    highlight_args,
-                    logger,
+                # onyomi godan verbs are always す verbs, e.g 呈す, 博す and have almost the same
+                # inflection as する but not quite, so check both possiblities and pick the one that
+                # matches the most of the okurigana
+                inflection_results = []
+                inflection_results.append(
+                    check_okurigana_for_inflection(
+                        "す",
+                        onyomi_match["matched_reading"],
+                        word_data,
+                        highlight_args,
+                        logger=logger,
+                    )
                 )
+                # In order to check for する, we need override the part_of_speech to check for
+                # vs (normal suru) inflections
+                inflection_results.append(
+                    check_okurigana_for_inflection(
+                        reading_okurigana="る",
+                        reading=onyomi_match["matched_reading"],
+                        word_data=word_data,
+                        highlight_args=highlight_args,
+                        part_of_speech="vs",
+                        logger=logger,
+                    )
+                )
+                # Pick the longest okurigana match
+                res = max(inflection_results, key=lambda x: len(x.okurigana))
                 logger.debug(f"process_readings - check_okurigana_for_inflection result: {res}")
                 if res.result != "no_okuri":
                     onyomi_process_result = ReadingProcessResult(
@@ -695,7 +714,11 @@ def process_readings(
                 logger.debug(f"check_kunyomi_readings while - non-matching stem: {kunyomi_reading}")
                 continue
             res = check_okurigana_for_inflection(
-                kunyomi_okurigana, kunyomi_reading, word_data, highlight_args, logger
+                reading_okurigana=kunyomi_okurigana,
+                reading=kunyomi_reading,
+                word_data=word_data,
+                highlight_args=highlight_args,
+                logger=logger,
             )
             logger.debug(f"check_kunyomi_readings while - check_okurigana result: {res}")
             if res.result in ["partial_okuri", "empty_okuri"]:
@@ -1119,10 +1142,17 @@ def check_okurigana_for_inflection(
     reading: str,
     word_data: WordData,
     highlight_args: HighlightArgs,
+    part_of_speech: Optional[PartOfSpeech] = None,
     logger: Logger = Logger("error"),
 ) -> OkuriResults:
     """
     Function that checks the okurigana for a match with the kunyomi okurigana
+    :param reading_okurigana: the okurigana to check
+    :param reading: the kunyomi/onyomi reading to check against
+    :param word_data: the word data containing the okurigana and other information
+    :param highlight_args: the highlight arguments containing the kanji to match
+    :param logger: the logger to use for debugging
+    :param part_of_speech: optional override for the part of speech to use
 
     :return: (string, string) the okurigana that should be highlighted and the rest of the okurigana
     """
@@ -1172,6 +1202,7 @@ def check_okurigana_for_inflection(
         reading_okurigana,
         highlight_args["kanji_to_match"],
         reading,
+        part_of_speech=part_of_speech,
         logger=logger,
     )
     logger.debug(

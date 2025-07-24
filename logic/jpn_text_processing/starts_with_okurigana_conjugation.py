@@ -1,7 +1,7 @@
 import sys
-from typing import Literal, NamedTuple
+from typing import Literal, NamedTuple, Optional
 
-from .okurigana_dict import get_okuri_dict_for_okurigana
+from .okurigana_dict import get_okuri_dict_for_okurigana, PartOfSpeech
 
 try:
     from ...utils.logger import Logger
@@ -22,6 +22,7 @@ def starts_with_okurigana_conjugation(
     kanji_okurigana: str,
     kanji: str,
     kanji_reading: str,
+    part_of_speech: Optional[PartOfSpeech] = None,
     logger: Logger = Logger("error"),
 ) -> OkuriResults:
     """
@@ -31,6 +32,8 @@ def starts_with_okurigana_conjugation(
     :param kanji_okurigana: okurigana of the kanji.
     :param kanji: kanji whose okurigana is being checked in kana_text.
     :param kanji_reading: reading of the kanji.
+    :param logger: Logger to use for debug messages.
+    :param part_of_speech: Optional override for the part of speech.
     :return: tuple of the okurigana (if any) and the rest of the text
     """
     # Sanity check, we need at least one character, and at least the kanji okurigana
@@ -38,7 +41,13 @@ def starts_with_okurigana_conjugation(
         return OkuriResults("", kana_text, "no_okuri")
 
     # Get the okurigana dict for the kanji
-    okuri_dict = get_okuri_dict_for_okurigana(kanji_okurigana, kanji, kanji_reading, logger=logger)
+    okuri_dict = get_okuri_dict_for_okurigana(
+        kanji_okurigana,
+        kanji,
+        kanji_reading,
+        part_of_speech=part_of_speech,
+        logger=logger,
+    )
 
     if not okuri_dict:
         return OkuriResults("", kana_text, "no_okuri")
@@ -204,7 +213,7 @@ def main():
         okurigana="る",
         kanji="去",
         kanji_reading="さ",
-        expected=("った", "", "partial_okuri"),
+        expected=("った", "", "full_okuri"),
     )
     print("\033[92mTests passed\033[0m")
 

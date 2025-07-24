@@ -1,4 +1,4 @@
-from typing import Union, Tuple
+from typing import Literal, Optional, Union, Tuple
 
 try:
     from ...utils.logger import Logger
@@ -6,6 +6,31 @@ except ImportError:
     from utils.logger import Logger
 
 from .regex import RENDAKU_CONVERSION_DICT_HIRAGANA
+
+PartOfSpeech = Literal[
+    "adj-i",
+    "adj-na",
+    "adj-ix",
+    "v1",
+    "v1-s",
+    "v5aru",
+    "v5b",
+    "v5g",
+    "v5k",
+    "v5k-s",
+    "v5m",
+    "v5n",
+    "v5r",
+    "v5r-i",
+    "v5s",
+    "v5t",
+    "v5u",
+    "v5u-s",
+    "vk",
+    "vs",
+    "vs-s",
+    "vs-i",
+]
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.
@@ -25,19 +50,19 @@ PART_OF_SPEECH_NUM: dict[int, list[str]] = {
     36: ["v5n", "Godan verb with `nu' ending"],
     37: ["v5r", "Godan verb with `ru' ending"],
     38: ["v5r-i", "Godan verb with `ru' ending (irregular verb)"],
+    # on top of normal kunyomi godan verbs, this contains:
+    # - onyomi verbs that can drop the る: 愛す, 呈す, 博す
+    # - onyomi verbs that all have small つ reading but can be read as す also: 接す, 察す, ...
     39: ["v5s", "Godan verb with `su' ending"],
     40: ["v5t", "Godan verb with `tsu' ending"],
     41: ["v5u", "Godan verb with `u' ending"],
     42: ["v5u-s", "Godan verb with `u' ending (special class)"],
     45: ["vk", "Kuru verb - special class"],
+    # Basic single or multi-kanji suru verbs: 属する/勉強する...
     46: ["vs", "noun or participle which takes the aux. verb suru"],
-    # 発する/察する/属する/... also some can drop the る: 接す, 察す, ...
-    # single kanji suru verbs that all have small つ reading
+    # Single or multi-kanji suru verbs with small つ reading: 発する/察する
     47: ["vs-s", "suru verb - special class"],
     # 為る itself, where the potential is できる
-    # Single kanji suru verbs that don't have small つ reading: 愛する, 関する, ... also 愛す
-    # whose potential is different: 愛せる, 関せる, ...
-    # also all other suru verbs where suru is conjugated as 為る
     48: ["vs-i", "suru verb - included"],
 }
 
@@ -167,7 +192,7 @@ def get_part_of_speech(
         return "v5r-i"
 
     # Handle vs-s vs vs-i for special suru verbs
-    if okurigana in ["する", "す"] and kanji_reading.endswith("っ"):
+    if okurigana in ["する"] and kanji_reading.endswith("っ"):
         return "vs-s"
     if okurigana in ["する"]:
         return "vs-i"
@@ -201,22 +226,26 @@ def get_okuri_dict_for_okurigana(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
+    part_of_speech: Optional[PartOfSpeech] = None,
     logger: Logger = Logger("error"),
 ) -> Union[dict, None]:
     """
     Get the okurigana progression dict for a dictionary form word.
     :param okurigana: The okurigana of the kanji.
     :param kanji: The kanji.
-    :param kanji_reading: The reading of the kanji
+    :param kanji_reading: The reading of the kanji.
+    :param logger: Logger to use for debug messages.
+    :param part_of_speech: Optional override for the part of speech.
     :return: The okurigana progression dict for the word.
         None if the word is not conjugatable.
     """
-    part_of_speech = get_part_of_speech(
-        okurigana=okurigana,
-        kanji=kanji,
-        kanji_reading=kanji_reading,
-        logger=logger,
-    )
+    if part_of_speech is None:
+        part_of_speech = get_part_of_speech(
+            okurigana=okurigana,
+            kanji=kanji,
+            kanji_reading=kanji_reading,
+            logger=logger,
+        )
     logger.debug(
         f"part_of_speech: {part_of_speech}, okurigana: {okurigana}, kanji: {kanji}, kanji_reading:"
         f" {kanji_reading}"
@@ -1161,6 +1190,48 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (45, "なかったり"),
     (45, "ませんでしたり"),
     (46, "する"),
+    (46, "する"),
+    (46, "します"),
+    (46, "しない"),
+    (46, "しません"),
+    (46, "した"),
+    (46, "しました"),
+    (46, "しなかった"),
+    (46, "しませんでした"),
+    (46, "して"),
+    (46, "しまして"),
+    (46, "しなくて"),
+    (46, "しないで"),
+    (46, "すれば"),
+    (46, "しなければ"),
+    (46, "される"),
+    (46, "されます"),
+    (46, "されない"),
+    (46, "されません"),
+    (46, "させる"),
+    (46, "させます"),
+    (46, "させない"),
+    (46, "させません"),
+    (46, "させられる"),
+    (46, "させられます"),
+    (46, "させられない"),
+    (46, "させられません"),
+    (46, "しよう"),
+    (46, "しましょう"),
+    (46, "するまい"),
+    (46, "しろ"),
+    (46, "せよ"),
+    (46, "しなさい"),
+    (46, "するな"),
+    (46, "したら"),
+    (46, "しましたら"),
+    (46, "しなかったら"),
+    (46, "しませんでしたら"),
+    (46, "したり"),
+    (46, "しましたり"),
+    (46, "しなかったり"),
+    (46, "しませんでしたり"),
+    (46, "し"),
     (47, "る", "す"),
     (47, "ます", "し"),
     (47, "ない", "さ"),
