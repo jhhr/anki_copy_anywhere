@@ -2594,6 +2594,17 @@ def main():
         ),
     )
     test(
+        test_name="adjective okurigana test 6/",
+        kanji="刳",
+        sentence="刳[えぐ]かったよな",
+        expected_kana_only="<b>えぐかった</b>よな",
+        expected_furigana="<b> 刳[えぐ]かった</b>よな",
+        expected_furikanji="<b> えぐ[刳]かった</b>よな",
+        expected_kana_only_with_tags_split="<b><kun>えぐ</kun><oku>かった</oku></b>よな",
+        expected_furigana_with_tags_split="<b><kun> 刳[えぐ]</kun><oku>かった</oku></b>よな",
+        expected_furikanji_with_tags_split="<b><kun> えぐ[刳]</kun><oku>かった</oku></b>よな",
+    )
+    test(
         test_name="numbers of people /1",
         kanji="一",
         sentence="一人[ひとり]",
