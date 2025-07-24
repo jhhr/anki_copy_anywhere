@@ -451,7 +451,8 @@ def reconstruct_furigana(
 
             logger.debug(
                 f"reconstruct_furigana - whole_word: {left_word}{middle_word}{right_word},"
-                f" furigana: {furigana}, wrapped_whole_word: {wrapped_whole_word}"
+                f" furigana: {furigana}, wrapped_whole_word: {wrapped_whole_word}, okurigana:"
+                f" {okurigana}, rest_kana: {rest_kana}"
             )
             okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
             return f"{wrapped_whole_word}{okurigana}{rest_kana}"
@@ -460,6 +461,11 @@ def reconstruct_furigana(
         return f" {left_word}{middle_word}{right_word}[{furigana}]{okurigana}{rest_kana}"
 
     if edge == "whole":
+        logger.debug(
+            f"reconstruct_furigana highlight whole word - before processing: edge: {edge},"
+            f" okuri_out_of_highlight: {okuri_out_of_highlight}, okurigana: {okurigana}, rest_kana:"
+            f" {rest_kana}"
+        )
         # Same as above except we add the<b> tags around the whole thing
         # First remove<b> tags from the furigana
         furigana = re.sub(r"<b>|</b>", "", furigana)
@@ -474,7 +480,7 @@ def reconstruct_furigana(
             return f"<b>{wrapped_word}{okurigana}</b>{rest_kana}"
 
         if okuri_out_of_highlight:
-            rest_kana = okurigana + rest_kana
+            rest_kana = f"{okurigana}{rest_kana}"
             okurigana = ""
         if reconstruct_type == "kana_only":
             return f"<b>{furigana}{okurigana}</b>{rest_kana}"
@@ -491,6 +497,11 @@ def reconstruct_furigana(
         (middle_word, middle_furigana, "middle"),
         (right_word, right_furigana, "right"),
     ]
+    logger.debug(
+        f"reconstruct_furigana with highlight in parts - before processing: {parts}, edge: {edge},"
+        f" okuri_out_of_highlight: {okuri_out_of_highlight}, okurigana: {okurigana}, rest_kana:"
+        f" {rest_kana}"
+    )
     for word, word_furigana, word_edge in parts:
         logger.debug(
             f"reconstruct_furigana - word: {word}, word_furigana: {word_furigana},"
@@ -522,13 +533,17 @@ def reconstruct_furigana(
                     # then we know the okurigana contains する inflections, if it's non-empty
                     # In any case, just add okuri to rest kana so we don't highlight it
                     if with_tags_def.with_tags:
-                        rest_kana += f"<oku>{okurigana}</oku>" if okurigana else ""
+                        rest_kana = f"<oku>{okurigana}</oku>{rest_kana}" if okurigana else rest_kana
                     else:
-                        rest_kana += okurigana
+                        rest_kana = f"{okurigana}{rest_kana}"
             if edge == word_edge:
                 # Finally, add the highlighting if this is the edge that was matched
                 part = f"<b>{part}</b>"
             result += part
+    logger.debug(
+        f"reconstruct_furigana with highlight - result after parts: {result}, okurigana:"
+        f" {okurigana}, rest_kana: {rest_kana}"
+    )
     return f"{result}{rest_kana}"
 
 
