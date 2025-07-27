@@ -3,12 +3,13 @@ from typing import Optional
 from anki.notes import Note
 
 from .kana_highlight import (
-    FuriReconstruct,
-    WithTagsDef,
     kana_filter,
     kana_highlight,
 )
 from ..utils.logger import Logger
+
+from .jpn_text_processing.types import WithTagsDef
+from .jpn_text_processing.construct_wrapped_furi_word import FuriReconstruct
 
 
 def kana_highlight_process(

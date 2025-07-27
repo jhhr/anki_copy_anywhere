@@ -1,21 +1,17 @@
 from functools import partial
 import re
-import json
-import os
-from typing import TypedDict, Literal, Optional, Tuple, NamedTuple, cast, Union
+from typing import Literal, Optional, Tuple, NamedTuple, cast, Union
 
 from .jpn_text_processing.number_to_kanji import NUMBER_TO_KANJI, number_to_kanji
 from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
-from .jpn_text_processing.get_conjugatable_okurigana_stem import (
-    get_conjugatable_okurigana_stem,
+from .jpn_text_processing.check_okurigana_for_inflection import (
+    check_okurigana_for_inflection,
 )
 from .jpn_text_processing.starts_with_okurigana_conjugation import (
-    starts_with_okurigana_conjugation,
     OkuriResults,
 )
 from .jpn_text_processing.okurigana_dict import (
     ONYOMI_GODAN_SU_FIRST_KANA,
-    PartOfSpeech,
 )
 
 from .jpn_text_processing.construct_wrapped_furi_word import (
@@ -37,26 +33,22 @@ from .jpn_text_processing.regex import (
     RENDAKU_CONVERSION_DICT_HIRAGANA,
     RENDAKU_CONVERSION_DICT_KATAKANA,
 )
+from .jpn_text_processing.types import (
+    WordData,
+    HighlightArgs,
+    Edge,
+    WithTagsDef,
+    FuriganaParts,
+    YomiMatchResult,
+    PartialResult,
+    FinalResult,
+)
+from .jpn_text_processing.all_kanji_data import all_kanji_data
 
 try:
     from ..utils.logger import Logger
 except ImportError:
     from utils.logger import Logger  # type: ignore[no-redef]
-
-
-class KanjiData(TypedDict):
-    onyomi: str
-    kunyomi: str
-
-
-# import all_kanji_data from the json file in .jpn_text_processing/all_kanji_data.json
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-json_file_path = os.path.join(current_dir, "jpn_text_processing", "all_kanji_data.json")
-
-all_kanji_data: dict[str, KanjiData] = {}
-with open(json_file_path, "r", encoding="utf-8") as f:
-    all_kanji_data = json.load(f)
 
 
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
@@ -156,148 +148,9 @@ def furigana_reverser(text):
     return re.sub(FURIGANA_REC, bracket_reverser, text.replace("&nbsp;", " "))
 
 
-class WithTagsDef(NamedTuple):
-    """
-    NamedTuple for the definition of the tags to wrap the furigana in
-    :param with_tags
-    :param merge_consecutive
-    :param onyomi_to_katakana
-    :param assume_dictionary_form
-    :param include_suru_okuri
-    """
-
-    with_tags: bool
-    merge_consecutive: bool
-    onyomi_to_katakana: bool
-    assume_dictionary_form: bool
-    include_suru_okuri: bool
-
-
-Edge = Literal["left", "right", "middle", "whole", "none"]
-
-
-class WordData(TypedDict):
-    """
-    TypedDict for data about a single word that was matched in the text for the kanji_to_match
-    :param kanji_pos
-    :param kanji_count
-    :param word
-    :param furigana
-    :param okurigana
-    :param edge
-    """
-
-    kanji_pos: int
-    kanji_count: int
-    word: str
-    furigana: str
-    furigana_is_katakana: bool
-    okurigana: str
-    edge: Edge
-
-
-class HighlightArgs(TypedDict):
-    """
-    TypedDict for the base arguments passed to kana_highlight as these get passed around a lot
-    :param text
-    :param onyomi
-    :param kunyomi
-    :param kanji_to_match
-    :param kanji_to_highlight
-    :param add_highlight
-    :param edge
-    """
-
-    onyomi: str
-    kunyomi: str
-    kanji_to_match: str
-    kanji_to_highlight: Optional[str]
-    add_highlight: bool
-    edge: Edge
-
-
-MatchType = Literal["onyomi", "kunyomi", "jukujikun", "none"]
-
-
-class YomiMatchResult(TypedDict):
-    """
-    TypedDict for the result of the onyomi or kunyomi match check
-    :param text
-    :param type
-    :param match_edge
-    :param actual_match
-    :param matched_reading
-    """
-
-    text: str
-    type: MatchType
-    match_edge: Edge
-    actual_match: str
-    matched_reading: str
-
-
-class PartialResult(TypedDict):
-    """
-    TypedDict for the partial result of the onyomi or kunyomi match check
-    :param matched_furigana
-    :param match_type
-    :param rest_furigana
-    :param okurigana
-    :param rest_kana
-    :param edge
-    """
-
-    matched_furigana: str
-    match_type: MatchType
-    rest_furigana: str
-    okurigana: str
-    rest_kana: str
-    edge: Edge
-
-
-class FinalResult(TypedDict):
-    """
-    TypedDict for the final result of the onyomi or kunyomi match check
-    :param furigana
-    :param okurigana
-    :param rest_kana
-    :param left_word
-    :param middle_word
-    :param right_word
-    :param edge
-    :param match_type
-    """
-
-    furigana: str
-    okurigana: str
-    rest_kana: str
-    left_word: str
-    middle_word: str
-    right_word: str
-    edge: Edge
-    match_type: MatchType
-
-
 REPLACED_FURIGANA_MIDDLE_RE = re.compile(r"^(.+)<b>(.+)</b>(.+)$")
 REPLACED_FURIGANA_RIGHT_RE = re.compile(r"^(.+)<b>(.+)</b>$")
 REPLACED_FURIGANA_LEFT_RE = re.compile(r"^<b>(.+)</b>(.+)$")
-
-
-class FuriganaParts(TypedDict):
-    """
-    TypedDict for the parts of the furigana that were matched
-    :param has_highlight
-    :param left_furigana
-    :param middle_furigana
-    :param right_furigana
-    :param matched_edge
-    """
-
-    has_highlight: bool
-    left_furigana: Optional[str]
-    middle_furigana: Optional[str]
-    right_furigana: Optional[str]
-    matched_edge: Edge
 
 
 def get_furigana_parts(
@@ -1137,91 +990,6 @@ def process_onyomi_match(
     return re.sub(reg, replacer, furigana)
 
 
-def check_okurigana_for_inflection(
-    reading_okurigana: str,
-    reading: str,
-    word_data: WordData,
-    highlight_args: HighlightArgs,
-    part_of_speech: Optional[PartOfSpeech] = None,
-    logger: Logger = Logger("error"),
-) -> OkuriResults:
-    """
-    Function that checks the okurigana for a match with the kunyomi okurigana
-    :param reading_okurigana: the okurigana to check
-    :param reading: the kunyomi/onyomi reading to check against
-    :param word_data: the word data containing the okurigana and other information
-    :param highlight_args: the highlight arguments containing the kanji to match
-    :param logger: the logger to use for debugging
-    :param part_of_speech: optional override for the part of speech to use
-
-    :return: (string, string) the okurigana that should be highlighted and the rest of the okurigana
-    """
-    # Kana text occurring after the kanji in the word, may not be okurigana and can
-    # contain other kana after the okurigana
-    maybe_okuri_text = word_data.get("okurigana")
-    logger.debug(
-        f"check okurigana 0 - kunyomi_okurigana: {reading_okurigana},"
-        f" maybe_okurigana: {maybe_okuri_text}"
-    )
-
-    if not reading_okurigana or not maybe_okuri_text:
-        return OkuriResults("", "", "no_okuri")
-
-    # Simple case, exact match, no need to check conjugations
-    if reading_okurigana == maybe_okuri_text:
-        return OkuriResults(reading_okurigana, "", "full_okuri")
-
-    # Check what kind of inflections we should be looking for from the kunyomi okurigana
-    conjugatable_stem = get_conjugatable_okurigana_stem(reading_okurigana)
-
-    # Another simple case, stem is the same as the okurigana, no need to check conjugations
-    if conjugatable_stem == maybe_okuri_text:
-        return OkuriResults(conjugatable_stem, "", "full_okuri")
-
-    logger.debug(f"check okurigana 1 - conjugatable_stem: {conjugatable_stem}")
-    if conjugatable_stem is None or not maybe_okuri_text.startswith(conjugatable_stem):
-        logger.debug("\ncheck okurigana 2 - no conjugatable_stem or no match")
-        # Not a verb or i-adjective, so just check for an exact match within the okurigana
-        if maybe_okuri_text.startswith(reading_okurigana):
-            logger.debug(f"check okurigana 3 - maybe_okuri_text: {maybe_okuri_text}")
-            return OkuriResults(
-                reading_okurigana,
-                maybe_okuri_text[len(reading_okurigana) :],
-                "full_okuri",
-            )
-        logger.debug("\ncheck okurigana 4 - no match")
-        return OkuriResults("", maybe_okuri_text, "no_okuri")
-
-    # Remove the conjugatable_stem from maybe_okurigana
-    trimmed_maybe_okuri = maybe_okuri_text[len(conjugatable_stem) :]
-    logger.debug(f"check okurigana 5 - trimmed_maybe_okuri: {trimmed_maybe_okuri}")
-
-    # Then check if that contains a conjugation for what we're looking for
-    conjugated_okuri, rest, return_type = starts_with_okurigana_conjugation(
-        trimmed_maybe_okuri,
-        reading_okurigana,
-        highlight_args["kanji_to_match"],
-        reading,
-        part_of_speech=part_of_speech,
-        logger=logger,
-    )
-    logger.debug(
-        f"check okurigana 6 - conjugated_okuri: {conjugated_okuri}, rest: {rest},"
-        f" return_type: {return_type}"
-    )
-
-    if return_type != "no_okuri":
-        logger.debug(
-            f"check okurigana 7 - result: {conjugatable_stem + conjugated_okuri}, rest: {rest}"
-        )
-        # remember to add the stem back!
-        return OkuriResults(conjugatable_stem + conjugated_okuri, rest, return_type)
-
-    # No match, this text doesn't contain okurigana for the kunyomi word
-    logger.debug("\ncheck okurigana 8 - no match")
-    return OkuriResults("", maybe_okuri_text, "no_okuri")
-
-
 def check_kunyomi_readings(
     highlight_args: HighlightArgs,
     word_data: WordData,
@@ -1665,7 +1433,7 @@ def handle_jukujikun_case(
 
 
 def handle_whole_word_case(
-    highlight_args,
+    highlight_args: HighlightArgs,
     word: str,
     furigana: str,
     okurigana: str,
