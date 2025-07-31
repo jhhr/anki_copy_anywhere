@@ -7,14 +7,12 @@ class WithTagsDef(NamedTuple):
     :param with_tags
     :param merge_consecutive
     :param onyomi_to_katakana
-    :param assume_dictionary_form
     :param include_suru_okuri
     """
 
     with_tags: bool
     merge_consecutive: bool
     onyomi_to_katakana: bool
-    assume_dictionary_form: bool
     include_suru_okuri: bool
 
 

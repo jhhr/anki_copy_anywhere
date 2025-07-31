@@ -518,9 +518,6 @@ class KanaHighlightProcessDialog(QDialog):
         self.return_type_cbox.setCurrentText("kana_only")
         self.form.addRow("Return type", self.return_type_cbox)
 
-        self.assume_dictionary_form_checkbox = QCheckBox("Assume content is in dictionary form")
-        self.form.addRow("", self.assume_dictionary_form_checkbox)
-
         self.wrap_readings_checkbox = QCheckBox(
             "Wrap readings in <on>, <kun>, <juk> and <oku> tags"
         )
@@ -538,10 +535,6 @@ class KanaHighlightProcessDialog(QDialog):
             self.kanji_field_cbox.setCurrentText(self.process.get("kanji_field"))
         with suppress(KeyError):
             self.return_type_cbox.setCurrentText(self.process.get("return_type"))
-        with suppress(KeyError):
-            self.assume_dictionary_form_checkbox.setChecked(
-                self.process.get("assume_dictionary_form", False)
-            )
         with suppress(KeyError):
             self.wrap_readings_checkbox.setChecked(self.process.get("wrap_readings_in_tags", False))
         with suppress(KeyError):
@@ -575,7 +568,6 @@ class KanaHighlightProcessDialog(QDialog):
             "name": KANA_HIGHLIGHT_PROCESS,
             "kanji_field": self.kanji_field_cbox.currentText(),
             "return_type": return_type,
-            "assume_dictionary_form": self.assume_dictionary_form_checkbox.isChecked(),
             "wrap_readings_in_tags": self.wrap_readings_checkbox.isChecked(),
             "merge_consecutive_tags": self.merge_consecutive_tags_checkbox.isChecked(),
             "onyomi_to_katakana": self.onyomi_to_katakana_checkbox.isChecked(),

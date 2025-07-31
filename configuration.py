@@ -85,7 +85,6 @@ class KanaHighlightProcess(TypedDict):
     name: str
     kanji_field: str
     return_type: FuriReconstruct
-    assume_dictionary_form: bool
     wrap_readings_in_tags: bool
     merge_consecutive_tags: bool
     onyomi_to_katakana: bool
@@ -146,7 +145,6 @@ NEW_PROCESS_DEFAULTS: dict[str, AnyProcess] = {
         return_type="kana_only",
         wrap_readings_in_tags=True,
         merge_consecutive_tags=True,
-        assume_dictionary_form=False,
     ),
 }
 

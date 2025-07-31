@@ -463,10 +463,7 @@ def process_readings(
     if onyomi_match["type"] == "onyomi":
         # Check for godan su verbs that have okurigana
         if maybe_okuri and maybe_okuri[0] in ONYOMI_GODAN_SU_FIRST_KANA:
-            if with_tags_def.assume_dictionary_form:
-                # No need to check okurigana for inflection if we assume dictionary form
-                onyomi_process_result = ReadingProcessResult(onyomi_match, "", maybe_okuri)
-            elif maybe_okuri.startswith("する"):
+            if maybe_okuri.startswith("する"):
                 # If this is just a straight up suru verb, we can take okurigana up to する
                 onyomi_process_result = ReadingProcessResult(onyomi_match, "する", maybe_okuri[2:])
             else:
@@ -539,13 +536,9 @@ def process_readings(
         f" {highlight_args}, next_kanji_in_word_is_repeater:"
         f" {next_kanji_in_word_is_repeater}"
     )
-    if (
-        not with_tags_def.assume_dictionary_form
-        and kunyomi_results["type"] == "kunyomi"
-        and (
-            word_data["edge"] in ["right", "whole"]
-            or (word_data["edge"] == "left" and next_kanji_in_word_is_repeater)
-        )
+    if kunyomi_results["type"] == "kunyomi" and (
+        word_data["edge"] in ["right", "whole"]
+        or (word_data["edge"] == "left" and next_kanji_in_word_is_repeater)
     ):
         kunyomi = highlight_args.get("kunyomi", "")
         kun_okuri_to_highlight = ""
@@ -613,15 +606,8 @@ def process_readings(
             kunyomi_results, kun_okuri_to_highlight, kun_rest_kana
         )
     elif kunyomi_results["type"] == "kunyomi":
-        if with_tags_def.assume_dictionary_form:
-            # If we assume that this is a dictionary form word, we don't need to process
-            # just return the okurigana as-is
-            logger.debug("\nassuming dictionary form - kunyomi_process_result with okurigana")
-            kunyomi_process_result = ReadingProcessResult(kunyomi_results, maybe_okuri, "")
-        # Ohterwise, we can only assume its rest_kana
-        else:
-            logger.debug("\nnot assuming dictionary form - kunyomi_process_result with rest_kana")
-            kunyomi_process_result = ReadingProcessResult(kunyomi_results, "", maybe_okuri)
+        logger.debug("\nnot assuming dictionary form - kunyomi_process_result with rest_kana")
+        kunyomi_process_result = ReadingProcessResult(kunyomi_results, "", maybe_okuri)
 
     # Compare the onyomi and kunyomi results and return the one that matched the most
     if onyomi_process_result and kunyomi_process_result:
@@ -1658,7 +1644,6 @@ def kana_highlight(
             True,  # with_tags
             True,  # merge_consecutive
             True,  # onyomi_to_katakana
-            False,  # assume_dictionary_form
             False,  # include_suru_okuri
         )
     """

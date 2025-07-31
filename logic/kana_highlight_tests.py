@@ -14,7 +14,6 @@ def test(
     kanji: Optional[str],
     sentence: str,
     ignore_fail: bool = False,
-    assume_dictionary_form: bool = False,
     onyomi_to_katakana: bool = True,
     include_suru_okuri: bool = False,
     debug: bool = False,
@@ -34,59 +33,47 @@ def test(
     cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
         (
             "furigana",
-            WithTagsDef(
-                False, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
-            ),
+            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
             expected_furigana,
         ),
         (
             "furigana",
-            WithTagsDef(
-                True, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
-            ),
+            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
             expected_furigana_with_tags_split,
         ),
         (
             "furigana",
-            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri),
+            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
             expected_furigana_with_tags_merged,
         ),
         (
             "furikanji",
-            WithTagsDef(
-                False, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
-            ),
+            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
             expected_furikanji,
         ),
         (
             "furikanji",
-            WithTagsDef(
-                True, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
-            ),
+            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
             expected_furikanji_with_tags_split,
         ),
         (
             "furikanji",
-            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri),
+            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
             expected_furikanji_with_tags_merged,
         ),
         (
             "kana_only",
-            WithTagsDef(
-                False, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
-            ),
+            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
             expected_kana_only,
         ),
         (
             "kana_only",
-            WithTagsDef(
-                True, False, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri
-            ),
+            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
             expected_kana_only_with_tags_split,
         ),
         (
             "kana_only",
-            WithTagsDef(True, True, onyomi_to_katakana, assume_dictionary_form, include_suru_okuri),
+            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
             expected_kana_only_with_tags_merged,
         ),
     ]
@@ -2385,9 +2372,8 @@ def main():
         ),
     )
     test(
-        test_name="Verb okurigana is gotten correctly when assuming dictionary form/",
+        test_name="Verb okurigana test /13",
         kanji="試",
-        assume_dictionary_form=True,
         sentence="試[こころ]みる",
         expected_kana_only="<b>こころみる</b>",
         expected_furigana="<b> 試[こころ]みる</b>",

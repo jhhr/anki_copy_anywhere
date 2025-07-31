@@ -636,7 +636,6 @@ def apply_process_chain(
                         process.get("wrap_readings_in_tags", True),
                         process.get("merge_consecutive_tags", True),
                         process.get("onyomi_to_katakana", False),
-                        process.get("assume_dictionary_form", False),
                         False,  # include_suru_okuri always false
                     ),
                     note=dest_note,
