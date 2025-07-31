@@ -23,8 +23,8 @@ from .jpn_text_processing.okurigana_mix_cleaning_replacer import (
     OKURIGANA_MIX_CLEANING_REC,
     okurigana_mix_cleaning_replacer,
 )
-from .jpn_text_processing.get_conjugated_okuri_with_spacey import (
-    get_conjugated_okuri_with_spacey,
+from .jpn_text_processing.get_conjugated_okuri_with_mecab import (
+    get_conjugated_okuri_with_mecab,
 )
 from .jpn_text_processing.regex import (
     KANJI_REC,
@@ -693,7 +693,7 @@ def process_jukujikun_reading(
     rest_kana = maybe_okuri
     if process_okurigana:
         # Go through each possible part_of_speec and check if the okurigana matches
-        okuri_result = get_conjugated_okuri_with_spacey(
+        okuri_result = get_conjugated_okuri_with_mecab(
             kanji=highlight_args.get("full_word"),
             kanji_reading=highlight_args.get("full_furigana"),
             maybe_okuri=maybe_okuri,

@@ -1954,7 +1954,7 @@ def main():
         test_name="correct juk for 菠薐草",
         kanji="",
         onyomi_to_katakana=False,
-        # 菠 has onyomi reading ほ which should no match in this case
+        # 菠 has onyomi reading ほ which should not match in this case
         sentence="<k> 菠薐[ほうれん]</k> 草[そう]",
         expected_kana_only="<k> ほうれん</k> そう",
         expected_furigana="<k> 菠薐[ほうれん]</k> 草[そう]",
