@@ -59,6 +59,8 @@ class HighlightArgs(TypedDict):
     kanji_to_highlight: Optional[str]
     add_highlight: bool
     edge: Edge
+    full_word: str
+    full_furigana: str
 
 
 MatchType = Literal["onyomi", "kunyomi", "jukujikun", "none"]
@@ -138,3 +140,63 @@ class FuriganaParts(TypedDict):
     middle_furigana: Optional[str]
     right_furigana: Optional[str]
     matched_edge: Edge
+
+
+PartOfSpeech = Literal[
+    "adj-i",
+    "adj-na",
+    "adj-ix",
+    "v1",
+    "v1-s",
+    "v5aru",
+    "v5b",
+    "v5g",
+    "v5k",
+    "v5k-s",
+    "v5m",
+    "v5n",
+    "v5r",
+    "v5r-i",
+    "v5s",
+    "v5t",
+    "v5u",
+    "v5u-s",
+    "vk",
+    "vs",
+    "vs-s",
+    "vs-i",
+]
+
+PARTS_OF_SPEECH: list[PartOfSpeech] = [
+    "adj-i",
+    "adj-na",
+    "adj-ix",
+    "v1",
+    "v1-s",
+    "v5aru",
+    "v5b",
+    "v5g",
+    "v5k",
+    "v5k-s",
+    "v5m",
+    "v5n",
+    "v5r",
+    "v5r-i",
+    "v5s",
+    "v5t",
+    "v5u",
+    "v5u-s",
+    "vk",
+    "vs",
+    "vs-s",
+    "vs-i",
+]
+
+OkuriType = Literal["full_okuri", "partial_okuri", "empty_okuri", "no_okuri", "detected_okuri"]
+
+
+class OkuriResults(NamedTuple):
+    okurigana: str
+    rest_kana: str
+    result: OkuriType
+    part_of_speech: Optional[PartOfSpeech] = None

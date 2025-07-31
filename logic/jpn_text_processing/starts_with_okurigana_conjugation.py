@@ -1,20 +1,14 @@
 import sys
-from typing import Literal, NamedTuple, Optional
+from typing import Optional
 
-from .okurigana_dict import get_okuri_dict_for_okurigana, PartOfSpeech
+from .okurigana_dict import get_okuri_dict_for_okurigana
 
 try:
     from ...utils.logger import Logger
 except ImportError:
     from utils.logger import Logger
 
-OkuriType = Literal["full_okuri", "partial_okuri", "empty_okuri", "no_okuri"]
-
-
-class OkuriResults(NamedTuple):
-    okurigana: str
-    rest_kana: str
-    result: OkuriType
+from .types import OkuriResults, OkuriType, PartOfSpeech
 
 
 def starts_with_okurigana_conjugation(
@@ -38,10 +32,10 @@ def starts_with_okurigana_conjugation(
     """
     # Sanity check, we need at least one character, and at least the kanji okurigana
     if not kana_text or not kanji_okurigana:
-        return OkuriResults("", kana_text, "no_okuri")
+        return OkuriResults("", kana_text, "no_okuri", None)
 
     # Get the okurigana dict for the kanji
-    okuri_dict = get_okuri_dict_for_okurigana(
+    okuri_dict, part_of_speech_for_okuri = get_okuri_dict_for_okurigana(
         kanji_okurigana,
         kanji,
         kanji_reading,
@@ -50,7 +44,7 @@ def starts_with_okurigana_conjugation(
     )
 
     if not okuri_dict:
-        return OkuriResults("", kana_text, "no_okuri")
+        return OkuriResults("", kana_text, "no_okuri", None)
 
     logger.debug(
         f"kana_text: {kana_text}, kanji_okurigana: {kanji_okurigana}, kanji: {kanji},"
@@ -59,7 +53,7 @@ def starts_with_okurigana_conjugation(
 
     if not kana_text[0] in okuri_dict and not okuri_dict[""]:
         logger.debug("no okurigana found and no empty string okurigana")
-        return OkuriResults("", kana_text, "no_okuri")
+        return OkuriResults("", kana_text, "no_okuri", None)
 
     okurigana = ""
     rest = kana_text
@@ -91,18 +85,22 @@ def starts_with_okurigana_conjugation(
         # If no okurigana was found, but this conjugation can be valid with no okurigana,
         # then we indicate that this empty string is a full okurigana
         okuri_result = "empty_okuri"
-    return OkuriResults(okurigana, rest, okuri_result)
+    return OkuriResults(okurigana, rest, okuri_result, part_of_speech_for_okuri)
 
 
 # Tests
 def test(text, okurigana, kanji, kanji_reading, expected):
-    okurigana, rest, return_type = starts_with_okurigana_conjugation(
+    okurigana, rest, return_type, result_part_of_speech = starts_with_okurigana_conjugation(
         text, okurigana, kanji, kanji_reading
     )
     try:
         assert okurigana == expected[0], f"okurigana: '{okurigana}' != '{expected[0]}'"
         assert rest == expected[1], f"rest: '{rest}' != '{expected[1]}'"
         assert return_type == expected[2], f"return_type: '{return_type}' != '{expected[2]}'"
+        if len(expected) > 3:
+            assert (
+                result_part_of_speech == expected[3]
+            ), f"part_of_speech: '{result_part_of_speech}' != '{expected[3]}'"
     except AssertionError as e:
         # Re-run with logging enabled
         starts_with_okurigana_conjugation(
@@ -120,92 +118,96 @@ def main():
         okurigana="い",
         kanji="無",
         kanji_reading="な",
-        expected=("かったら", "", "full_okuri"),
+        expected=("かったら", "", "full_okuri", "adj-i"),
     )
     test(
         text="ったか",
         okurigana="る",
         kanji="去",
         kanji_reading="さ",
-        expected=("った", "か", "full_okuri"),
+        expected=("った", "か", "full_okuri", "v5r"),
     )
     test(
         text="ないで",
         okurigana="る",
         kanji="在",
         kanji_reading="あ",
-        expected=("ないで", "", "full_okuri"),
+        expected=("ないで", "", "full_okuri", "v5r-i"),
     )
     test(
         text="んでくれ",
         okurigana="ぬ",
         kanji="死",
         kanji_reading="し",
-        expected=("んで", "くれ", "full_okuri"),
+        expected=("んで", "くれ", "full_okuri", "v5n"),
     )
     test(
         text="くない",
         okurigana="きい",
         kanji="大",
         kanji_reading="おお",
-        expected=("くない", "", "full_okuri"),
+        expected=("くない", "", "full_okuri", "adj-i"),
     )
     test(
         text="くないよ",
         okurigana="さい",
         kanji="小",
         kanji_reading="ちい",
-        expected=("くない", "よ", "full_okuri"),
+        expected=("くない", "よ", "full_okuri", "adj-i"),
     )
     test(
         text="している",
         okurigana="る",
         kanji="為",
         kanji_reading="す",
-        expected=("して", "いる", "full_okuri"),
+        expected=("して", "いる", "full_okuri", "vs-i"),
     )
     test(
         text="してた",
         okurigana="する",
         kanji="動",
         kanji_reading="どう",
-        expected=("してた", "", "full_okuri"),
+        # suru verbs should be vs-s but that's difficult to detect
+        # When actually dealing with suru verbs, part_of_speech should be provided to the function
+        # to get the correct okuri progression
+        expected=("してた", "", "full_okuri", "vs-i"),
     )
     test(
         text="いでる",
         okurigana="ぐ",
         kanji="泳",
         kanji_reading="およ",
-        expected=("いで", "る", "full_okuri"),
+        expected=("いで", "る", "full_okuri", "v5g"),
     )
     test(
         text="いです",
         okurigana="い",
         kanji="良",
         kanji_reading="よ",
-        expected=("い", "です", "full_okuri"),
+        expected=("い", "です", "full_okuri", "adj-ix"),
     )
     test(
         text="つ",
         okurigana="つ",
         kanji="待",
         kanji_reading="ま",
-        expected=("つ", "", "full_okuri"),
+        expected=("つ", "", "full_okuri", "v5t"),
     )
     test(
         text="いてたか",
         okurigana="く",
         kanji="聞",
         kanji_reading="き",
-        expected=("いて", "たか", "full_okuri"),
+        expected=("いて", "たか", "full_okuri", "v5k"),
     )
     # empty okuri tests
     test(
+        # 恥[は]ずかしげな is an i-adjective, not na-adjective!
         text="げな",
         okurigana="ずかしい",
         kanji="恥",
         kanji_reading="は",
-        expected=("", "げな", "empty_okuri"),
+        expected=("", "げな", "empty_okuri", "adj-i"),
     )
     # partial okuri tests
     test(
@@ -213,7 +215,7 @@ def main():
         okurigana="る",
         kanji="去",
         kanji_reading="さ",
-        expected=("った", "", "full_okuri"),
+        expected=("った", "", "full_okuri", "v5r"),
     )
     print("\033[92mTests passed\033[0m")
 

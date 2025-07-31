@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union, Tuple
+from typing import Optional, Union, Tuple
 
 try:
     from ...utils.logger import Logger
@@ -7,30 +7,7 @@ except ImportError:
 
 from .regex import RENDAKU_CONVERSION_DICT_HIRAGANA
 
-PartOfSpeech = Literal[
-    "adj-i",
-    "adj-na",
-    "adj-ix",
-    "v1",
-    "v1-s",
-    "v5aru",
-    "v5b",
-    "v5g",
-    "v5k",
-    "v5k-s",
-    "v5m",
-    "v5n",
-    "v5r",
-    "v5r-i",
-    "v5s",
-    "v5t",
-    "v5u",
-    "v5u-s",
-    "vk",
-    "vs",
-    "vs-s",
-    "vs-i",
-]
+from .types import PartOfSpeech
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.
@@ -228,7 +205,7 @@ def get_okuri_dict_for_okurigana(
     kanji_reading: str,
     part_of_speech: Optional[PartOfSpeech] = None,
     logger: Logger = Logger("error"),
-) -> Union[dict, None]:
+) -> tuple[Union[dict, None], PartOfSpeech]:
     """
     Get the okurigana progression dict for a dictionary form word.
     :param okurigana: The okurigana of the kanji.
@@ -251,8 +228,8 @@ def get_okuri_dict_for_okurigana(
         f" {kanji_reading}"
     )
     if part_of_speech is None:
-        return None
-    return POSSIBLE_OKURIGANA_PROGRESSION_DICT[part_of_speech]
+        return None, None
+    return POSSIBLE_OKURIGANA_PROGRESSION_DICT[part_of_speech], part_of_speech
 
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/conjo.csv

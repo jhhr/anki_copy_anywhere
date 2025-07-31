@@ -1,23 +1,30 @@
 from typing import Union
 
-CONJUGATABLE_LAST_OKURI: set[str] = {
+from .types import PartOfSpeech
+
+CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH: dict[str, list[PartOfSpeech]] = {
     # Godan verbs
-    "う",
-    "く",
-    "ぐ",
-    "す",
-    "つ",
-    "ぬ",
-    "ぶ",
-    "む",
-    # Godan or ichidan, note also jiru and zuru verbs are ichidan
-    "る",
+    "う": ["v5u"],
+    "く": ["v5k"],
+    "ぐ": ["v5g"],
+    "す": ["v5s"],
+    "つ": ["v5t"],
+    "ぬ": ["v5n"],
+    "ぶ": ["v5b"],
+    "む": ["v5m"],
+    # Godan or ichidan, note also jiru and zuru verbs are ichidan, also each suru verb special class
+    "る": ["v5r", "v1", "vs", "vs-i", "vs-s"],
     # i-adjectives
-    "い",
+    "い": ["adj-i"],
 }
 
 
-def get_conjugatable_okurigana_stem(plain_okuri: str) -> Union[str, None]:
+CONJUGATABLE_LAST_OKURI: set[str] = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.keys()
+
+
+def get_conjugatable_okurigana_stem(
+    plain_okuri: str,
+) -> tuple[Union[str, None], list[PartOfSpeech]]:
     """
     Returns the stem of a word's okurigana.
     :param plain_okuri: A dictionary form word's okurigana
@@ -27,7 +34,8 @@ def get_conjugatable_okurigana_stem(plain_okuri: str) -> Union[str, None]:
     """
     # Sanity check, we need at least one character
     if not plain_okuri:
-        return None
-    if plain_okuri[-1] in CONJUGATABLE_LAST_OKURI:
-        return plain_okuri[:-1]
-    return None
+        return None, []
+    maybe_stem = plain_okuri[-1]
+    if maybe_stem in CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH:
+        return plain_okuri[:-1], CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH[maybe_stem]
+    return None, []

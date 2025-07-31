@@ -338,12 +338,12 @@ def main():
         expected_kana_only="<gikun> すっきりする</gikun>",
         expected_furigana="<gikun> 清々[すっきり]する</gikun>",
         expected_furikanji="<gikun> すっきり[清々]する</gikun>",
-        expected_kana_only_with_tags_split="<gikun> <juk>すっきり</juk>する</gikun>",
-        expected_furigana_with_tags_split="<gikun><juk> 清々[すっきり]</juk>する</gikun>",
-        expected_furikanji_with_tags_split="<gikun><juk> すっきり[清々]</juk>する</gikun>",
-        expected_kana_only_with_tags_merged="<gikun> <juk>すっきり</juk>する</gikun>",
-        expected_furigana_with_tags_merged="<gikun><juk> 清々[すっきり]</juk>する</gikun>",
-        expected_furikanji_with_tags_merged="<gikun><juk> すっきり[清々]</juk>する</gikun>",
+        expected_kana_only_with_tags_split="<gikun> <juk>すっきり</juk><oku>する</oku></gikun>",
+        expected_furigana_with_tags_split="<gikun><juk> 清々[すっきり]</juk><oku>する</oku></gikun>",
+        expected_furikanji_with_tags_split="<gikun><juk> すっきり[清々]</juk><oku>する</oku></gikun>",
+        expected_kana_only_with_tags_merged="<gikun> <juk>すっきり</juk><oku>する</oku></gikun>",
+        expected_furigana_with_tags_merged="<gikun><juk> 清々[すっきり]</juk><oku>する</oku></gikun>",
+        expected_furikanji_with_tags_merged="<gikun><juk> すっきり[清々]</juk><oku>する</oku></gikun>",
     )
     test(
         test_name="Should match 斯斯 as kunyomi in 斯斯然然 - no highlight",
@@ -1545,12 +1545,12 @@ def main():
         expected_kana_only=" すがすがしい",
         expected_furigana=" 清々[すがすが]しい",
         expected_furikanji=" すがすが[清々]しい",
-        expected_kana_only_with_tags_split=" <juk>すがすが</juk>しい",
-        expected_furigana_with_tags_split="<juk> 清々[すがすが]</juk>しい",
-        expected_furikanji_with_tags_split="<juk> すがすが[清々]</juk>しい",
-        expected_kana_only_with_tags_merged=" <juk>すがすが</juk>しい",
-        expected_furigana_with_tags_merged="<juk> 清々[すがすが]</juk>しい",
-        expected_furikanji_with_tags_merged="<juk> すがすが[清々]</juk>しい",
+        expected_kana_only_with_tags_split=" <juk>すがすが</juk><oku>しい</oku>",
+        expected_furigana_with_tags_split="<juk> 清々[すがすが]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_split="<juk> すがすが[清々]</juk><oku>しい</oku>",
+        expected_kana_only_with_tags_merged=" <juk>すがすが</juk><oku>しい</oku>",
+        expected_furigana_with_tags_merged="<juk> 清々[すがすが]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_merged="<juk> すがすが[清々]</juk><oku>しい</oku>",
     )
     test(
         test_name="jukujikun test 清々しい with highlight",
@@ -1559,12 +1559,12 @@ def main():
         expected_kana_only="<b>すがすが</b>しい",
         expected_furigana="<b> 清々[すがすが]</b>しい",
         expected_furikanji="<b> すがすが[清々]</b>しい",
-        expected_kana_only_with_tags_split="<b><juk>すがすが</juk></b>しい",
-        expected_furigana_with_tags_split="<b><juk> 清々[すがすが]</juk></b>しい",
-        expected_furikanji_with_tags_split="<b><juk> すがすが[清々]</juk></b>しい",
-        expected_kana_only_with_tags_merged="<b><juk>すがすが</juk></b>しい",
-        expected_furigana_with_tags_merged="<b><juk> 清々[すがすが]</juk></b>しい",
-        expected_furikanji_with_tags_merged="<b><juk> すがすが[清々]</juk></b>しい",
+        expected_kana_only_with_tags_split="<b><juk>すがすが</juk></b><oku>しい</oku>",
+        expected_furigana_with_tags_split="<b><juk> 清々[すがすが]</juk></b><oku>しい</oku>",
+        expected_furikanji_with_tags_split="<b><juk> すがすが[清々]</juk></b><oku>しい</oku>",
+        expected_kana_only_with_tags_merged="<b><juk>すがすが</juk></b><oku>しい</oku>",
+        expected_furigana_with_tags_merged="<b><juk> 清々[すがすが]</juk></b><oku>しい</oku>",
+        expected_furikanji_with_tags_merged="<b><juk> すがすが[清々]</juk></b><oku>しい</oku>",
     )
     test(
         test_name="jukujikun test 清々しい with another word at left - no highlight",
@@ -1706,13 +1706,22 @@ def main():
         ),
     )
     test(
-        ignore_fail=True,
         test_name="jukujikun test 蕎麦 not matched",
         kanji="屋",
         sentence="蕎麦屋[そばや]",
         expected_kana_only="そば<b>や</b>",
         expected_kana_only_with_tags_split="<juk>そ</juk><juk>ば</juk><b><kun>や</kun></b>",
         expected_kana_only_with_tags_merged="<juk>そば</juk><b><kun>や</kun></b>",
+        expected_furigana=" 蕎麦[そば]<b> 屋[や]</b>",
+        expected_furikanji=" そば[蕎麦]<b> や[屋]</b>",
+        expected_furigana_with_tags_split=(
+            "<juk> 蕎[そ]</juk><juk> 麦[ば]</juk><b><kun> 屋[や]</kun></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> そ[蕎]</juk><juk> ば[麦]</juk><b><kun> や[屋]</kun></b>"
+        ),
+        expected_furigana_with_tags_merged="<juk> 蕎麦[そば]</juk><b><kun> 屋[や]</kun></b>",
+        expected_furikanji_with_tags_merged="<juk> そば[蕎麦]</juk><b><kun> や[屋]</kun></b>",
     )
     test(
         test_name="jukujikun test 風邪 matched",
@@ -1829,16 +1838,16 @@ def main():
         kanji="揶",
         sentence="揶揄[からか]う",
         expected_kana_only="<b>から</b>かう",
-        expected_kana_only_with_tags_split="<b><juk>から</juk></b><juk>か</juk>う",
-        expected_kana_only_with_tags_merged="<b><juk>から</juk></b><juk>か</juk>う",
+        expected_kana_only_with_tags_split="<b><juk>から</juk></b><juk>か</juk><oku>う</oku>",
+        expected_kana_only_with_tags_merged="<b><juk>から</juk></b><juk>か</juk><oku>う</oku>",
     )
     test(
         test_name="multi-kanji jukujikun verb reading matched right",
         kanji="揄",
         sentence="揶揄[からか]う",
-        expected_kana_only="から<b>か</b>う",
-        expected_kana_only_with_tags_split="<juk>から</juk><b><juk>か</juk></b>う",
-        expected_kana_only_with_tags_merged="<juk>から</juk><b><juk>か</juk></b>う",
+        expected_kana_only="から<b>かう</b>",
+        expected_kana_only_with_tags_split="<juk>から</juk><b><juk>か</juk><oku>う</oku></b>",
+        expected_kana_only_with_tags_merged="<juk>から</juk><b><juk>か</juk><oku>う</oku></b>",
     )
     test(
         test_name="Should be able to handle vowel change /1",
@@ -1861,7 +1870,6 @@ def main():
         # and then determine where the okurigana ends
         sentence="逆上[のぼ]せる",
         # Only dictionary forms can be handled for now
-        assume_dictionary_form=True,
         expected_kana_only="<b>の</b>ぼせる",
         expected_furigana="<b> 逆[の]</b> 上[ぼ]せる",
         expected_furikanji="<b> の[逆]</b> ぼ[上]せる",
@@ -1876,10 +1884,7 @@ def main():
         test_name="Should be able to get inflected okurigana of jukujikun reading",
         kanji="逆",
         sentence="逆上[のぼ]せたので",
-        # Trying to get the okurigana of the inflected form from jukujikun is too hard
-        # for now, ignore
-        ignore_fail=True,
-        expected_kana_only="<b>の</b>せたので",
+        expected_kana_only="<b>の</b>ぼせたので",
         expected_furigana="<b> 逆[の]</b> 上[ぼ]せたので",
         expected_furikanji="<b> の[逆]</b> ぼ[上]せたので",
         expected_kana_only_with_tags_split="<b><juk>の</juk></b><juk>ぼ</juk><oku>せた</oku>ので",
@@ -1889,7 +1894,7 @@ def main():
         expected_furikanji_with_tags_split=(
             "<b><juk> の[逆]</juk></b><juk> ぼ[上]</juk><oku>せた</oku>ので"
         ),
-        expected_kana_only_with_tags_merged="<b><juk>の</juk></b><juk>ぼせた</juk>ので",
+        expected_kana_only_with_tags_merged="<b><juk>の</juk></b><juk>ぼ</juk><oku>せた</oku>ので",
         expected_furigana_with_tags_merged=(
             "<b><juk> 逆[の]</juk></b><juk> 上[ぼ]</juk><oku>せた</oku>ので"
         ),

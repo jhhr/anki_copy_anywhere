@@ -23,6 +23,9 @@ from .jpn_text_processing.okurigana_mix_cleaning_replacer import (
     OKURIGANA_MIX_CLEANING_REC,
     okurigana_mix_cleaning_replacer,
 )
+from .jpn_text_processing.get_conjugated_okuri_with_spacey import (
+    get_conjugated_okuri_with_spacey,
+)
 from .jpn_text_processing.regex import (
     KANJI_REC,
     DOUBLE_KANJI_REC,
@@ -232,7 +235,7 @@ def reconstruct_furigana(
     # Keep okuri out of the highlight if it is not supposed to be included
     okuri_out_of_highlight = (
         not with_tags_def.include_suru_okuri
-        and highlight_match_type == "onyomi"
+        and highlight_match_type in ["onyomi", "jukujikun"]
         and (len(f"{left_word}{middle_word}{right_word}") > 1 or okurigana == "する")
     )
     if not edge:
@@ -657,6 +660,7 @@ def process_jukujikun_reading(
     highlight_args: HighlightArgs,
     word_data: WordData,
     with_tags_def: WithTagsDef,
+    process_okurigana: bool,
     logger: Logger = Logger("error"),
 ) -> ReadingProcessResult:
 
@@ -683,11 +687,31 @@ def process_jukujikun_reading(
             "",
             maybe_okuri,
         )
+    match_result = handle_jukujikun_case(word_data, highlight_args, with_tags_def.with_tags)
 
+    okurigana = ""
+    rest_kana = maybe_okuri
+    if process_okurigana:
+        # Go through each possible part_of_speec and check if the okurigana matches
+        okuri_result = get_conjugated_okuri_with_spacey(
+            kanji=highlight_args.get("full_word"),
+            kanji_reading=highlight_args.get("full_furigana"),
+            maybe_okuri=maybe_okuri,
+            logger=logger,
+        )
+        if okuri_result.result != "no_okuri":
+            okurigana = okuri_result.okurigana
+            rest_kana = okuri_result.rest_kana
+            logger.debug(
+                f"process_jukujikun_reading - okurigana found: {okurigana}, rest_kana: {rest_kana},"
+                f" result type: {okuri_result.result}"
+            )
+        else:
+            logger.debug("process_jukujikun_reading - no okurigana match found")
     return ReadingProcessResult(
-        handle_jukujikun_case(word_data, highlight_args, with_tags_def.with_tags),
-        maybe_okuri if with_tags_def.assume_dictionary_form else "",
-        maybe_okuri if not with_tags_def.assume_dictionary_form else "",
+        match_result,
+        okurigana,
+        rest_kana,
     )
 
 
@@ -1129,13 +1153,13 @@ def check_kunyomi_readings(
     # e.g. 曳舟--曳き舟, 取調--取り調べ, 書留--書き留め
     okuri_included_results: list[YomiMatchResult] = []
     for kunyomi_stem, kunyomi_dict_form_okuri, full_reading in kunyomi_stem_and_okuris:
-        logger.debug(
-            f"check_kunyomi_readings - noun form: {kunyomi_stem}, kunyomi_dict_form_okuri:"
-            f" {kunyomi_dict_form_okuri}\nokurigana: {okurigana}, kanji_to_match:"
-            f" {kanji_to_match}"
-        )
         noun_form_okuri = get_verb_noun_form_okuri(
             kunyomi_dict_form_okuri, kanji_to_match, kunyomi_reading
+        )
+        logger.debug(
+            f"check_kunyomi_readings - kunyomi_stem: {kunyomi_stem}, kunyomi_dict_form_okuri:"
+            f" {kunyomi_dict_form_okuri}\nokurigana: {okurigana}, kanji_to_match:"
+            f" {kanji_to_match}, noun_form_okuri: {noun_form_okuri}"
         )
         if furigana_is_katakana:
             noun_form_okuri = to_katakana(noun_form_okuri)
@@ -1300,7 +1324,7 @@ def handle_furigana_doubling(
 
 def handle_jukujikun_case(
     word_data: WordData,
-    highlightArgs: HighlightArgs,
+    highlight_args: HighlightArgs,
     wrap_readings_with_tags: bool,
     logger: Logger = Logger("error"),
 ) -> YomiMatchResult:
@@ -1310,7 +1334,7 @@ def handle_jukujikun_case(
     the kanji position
     :return: Result dict with the modified furigana
     """
-    kanji_to_highlight = highlightArgs.get("kanji_to_highlight", "")
+    kanji_to_highlight = highlight_args.get("kanji_to_highlight", "")
     kanji_count = word_data.get("kanji_count", 0)
     word = word_data.get("word", "")
     try:
@@ -1468,6 +1492,7 @@ def handle_whole_word_case(
             highlight_args,
             word_data,
             with_tags_def=with_tags_def,
+            process_okurigana=True,
             logger=logger,
         )
     result, okurigana_to_highlight, rest_kana = res
@@ -1503,8 +1528,8 @@ def handle_whole_word_case(
 
 def handle_partial_word_case(
     highlight_args: HighlightArgs,
-    word: str,
-    furigana: str,
+    cur_word: str,
+    cur_furigana: str,
     okurigana: str,
     with_tags_def: WithTagsDef,
     logger: Logger = Logger("error"),
@@ -1517,17 +1542,17 @@ def handle_partial_word_case(
     """
     kanji_to_match = highlight_args.get("kanji_to_match", "")
     logger.debug(
-        f"handle_partial_word_case - kanji_to_match: {kanji_to_match}, word: {word},"
-        f" furigana: {furigana}, okurigana: {okurigana}"
+        f"handle_partial_word_case - kanji_to_match: {kanji_to_match}, word: {cur_word},"
+        f" furigana: {cur_furigana}, okurigana: {okurigana}"
     )
 
-    kanji_pos = word.find(kanji_to_match)
+    kanji_pos = cur_word.find(kanji_to_match)
     if kanji_pos == -1:
         # No match found, return the furigana as-is
         return {
             "matched_furigana": "",
             "match_type": "none",
-            "rest_furigana": furigana,
+            "rest_furigana": cur_furigana,
             "okurigana": okurigana,
             "rest_kana": "",
             "edge": "whole",
@@ -1542,43 +1567,43 @@ def handle_partial_word_case(
         return {
             "matched_furigana": "",
             "match_type": "none",
-            "rest_furigana": furigana,
+            "rest_furigana": cur_furigana,
             "okurigana": okurigana,
             "rest_kana": "",
             "edge": "whole",
         }
 
-    if edge == "whole" and len(word) > 1 and "々" not in word:
+    if edge == "whole" and len(cur_word) > 1 and "々" not in cur_word:
         # If the edge is whole but the word is longer than 1 kanji, treat it as a partial match
         if kanji_pos == 0:
             edge = "left"
-        elif kanji_pos == len(word) - 1:
+        elif kanji_pos == len(cur_word) - 1:
             edge = "right"
         else:
             edge = "middle"
 
     word_data: WordData = {
         "kanji_pos": kanji_pos,
-        "kanji_count": len(word),
-        "furigana": furigana,
-        "furigana_is_katakana": KATAKANA_REC.match(furigana) is not None,
+        "kanji_count": len(cur_word),
+        "furigana": cur_furigana,
+        "furigana_is_katakana": KATAKANA_REC.match(cur_furigana) is not None,
         "edge": edge,
-        "word": word,
+        "word": cur_word,
         "okurigana": okurigana,
     }
 
     logger.debug(
-        f"handle_partial_word_case - word: {word}, furigana: {furigana}, okurigana: {okurigana},"
-        f" kanji_to_match: {kanji_to_match}, kanji_data: {all_kanji_data.get(kanji_to_match)},"
-        f" edge: {edge}"
+        f"handle_partial_word_case - word: {cur_word}, furigana: {cur_furigana}, okurigana:"
+        f" {okurigana}, kanji_to_match: {kanji_to_match}, kanji_data:"
+        f" {all_kanji_data.get(kanji_to_match)}, edge: {edge}"
     )
 
     # Handle cases that should be a jukujikun reading but the first kanji has a matching kunyomi
     if (
         # All these cases are 2-kanji long
-        len(word) >= 2
-        and (juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(word[:2]))
-        and furigana.startswith(juku_reading)
+        len(cur_word) >= 2
+        and (juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(cur_word[:2]))
+        and cur_furigana.startswith(juku_reading)
     ):
         # Force these into the jukujikun processing
         return None
@@ -1606,7 +1631,7 @@ def handle_partial_word_case(
     }
 
     matched_furigana = main_result["text"]
-    rest_furigana = furigana[len(matched_furigana) :]
+    rest_furigana = cur_furigana[len(matched_furigana) :]
     if okurigana_to_highlight:
         furi_okuri_result["matched_furigana"] = matched_furigana
         furi_okuri_result["rest_furigana"] = rest_furigana
@@ -1659,40 +1684,41 @@ def kana_highlight(
         :return: string, the modified furigana
         """
         nonlocal kanji_to_highlight
-        word = match.group(1)
-        furigana = match.group(2)
+        full_word = match.group(1)
+        full_furigana = match.group(2)
         okurigana = match.group(3)
         logger.debug(
-            f"furigana_replacer - word: {word}, furigana: {furigana}, okurigana: {okurigana}"
+            f"furigana_replacer - word: {full_word}, furigana: {full_furigana}, okurigana:"
+            f" {okurigana}"
         )
         # Replace doubled kanji with the repeater character
-        word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", word)
-        logger.debug(f"furigana_replacer - word after double kanji: {word}")
+        full_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
+        logger.debug(f"furigana_replacer - word after double kanji: {full_word}")
 
-        if furigana.startswith("sound:"):
+        if full_furigana.startswith("sound:"):
             # This was something like 漢字[sound:...], we shouldn't modify the text in the brackets
             # as it'd break the audio tag. But we know the text to the right is kanji
             # (what is it doing there next to a sound tag?) so we'll just leave it out anyway
-            return furigana + okurigana
+            return full_furigana + okurigana
 
         highlight_kanji_is_whole_word = kanji_to_highlight is not None and (
-            word == kanji_to_highlight
-            or f"{kanji_to_highlight}々" == word
-            or kanji_to_highlight * 2 == word
+            full_word == kanji_to_highlight
+            or f"{kanji_to_highlight}々" == full_word
+            or kanji_to_highlight * 2 == full_word
         )
-        word_is_repeated_kanji = len(word) == 2 and word[1] == "々"
+        word_is_repeated_kanji = len(full_word) == 2 and full_word[1] == "々"
         is_whole_word_case = highlight_kanji_is_whole_word or word_is_repeated_kanji
 
         # Whole word case is easy, just highlight the whole furigana
         if is_whole_word_case:
-            kanji_to_match = kanji_to_highlight if highlight_kanji_is_whole_word else word[0]
+            kanji_to_match = kanji_to_highlight if highlight_kanji_is_whole_word else full_word[0]
             kanji_data = all_kanji_data.get(kanji_to_match)
             if not kanji_data:
                 logger.error(
                     f"Error in kana_highlight[]: kanji '{kanji_to_match}' not found in"
                     " all_kanji_data"
                 )
-                return furigana + okurigana
+                return full_furigana + okurigana
             highlight_args: HighlightArgs = {
                 "kanji_to_highlight": kanji_to_highlight,
                 "kanji_to_match": kanji_to_match,
@@ -1700,11 +1726,13 @@ def kana_highlight(
                 "kunyomi": kanji_data.get("kunyomi", ""),
                 "add_highlight": True,
                 "edge": "whole",
+                "full_word": full_word,
+                "full_furigana": full_furigana,
             }
             final_result = handle_whole_word_case(
                 highlight_args,
-                word,
-                furigana,
+                full_word,
+                full_furigana,
                 okurigana,
                 with_tags_def,
                 logger,
@@ -1713,10 +1741,11 @@ def kana_highlight(
                 final_result,
                 with_tags_def,
                 reconstruct_type=return_type,
+                logger=logger,
             )
 
-        cur_furigana_section = furigana
-        cur_word = word
+        cur_furigana_section = full_furigana
+        cur_word = full_word
         cur_edge: Edge = "left"
         is_last_kanji = False
         kanji_to_highlight_passed = False
@@ -1739,7 +1768,7 @@ def kana_highlight(
         replace_num_kanji = None
         num_in_kanji_to_replace = None
         last_replaced_kanji_index = None
-        furigana_is_katakana = KATAKANA_REC.match(furigana) is not None
+        furigana_is_katakana = KATAKANA_REC.match(full_furigana) is not None
 
         def process_kanji_in_word(
             kanji: str,
@@ -1781,7 +1810,7 @@ def kana_highlight(
                     f"Error in kana_highlight[]: main word loop, kanji '{kanji}' not found in"
                     " all_kanji_data"
                 )
-                return furigana + okurigana
+                return full_furigana + okurigana
             is_kanji_to_highlight = kanji == kanji_to_highlight
             highlight_args = {
                 "kanji_to_highlight": kanji_to_highlight,
@@ -1793,6 +1822,8 @@ def kana_highlight(
                 # the edge is "left" until the last kanji. Since the last kanji is a single kanji
                 # the edge is "whole" and not "right"
                 "edge": "left" if not is_last_kanji else "whole",
+                "full_word": full_word,
+                "full_furigana": full_furigana,
             }
             partial_result = handle_partial_word_case(
                 highlight_args,
@@ -1915,9 +1946,9 @@ def kana_highlight(
 
         # For the partial case, we need to split the furigana for each kanji using the kanji_data
         # for each one, highlight the kanji_to_match and reconstruct the furigana
-        for index, kanji in enumerate(word):
+        for index, kanji in enumerate(full_word):
             logger.debug(
-                f"main word loop - kanji: {kanji}, index: {index}, word: {word},"
+                f"main word loop - kanji: {kanji}, index: {index}, word: {full_word},"
                 f" cur_furigana_section: {cur_furigana_section}, cur_word: {cur_word}"
             )
             if kanji == "々":
@@ -1940,9 +1971,9 @@ def kana_highlight(
             elif last_replaced_kanji_index is not None and index > last_replaced_kanji_index:
                 last_replaced_kanji_index = None
 
-            is_last_kanji = index == len(word) - 1
+            is_last_kanji = index == len(full_word) - 1
 
-            next_kanji = word[index + 1] if not is_last_kanji else ""
+            next_kanji = full_word[index + 1] if not is_last_kanji else ""
             # Get all next characters that are numbers that ought to be processed as kanji
             number_kanji = []
             num_index = index
@@ -1951,8 +1982,8 @@ def kana_highlight(
                 last_replaced_kanji_index = num_index
                 number_kanji.append(num_kanji)
                 num_index += 1
-                if num_index < len(word):
-                    num_kanji = word[num_index]
+                if num_index < len(full_word):
+                    num_kanji = full_word[num_index]
                 else:
                     num_kanji = ""
 
@@ -2033,11 +2064,11 @@ def kana_highlight(
 
                     continue
 
-            kanji_pos = word.find(kanji)
+            kanji_pos = full_word.find(kanji)
             if kanji_pos == 0 and len(cur_word) > 1:
                 # If the kanji is the first one in the word, the edge is "left"
                 cur_edge = "left"
-            should_continue = process_kanji_in_word(kanji, index, word, cur_edge)
+            should_continue = process_kanji_in_word(kanji, index, full_word, cur_edge)
             if not should_continue:
                 logger.debug("process_kanji_in_word - breaking out of loop")
                 break
@@ -2067,7 +2098,7 @@ def kana_highlight(
             # The edge is reversed now, so the first kanji is the right edge
             is_first_kanji = i == juku_word_length - 1
             is_last_kanji = i == 0
-            original_word_index = len(word) - i - 1
+            original_word_index = len(full_word) - i - 1
             # Last kanji is where we left off with the previous loop, so we can stop there
             prev_kanji = juku_word_reversed[i - 1] if i > 0 else ""
             prev_kanji_is_repeater_and_last = prev_kanji == "々" and i == 1
@@ -2079,7 +2110,7 @@ def kana_highlight(
                     juku_word_pos_to_highlight = "right" if juku_word_length == 2 else "middle"
                     logger.debug(
                         "reversing whole word is kanji + repeater - juku_word_start:"
-                        f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {word}"
+                        f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {full_word}"
                         f" juku_word_start_edge: {juku_word_start_edge}"
                     )
                 continue
@@ -2096,7 +2127,7 @@ def kana_highlight(
                     f"Error in kana_highlight[]: reversing, kanji '{kanji}' not found in"
                     " all_kanji_data"
                 )
-                return furigana + okurigana
+                return full_furigana + okurigana
             is_kanji_to_highlight = kanji == kanji_to_highlight
             highlight_args = {
                 "kanji_to_highlight": kanji_to_highlight,
@@ -2106,6 +2137,8 @@ def kana_highlight(
                 "add_highlight": is_kanji_to_highlight,
                 # Right edge now, as we're going backwards
                 "edge": "right" if not is_first_kanji else "whole",
+                "full_word": full_word,
+                "full_furigana": full_furigana,
             }
             cur_word = kanji
             partial_result = handle_partial_word_case(
@@ -2133,7 +2166,7 @@ def kana_highlight(
                     juku_word_start = juku_word_end - 1
                     logger.debug(
                         "reversing partial, prev_kanji was repeater - juku_word_start:"
-                        f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {word}"
+                        f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {full_word}"
                     )
                 break
             matched_furigana = partial_result["matched_furigana"]
@@ -2225,8 +2258,8 @@ def kana_highlight(
             f" {juku_word_end}, juku_furigana: {juku_furigana}"
         )
         if juku_word_start is not None and juku_word_end is not None and juku_furigana is not None:
-            juku_word = word[juku_word_start : juku_word_end + 1]
-            juku_at_word_right_edge = juku_word_end == len(word) - 1
+            juku_word = full_word[juku_word_start : juku_word_end + 1]
+            juku_at_word_right_edge = juku_word_end == len(full_word) - 1
             juku_at_word_left_edge = juku_word_start == 0
             logger.debug(
                 f"start processing reversed handle_jukujikun_case - juku_word: {juku_word},"
@@ -2251,11 +2284,14 @@ def kana_highlight(
                 "kunyomi": "",
                 "add_highlight": True,
                 "edge": "whole",
+                "full_word": full_word,
+                "full_furigana": full_furigana,
             }
             juku_result, juku_okuri, juku_rest_kana = process_jukujikun_reading(
                 juku_highlight_args,
                 word_data,
                 with_tags_def=with_tags_def,
+                process_okurigana=is_last_kanji,
                 logger=logger,
             )
             logger.debug(
