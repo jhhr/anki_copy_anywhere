@@ -1488,16 +1488,18 @@ def handle_whole_word_case(
     )
 
     kanji_to_highlight = highlight_args.get("kanji_to_highlight", None)
+    word = word_data.get("word", "")
+    do_highlight = kanji_to_highlight and kanji_to_highlight in word
     if result["type"] == "onyomi":
         onyomi_kana = to_katakana(furigana) if with_tags_def.onyomi_to_katakana else furigana
         # For onyomi matches the furigana may be be in katakana
         if with_tags_def.with_tags:
             onyomi_kana = f"<on>{onyomi_kana}</on>"
-        final_furigana = f"<b>{onyomi_kana}</b>" if kanji_to_highlight else onyomi_kana
+        final_furigana = f"<b>{onyomi_kana}</b>" if do_highlight else onyomi_kana
     elif result["type"] == "kunyomi":
         if with_tags_def.with_tags:
             furigana = f"<kun>{furigana}</kun>"
-        final_furigana = f"<b>{furigana}</b>" if kanji_to_highlight else furigana
+        final_furigana = f"<b>{furigana}</b>" if do_highlight else furigana
     elif result["type"] == "jukujikun":
         final_furigana = result["text"]
     return {

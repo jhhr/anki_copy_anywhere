@@ -319,6 +319,20 @@ def main():
         expected_furikanji_with_tags_merged="<kun> ゆめゆめ[努々]</kun>",
     )
     test(
+        test_name="Repeater word with another kanji as highlight",
+        kanji="彼",
+        sentence="我々[われわれ]",
+        expected_kana_only="われわれ",
+        expected_furigana=" 我々[われわれ]",
+        expected_furikanji=" われわれ[我々]",
+        expected_kana_only_with_tags_split="<kun>われわれ</kun>",
+        expected_furigana_with_tags_split="<kun> 我々[われわれ]</kun>",
+        expected_furikanji_with_tags_split="<kun> われわれ[我々]</kun>",
+        expected_kana_only_with_tags_merged="<kun>われわれ</kun>",
+        expected_furigana_with_tags_merged="<kun> 我々[われわれ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> われわれ[我々]</kun>",
+    )
+    test(
         test_name="Jukujikun repeater word with no repeating furigana with no highlight",
         kanji="",
         sentence="<gikun> 清々[すっきり]する</gikun>",
