@@ -48,6 +48,7 @@ class RegexProcess(TypedDict):
     regex_separator: str
     replacement_separator: str
     flags: Optional[str]
+    use_all_notes: bool
 
 
 def get_regex_process_label(regex_process):

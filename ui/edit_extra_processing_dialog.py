@@ -38,7 +38,7 @@ from .required_text_input import RequiredLineEdit
 
 from .list_input import ListInputWidget
 from .required_combobox import RequiredCombobox
-from ..configuration import CopyDefinition
+from ..configuration import COPY_MODE_ACROSS_NOTES, CopyDefinition
 from .multi_combo_box import MultiComboBox
 
 if qtmajor > 5:
@@ -205,6 +205,28 @@ class RegexProcessDialog(QDialog):
         self.top_label = QLabel(self.description)
         self.form.addRow(self.top_label)
 
+        self.use_all_notes_checkbox = QCheckBox(
+            "Use all notes from query (regex and replacement gets repeated for each note)"
+        )
+        self.use_all_notes_checkbox.setToolTip("""
+        If checked, the regex and replacement is constructed per note in the query, concatenating
+        the results together. That is, for a regex "XYZ" and 3 queried notes you get "XYZXYZXYZ"
+        where within each "XYZ" the values from each note are used.
+        <br />
+        This is only needed in destination to sources mode, if you are querying more than one note,
+        and then only sometimes.
+        """)
+        self.form.addRow(self.use_all_notes_checkbox)
+        # Only show this checkbox if this is not a variable extra processing and destination to sources mode
+        if (
+            not self.is_variable_extra_processing
+            and self.state.copy_mode == COPY_MODE_ACROSS_NOTES
+            and self.state.copy_direction == DIRECTION_DESTINATION_TO_SOURCES
+        ):
+            self.use_all_notes_checkbox.setVisible(True)
+        else:
+            self.use_all_notes_checkbox.setVisible(False)
+
         self.regex_field_layout = InterpolatedTextEditLayout(
             label="Regex",
             is_required=True,
@@ -273,6 +295,12 @@ class RegexProcessDialog(QDialog):
             flags = self.process["flags"]
             if flags:
                 self.flags_field.setCurrentText(flags)
+        with suppress(KeyError):
+            self.regex_separator_edit.setText(self.process.get("regex_separator", ""))
+        with suppress(KeyError):
+            self.replacement_separator_edit.setText(self.process.get("replacement_separator", ""))
+        with suppress(KeyError):
+            self.use_all_notes_checkbox.setChecked(self.process.get("use_all_notes", False))
 
         # Add Ok and Cancel buttons as QPushButtons
         self.ok_button = QPushButton("OK")
@@ -330,6 +358,7 @@ class RegexProcessDialog(QDialog):
             "regex_separator": self.regex_separator_edit.text(),
             "replacement_separator": self.replacement_separator_edit.text(),
             "flags": self.flags_field.currentText(),
+            "use_all_notes": self.use_all_notes_checkbox.isChecked(),
         }
         self.accept()
 

@@ -643,10 +643,11 @@ def apply_process_chain(
                 )
 
             elif is_regex_process(process):
+                use_all_notes = process.get("use_all_notes", False)
                 interpolated_regex = get_field_values_from_notes(
                     copy_from_text=process.get("regex", ""),
-                    notes=notes,
-                    dest_note=dest_note,
+                    notes=notes if use_all_notes and len(notes) > 1 else [dest_note],
+                    dest_note=dest_note if use_all_notes and len(notes) > 1 else None,
                     variable_values_dict=variable_values_dict,
                     select_card_separator=process.get("regex_separator", ""),
                     multiple_note_types=multiple_note_types,
@@ -656,8 +657,8 @@ def apply_process_chain(
 
                 interpolated_replacement = get_field_values_from_notes(
                     copy_from_text=process.get("replacement", ""),
-                    notes=notes,
-                    dest_note=dest_note,
+                    notes=notes if use_all_notes and len(notes) > 1 else [dest_note],
+                    dest_note=dest_note if use_all_notes and len(notes) > 1 else None,
                     variable_values_dict=variable_values_dict,
                     select_card_separator=process.get("replacement_separator", ""),
                     multiple_note_types=multiple_note_types,
