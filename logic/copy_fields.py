@@ -776,6 +776,7 @@ def copy_for_single_trigger_note(
             logger.error("Error in copy fields: missing across mode direction value")
             return False
         target_notes = get_across_target_notes(
+            copy_definition=copy_definition,
             copy_from_cards_query=copy_from_cards_query or "",
             trigger_note=trigger_note,
             deck_id=deck_id,
@@ -1049,6 +1050,7 @@ def sort_by_field_value(note: Note, sort_by_field) -> Any:
 
 
 def get_across_target_notes(
+    copy_definition: CopyDefinition,
     copy_from_cards_query: str,
     trigger_note: Note,
     extra_state: dict,
@@ -1162,10 +1164,13 @@ def get_across_target_notes(
         )
 
     if len(card_ids) == 0:
-        logger.error(
-            "Error in copy fields: Did not find any cards with"
-            f" copy_from_cards_query='{interpolated_cards_query}'"
-        )
+        if copy_definition.get("show_error_if_none_found", False):
+            logger.error(
+                "Error in copy fields: Did not find any cards with"
+                f" copy_from_cards_query='{interpolated_cards_query}'"
+            )
+        else:
+            logger.debug(f'No cards found with copy_from_cards_query="{interpolated_cards_query}",')
         return []
 
     has_sort_by_field = sort_by_field and sort_by_field != "-"

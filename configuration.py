@@ -241,6 +241,7 @@ class CopyDefinition(TypedDict):
     select_card_by: SelectCardByType
     select_card_count: Optional[str]
     select_card_separator: Optional[str]
+    show_error_if_none_found: Optional[bool]
 
 
 def compare_versions(version1: str, version2: str) -> int:

@@ -337,6 +337,10 @@ class QueryTabWidget(QWidget):
         self.card_select_separator = RequiredLineEdit()
         self.card_select_separator.setText(", ")
         query_form.addRow("<h5>Separator for multiple values</h5>", self.card_select_separator)
+
+        self.show_error_for_none_found = QCheckBox("Show error, if no notes found for the query")
+        query_form.addRow(self.show_error_for_none_found)
+
         spacer = QSpacerItem(100, 40, QSizePolicyMinimum, QSizePolicyExpanding)
         query_layout.addSpacerItem(spacer)
         # Set the current text in the combo boxes to what we had in memory in the configuration
@@ -352,6 +356,10 @@ class QueryTabWidget(QWidget):
                 self.card_select_count.setText(copy_definition["select_card_count"])
             with suppress(KeyError):
                 self.card_select_separator.setText(copy_definition["select_card_separator"])
+            with suppress(KeyError):
+                self.show_error_for_none_found.setChecked(
+                    copy_definition.get("show_error_if_none_found", False)
+                )
 
     # If card_select_count is > 1, separator is required, otherwise it's ok to be empty
     def on_card_select_count_changed(self, text: str):
@@ -749,6 +757,12 @@ class AcrossNotesCopyEditor(QWidget):
         self.create_and_set_query_editor()
         return self.query_editor.card_select_separator
 
+    @property
+    def show_error_for_none_found(self):
+        """Lazy access to show error for none found checkbox"""
+        self.create_and_set_query_editor()
+        return self.query_editor.show_error_for_none_found
+
 
 class WithinNoteCopyEditor(QWidget):
     def __init__(
@@ -977,6 +991,9 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "select_card_separator": self.across_notes_editor_tab.card_select_separator.text(),
                 "copy_mode": COPY_MODE_ACROSS_NOTES,
                 "across_mode_direction": self.across_notes_editor_tab.get_selected_direction(),
+                "show_error_if_none_found": (
+                    self.across_notes_editor_tab.show_error_for_none_found.isChecked()
+                ),
             }
             return across_copy_definition
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
@@ -1000,6 +1017,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "select_card_by": "None",
                 "select_card_count": None,
                 "select_card_separator": None,
+                "show_error_if_none_found": False,
             }
             return within_copy_definition
         return None
