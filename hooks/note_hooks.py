@@ -128,6 +128,11 @@ def run_copy_fields_on_add(note: Note, deck_id: int):
     # Other altenatives would be to add a flag to new notes and run the deferred copy definitions
     # on syncing but that seems less user-friendly.
     undo_entry = mw.col.add_custom_undo_entry(undo_text)
+    # Copy definitions that perform queries may still modify the added note and add it to
+    # copied_into_notes, so we need to remove the new note from copied_into_notes so as to
+    # not cause an error with mw.col_update_notes
+    copied_into_notes = [note for note in copied_into_notes if note.id != 0]
+
     mw.col.update_notes(copied_into_notes)
     mw.col.merge_undo_entries(undo_entry)
 
