@@ -2397,6 +2397,17 @@ def main():
         expected_furikanji_with_tags_split="<b><kun> こころ[試]</kun><oku>みる</oku></b>",
     )
     test(
+        test_name="Verb okurigana test /14",
+        kanji="",
+        sentence="伸[の]ばす",
+        expected_kana_only="のばす",
+        expected_furigana=" 伸[の]ばす",
+        expected_furikanji=" の[伸]ばす",
+        expected_kana_only_with_tags_split="<kun>の</kun><oku>ばす</oku>",
+        expected_furigana_with_tags_split="<kun> 伸[の]</kun><oku>ばす</oku>",
+        expected_furikanji_with_tags_split="<kun> の[伸]</kun><oku>ばす</oku>",
+    )
+    test(
         test_name="Adjective okurigana test 1/",
         kanji="悲",
         sentence="彼[かれ]は 悲[かな]しくすぎるので、 悲[かな]しみの 悲[かな]しさを 悲[かな]しんでいる。",
