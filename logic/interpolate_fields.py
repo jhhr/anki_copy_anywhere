@@ -333,14 +333,17 @@ def get_card_values_dict_for_note(
     """
     card_values = {}
 
-    # cards will be empty for a new note being added so we can't return anything
-    cards = note.cards()
-    if not cards:
-        note_type = note.note_type()
-        if note_type:
-            for card_template in note_type["tmpls"]:
-                # Make a fake card to get the default values
-                card_values[card_template["name"]] = get_value_for_card(Card(mw.col), note)
+    current_cards = note.cards()
+    note_type = note.note_type()
+    all_card_templates = note_type["tmpls"] if note_type else []
+    # all cards will be empty for a new note being added
+    # and some cards may be missing, if the template is conditional
+    template_names_with_current_card = {card.template()["name"] for card in current_cards}
+    # For each card type that doesn't have a card yet, add default values
+    for card_template in all_card_templates:
+        if card_template["name"] not in template_names_with_current_card:
+            # Make a fake card to get the default values
+            card_values[card_template["name"]] = get_value_for_card(Card(mw.col), note)
     # Add values as a dict by card_type_name
     for card in note.cards():
         card_type_name = card.template()["name"]
