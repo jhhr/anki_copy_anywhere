@@ -5,7 +5,7 @@ from typing_extensions import TypeGuard
 
 from aqt import mw
 
-from .logic.kana_highlight import FuriReconstruct
+from .logic.jpn_text_processing.kana_highlight import FuriReconstruct
 from .logic.interpolate_fields import (
     intr_format,
     TARGET_NOTES_COUNT,

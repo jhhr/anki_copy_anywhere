@@ -2,31 +2,31 @@ from functools import partial
 import re
 from typing import Literal, Optional, Tuple, NamedTuple, cast, Union
 
-from .jpn_text_processing.number_to_kanji import NUMBER_TO_KANJI, number_to_kanji
-from .jpn_text_processing.kana_conv import to_katakana, to_hiragana
-from .jpn_text_processing.check_okurigana_for_inflection import (
+from .number_to_kanji import NUMBER_TO_KANJI, number_to_kanji
+from .kana_conv import to_katakana, to_hiragana
+from .check_okurigana_for_inflection import (
     check_okurigana_for_inflection,
 )
-from .jpn_text_processing.starts_with_okurigana_conjugation import (
+from .starts_with_okurigana_conjugation import (
     OkuriResults,
 )
-from .jpn_text_processing.okurigana_dict import (
+from .okurigana_dict import (
     ONYOMI_GODAN_SU_FIRST_KANA,
 )
 
-from .jpn_text_processing.construct_wrapped_furi_word import (
+from .construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
     FuriReconstruct,
 )
-from .jpn_text_processing.okurigana_dict import get_verb_noun_form_okuri
-from .jpn_text_processing.okurigana_mix_cleaning_replacer import (
+from .okurigana_dict import get_verb_noun_form_okuri
+from .okurigana_mix_cleaning_replacer import (
     OKURIGANA_MIX_CLEANING_REC,
     okurigana_mix_cleaning_replacer,
 )
-from .jpn_text_processing.get_conjugated_okuri_with_mecab import (
+from .get_conjugated_okuri_with_mecab import (
     get_conjugated_okuri_with_mecab,
 )
-from .jpn_text_processing.regex import (
+from .regex import (
     KANJI_REC,
     DOUBLE_KANJI_REC,
     KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
@@ -36,7 +36,7 @@ from .jpn_text_processing.regex import (
     RENDAKU_CONVERSION_DICT_HIRAGANA,
     RENDAKU_CONVERSION_DICT_KATAKANA,
 )
-from .jpn_text_processing.types import (
+from .types import (
     WordData,
     HighlightArgs,
     Edge,
@@ -46,10 +46,10 @@ from .jpn_text_processing.types import (
     PartialResult,
     FinalResult,
 )
-from .jpn_text_processing.all_kanji_data import all_kanji_data
+from .all_kanji_data import all_kanji_data
 
 try:
-    from ..utils.logger import Logger
+    from ...utils.logger import Logger
 except ImportError:
     from utils.logger import Logger  # type: ignore[no-redef]
 

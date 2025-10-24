@@ -2,7 +2,7 @@ from typing import Optional
 
 from anki.notes import Note
 
-from .kana_highlight import (
+from .jpn_text_processing.kana_highlight import (
     kana_filter,
     kana_highlight,
 )

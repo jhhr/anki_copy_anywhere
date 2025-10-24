@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 from .kana_highlight import kana_highlight, FuriReconstruct, WithTagsDef
 
 try:
-    from ..utils.logger import Logger
+    from ...utils.logger import Logger
 except ImportError:
     from utils.logger import Logger  # type: ignore[no-redef]
 
@@ -2386,7 +2386,7 @@ def main():
         ),
     )
     test(
-        test_name="Verb okurigana test /13",
+        test_name="Verb okurigana test 13/",
         kanji="試",
         sentence="試[こころ]みる",
         expected_kana_only="<b>こころみる</b>",
@@ -2397,7 +2397,7 @@ def main():
         expected_furikanji_with_tags_split="<b><kun> こころ[試]</kun><oku>みる</oku></b>",
     )
     test(
-        test_name="Verb okurigana test /14",
+        test_name="Verb okurigana test 14/",
         kanji="",
         sentence="伸[の]ばす",
         expected_kana_only="のばす",

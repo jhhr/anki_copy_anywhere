@@ -72,7 +72,7 @@ from ..configuration import (
     DIRECTION_DESTINATION_TO_SOURCES,
 )
 
-from ..logic.kana_highlight import FuriReconstruct
+from ..logic.jpn_text_processing.kana_highlight import FuriReconstruct
 
 
 class ClickableLabel(QLabel):
