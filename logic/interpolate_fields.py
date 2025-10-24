@@ -69,6 +69,8 @@ CARD_TYPE = "__Card_Type"
 CARD_LAST_EASES = f"__Card_Last_Reps{ARG_SEPARATOR}"
 CARD_LAST_FACTORS = f"__Card_Last_Factors{ARG_SEPARATOR}"
 CARD_LAST_IVLS = f"__Card_Last_Intervals{ARG_SEPARATOR}"
+CARD_LAST_REV_TYPES = f"__Card_Last_Review_Types{ARG_SEPARATOR}"
+CARD_LAST_REV_TIMES = f"__Card_Last_Review_Times{ARG_SEPARATOR}"
 
 # Card values are all predetermined stuff
 # So this is all the keys the card data menus will have
@@ -93,6 +95,8 @@ CARD_VALUES = [
     CARD_LAST_EASES,
     CARD_LAST_FACTORS,
     CARD_LAST_IVLS,
+    CARD_LAST_REV_TYPES,
+    CARD_LAST_REV_TIMES,
 ]
 # Dict for quick matching between interpolated fields and special values
 CARD_VALUES_DICT = {key: None for key in CARD_VALUES}
@@ -235,13 +239,15 @@ def get_card_last_reps(
     get_ease: bool = False,
     get_ivl: bool = False,
     get_fct: bool = False,
+    get_type: bool = False,
+    get_time: bool = False,
 ) -> Union[
     # Return  or a flat list of values
     Sequence[Union[int, float]],
     # or a list of lists of values when two or more rev_log fields are requested
     Sequence[Sequence[Union[int, float]]],
 ]:
-    if not get_ease and not get_ivl and not get_fct:
+    if not get_ease and not get_ivl and not get_fct and not get_type and not get_time:
         return []
     all = rep_count == "all"
     if not all:
@@ -256,7 +262,15 @@ def get_card_last_reps(
     select_cols = ",".join(
         filter(
             None,
-            ["ease" if get_ease else "", "ivl" if get_ivl else "", "factor" if get_fct else ""],
+            [
+                "ease" if get_ease else "",
+                "ivl" if get_ivl else "",
+                "factor" if get_fct else "",
+                "type" if get_type else "",
+                # id is the epoch-milliseconds timestamp of when the review happened
+                # time is the time spent in milliseconds
+                "id" if get_time else "",
+            ],
         )
     )
     reps = mw.col.db.list(f"""SELECT
@@ -319,6 +333,8 @@ def get_value_for_card(
         CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),
         CARD_LAST_FACTORS: partial(get_card_last_reps, card.id, get_fct=True),
         CARD_LAST_IVLS: partial(get_card_last_reps, card.id, get_ivl=True),
+        CARD_LAST_REV_TYPES: partial(get_card_last_reps, card.id, get_type=True),
+        CARD_LAST_REV_TIMES: partial(get_card_last_reps, card.id, get_time=True),
     }
 
 
@@ -444,11 +460,16 @@ def get_from_note_fields(
             maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = card_match.group(
                 1, 2, 3
             )
+            print("maybe_card_type_name:", maybe_card_type_name)
+            print("maybe_card_value_key:", maybe_card_value_key)
+            print("maybe_card_value_arg:", maybe_card_value_arg)
         # Check if the card type name is valid
         if maybe_card_value_key in CARD_VALUES_DICT:
             # If we haven't made the card values dict yet, do it now
             if card_values_dict is None:
                 card_values_dict = get_card_values_dict_for_note(note)
+
+            print("card_values_dict:", card_values_dict)
 
             # New notes will have no cards, so we can't get a value
             # Return "" so we don't flag this as an invalid field
@@ -467,8 +488,12 @@ def get_from_note_fields(
                 # If there somehow are zero card types, we of course can't get a value
 
             value_dict = card_values_dict.get(maybe_card_type_name)
+            print("value_dict:", value_dict)
+            if value_dict:
+                print("maybe_card_value_key in value_dict:", maybe_card_value_key in (value_dict))
             if value_dict and maybe_card_value_key in value_dict:
                 value_or_partial = value_dict.get(maybe_card_value_key)
+                print("value_or_partial:", value_or_partial)
                 # Check if this value is a function that needs the argument
                 if isinstance(value_or_partial, partial):
                     value = value_or_partial(maybe_card_value_arg)
