@@ -161,6 +161,14 @@ class BasicEditorFormLayout(QFormLayout):
             self.update_deck_multibox_options,
         )
 
+        self.include_subdecks_checkbox = QCheckBox("Include subdecks of selected decks")
+        self.include_subdecks_checkbox.setChecked(False)
+        self.addRow("", self.include_subdecks_checkbox)
+        self.state.connect_include_subdecks_checkbox(self.include_subdecks_checkbox)
+
+        spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
+        self.addItem(spacer)
+
         self.copy_on_sync_checkbox = QCheckBox("Run on sync for reviewed cards")
         self.copy_on_sync_checkbox.setChecked(False)
         self.addRow("", self.copy_on_sync_checkbox)
@@ -220,6 +228,7 @@ class BasicEditorFormLayout(QFormLayout):
         self.copy_on_add_checkbox.setChecked(self.state.copy_on_add)
         self.copy_on_review_checkbox.setChecked(self.state.copy_on_review)
         self.decks_limit_multibox.setCurrentText(self.state.only_copy_into_decks)
+        self.include_subdecks_checkbox.setChecked(self.state.include_subdecks)
         self.update_direction_labels(self.state.copy_direction)
         self.set_note_type_warning()
         self.update_deck_multibox_options()
@@ -1198,6 +1207,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "definition_name": self.state.definition_name,
                 "copy_into_note_types": self.state.copy_into_note_types,
                 "only_copy_into_decks": self.state.only_copy_into_decks,
+                "include_subdecks": self.state.include_subdecks,
                 "copy_on_sync": self.state.copy_on_sync,
                 "copy_on_add": self.state.copy_on_add,
                 "copy_on_review": self.state.copy_on_review,
@@ -1236,6 +1246,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "definition_name": self.state.definition_name,
                 "copy_into_note_types": self.state.copy_into_note_types,
                 "only_copy_into_decks": self.state.only_copy_into_decks,
+                "include_subdecks": self.state.include_subdecks,
                 "copy_on_sync": self.state.copy_on_sync,
                 "copy_on_add": self.state.copy_on_add,
                 "copy_on_review": self.state.copy_on_review,

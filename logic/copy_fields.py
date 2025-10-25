@@ -8,6 +8,7 @@ from typing import Callable, Union, Optional, Tuple, Sequence, Any
 from anki.collection import OpChanges
 from anki.cards import Card
 from anki.notes import Note, NoteId
+from anki.decks import DeckId
 from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
@@ -737,6 +738,7 @@ def copy_for_single_trigger_note(
     field_to_file_defs = copy_definition.get("field_to_file_defs", [])
     field_to_variable_defs = copy_definition.get("field_to_variable_defs", [])
     only_copy_into_decks = copy_definition.get("only_copy_into_decks", None)
+    include_subdecks = copy_definition.get("include_subdecks", False)
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
     copy_condition_query = copy_definition.get("copy_condition_query", None)
     condition_only_on_sync = copy_definition.get("condition_only_on_sync", False)
@@ -819,6 +821,7 @@ def copy_for_single_trigger_note(
             extra_state=extra_state,
             sort_by_field=sort_by_field,
             only_copy_into_decks=only_copy_into_decks,
+            include_subdecks=include_subdecks,
             select_card_by=select_card_by,
             select_card_count=select_card_count,
             logger=logger,
@@ -1111,6 +1114,7 @@ def get_across_target_notes(
     deck_id: Optional[int] = None,
     variable_values_dict: Optional[dict] = None,
     only_copy_into_decks: Optional[str] = None,
+    include_subdecks: bool = False,
     select_card_count: Optional[str] = "1",
     logger: Logger = Logger("error"),
 ) -> list[Note]:
@@ -1128,6 +1132,7 @@ def get_across_target_notes(
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param only_copy_into_decks: A comma separated whitelist of deck names. Limits the cards to copy
         from to only those in the decks in the whitelist
+    :param include_subdecks: Whether to include subdecks of the whitelisted decks
     :param select_card_count: How many cards to select from the query. Default is 1
     :param logger: Logger to use for errors and debug messages.
     :return: A list of notes to copy from
@@ -1135,7 +1140,8 @@ def get_across_target_notes(
     logger.debug(
         f"get_across_target_notes: copy_from_cards_query='{copy_from_cards_query}', "
         f"select_card_by='{select_card_by}', deck_id={deck_id}, "
-        f"only_copy_into_decks='{only_copy_into_decks}', select_card_count='{select_card_count}'"
+        f"only_copy_into_decks='{only_copy_into_decks}', select_card_count='{select_card_count}', "
+        f"include_subdecks={include_subdecks}"
     )
 
     if not select_card_by:
@@ -1169,21 +1175,28 @@ def get_across_target_notes(
         # parent names can't be included since adding :: would break the filter text
         target_deck_names = only_copy_into_decks.strip('""').split('", "')
 
-        whitelist_dids = [
+        unique_whitelist_dids: set[DeckId] = {
             mw.col.decks.id_for_name(target_deck_name) for target_deck_name in target_deck_names
-        ]
-        unique_whitelist_dids = set(whitelist_dids)
-        deck_ids = []
+        }
+        if include_subdecks:
+            parent_dids = set()
+            for did in unique_whitelist_dids:
+                child_dids = [d[1] for d in mw.col.decks.children(did)]
+                parent_dids.update(child_dids)
+            unique_whitelist_dids.update(parent_dids)
+        deck_ids_of_cards = []
         if deck_id is not None:
-            deck_ids.append(deck_id)
+            deck_ids_of_cards.append(deck_id)
         else:
             for card in trigger_note.cards():
-                deck_ids.append(card.odid or card.did)
+                deck_ids_of_cards.append(card.odid or card.did)
         logger.debug(
-            f"get_across_target_notes: deck_ids={deck_ids},"
+            f"get_across_target_notes: deck_ids={deck_ids_of_cards},"
             f" unique_whitelist_dids={unique_whitelist_dids}"
         )
-        if deck_ids and not any(deck_id in unique_whitelist_dids for deck_id in deck_ids):
+        if deck_ids_of_cards and not any(
+            deck_id in unique_whitelist_dids for deck_id in deck_ids_of_cards
+        ):
             logger.debug(
                 "get_across_target_notes: No deck id in whitelist, skipping copy for note"
                 f" {trigger_note.id}"

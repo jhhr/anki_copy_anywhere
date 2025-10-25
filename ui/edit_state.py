@@ -88,6 +88,7 @@ class EditState:
         self.copy_into_note_types: str = ""
         self.selected_models: list[NotetypeDict] = []
         self.only_copy_into_decks: str = ""
+        self.include_subdecks: bool = False
         self.all_decks: list[DeckDict] = []
         self.current_deck_names: list[str] = []
         self.current_decks: list[NotetypeDict] = []
@@ -135,6 +136,7 @@ class EditState:
         self.target_note_type_editors: list[MultiComboBox] = []
         self.target_note_type_callbacks: list[Callable[[QLabel], None]] = []
         self.only_copy_into_decks_editors: list[MultiComboBox] = []
+        self.include_subdecks_editors: list[QCheckBox] = []
         self.copy_on_sync_editors: list[QCheckBox] = []
         self.copy_on_add_editors: list[QCheckBox] = []
         self.copy_on_review_editors: list[QCheckBox] = []
@@ -155,6 +157,11 @@ class EditState:
             self.target_note_type_callbacks,
             self.update_decks,
         )
+        self.connect_include_subdecks_checkbox = self._make_connect_checkbox_editor(
+            self.include_subdecks_editors,
+            "include_subdecks",
+        )
+
         self.connect_copy_on_sync_checkbox = self._make_connect_checkbox_editor(
             self.copy_on_sync_editors,
             "copy_on_sync",
@@ -371,6 +378,16 @@ class EditState:
         current_deck_names = self.only_copy_into_decks.strip('""').split('", "')
         all_decks = [mw.col.decks.get(did) for did in dids]
         all_decks = [d for d in all_decks if d is not None]
+        deck_name_set = {deck["name"] for deck in all_decks}
+        # Include parent decks of current decks even if they're empty
+        for deck in all_decks:
+            deck_parents = mw.col.decks.parents(deck["id"])
+            for parent_deck in deck_parents:
+                if parent_deck["name"] not in deck_name_set:
+                    all_decks.append(parent_deck)
+                    deck_name_set.add(parent_deck["name"])
+        # sort decks by name
+        all_decks.sort(key=lambda d: d["name"])
         current_decks_in_all_decks = [d for d in all_decks if d["name"] in current_deck_names]
         self.all_decks = all_decks
         self.current_deck_names = current_deck_names

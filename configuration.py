@@ -238,6 +238,7 @@ class CopyDefinition(TypedDict):
     add_tags: Optional[str]
     remove_tags: Optional[str]
     only_copy_into_decks: Optional[str]
+    include_subdecks: Optional[bool]
     copy_condition_query: Optional[str]
     condition_only_on_sync: Optional[bool]
     copy_from_cards_query: Optional[str]
