@@ -1,5 +1,5 @@
 from contextlib import suppress
-from typing import Optional, Union, Tuple, cast
+from typing import Callable, Optional, Union, Tuple, cast
 
 
 from aqt import mw
@@ -94,6 +94,7 @@ class BasicEditorFormLayout(QFormLayout):
         self,
         parent,
         state: EditState,
+        get_condition_query_editor: Optional[Callable[[], QWidget]] = None,
         copy_definition: Optional[CopyDefinition] = None,
         extra_top_widgets: Optional[list[Tuple[QLabel, QWidget]]] = None,
     ):
@@ -101,6 +102,7 @@ class BasicEditorFormLayout(QFormLayout):
 
         self.copy_definition = copy_definition
         self.state = state
+        self.get_condition_query_editor = get_condition_query_editor
 
         # Get the names of all the decks
         model_names_list = []
@@ -161,6 +163,29 @@ class BasicEditorFormLayout(QFormLayout):
         self.copy_on_sync_checkbox = QCheckBox("Run on sync for reviewed cards")
         self.copy_on_sync_checkbox.setChecked(False)
         self.addRow("", self.copy_on_sync_checkbox)
+
+        def update_condition_only_on_sync_checkbox():
+            # get the condition_query_tab_widget from the parent
+            condition_query_tab_widget = self.get_condition_query_editor()
+            if condition_query_tab_widget is None:
+                # Widget hasn't been created yet, so nothing to update
+                return
+            # enable or disable the condition_only_on_sync_checkbox based on copy_on_sync_checkbox
+            if self.state.copy_on_sync:
+                condition_query_tab_widget.condition_only_on_sync_checkbox.setEnabled(True)
+                # Unset the tooltip
+                condition_query_tab_widget.condition_only_on_sync_checkbox.setToolTip("")
+            else:
+                condition_query_tab_widget.condition_only_on_sync_checkbox.setEnabled(False)
+                condition_query_tab_widget.condition_only_on_sync_checkbox.setToolTip(
+                    "This option is only available when 'Run on sync for reviewed cards' is enabled"
+                    " in Basic Settings"
+                )
+
+        self.copy_on_sync_checkbox_callback = state.add_copy_on_sync_callback(
+            update_condition_only_on_sync_checkbox, is_visible=True
+        )
+
         state.connect_copy_on_sync_checkbox(self.copy_on_sync_checkbox)
 
         self.copy_on_add_checkbox = QCheckBox("Run when adding new note")
@@ -244,7 +269,110 @@ class BasicEditorFormLayout(QFormLayout):
             self.decks_limit_multibox.setDisabled(True)
 
 
-class QueryTabWidget(QWidget):
+class ConditionQueryTabWidget(QWidget):
+    """
+    A widget that contains the condition query text editor and related UI elements.
+    This is used in both AcrossNotesCopyEditor and WithinNoteCopyEditor to allow users
+    to input a condition query.
+    """
+
+    def __init__(self, parent, copy_definition: CopyDefinition, state: EditState):
+        super().__init__(parent)
+        self.state = state
+        self.copy_definition = copy_definition
+
+        query_layout = QVBoxLayout(self)
+        query_layout.setAlignment(QAlignTop)
+
+        query_form = QFormLayout()
+        query_form.setAlignment(QAlignTop)
+        query_layout.addLayout(query_form)
+
+        self.condition_query_text_label = QLabel("<h2>Condition query for trigger notes</h2>")
+        self.condition_query_text_layout = InterpolatedTextEditLayout(
+            label=self.condition_query_text_label,
+            # No special fields for search, just the destination note fields will be used
+            options_dict={},
+            description=f"""<ul>
+            <li>Use the same query syntax as in the card/note browser</li>
+            <li>Reference the trigger notes' fields with {intr_format('Field Name')}.</li>
+            <li>You can use card properties as well, e.g. prop:ivl, is:learn etc.</li>
+            <li>Right-click to select a {intr_format('Field Name')} or special values to paste</li>
+            <li>Matching the trigger note's id will automatically include it in the query.</li>
+            </ul>""",
+            height=100,
+            placeholder_text='"tag:Some tag" prop:reps>0 -is:suspended',
+        )
+        self.condition_query_widget = QWidget()
+        self.condition_query_widget.setLayout(self.condition_query_text_layout)
+        # Make the condition_query_widget start at a maximum of 200px height, but expand vertically
+        self.condition_query_widget.setMinimumHeight(100)
+        self.condition_query_widget.setSizePolicy(QSizePolicyPreferred, QSizePolicyFixed)
+
+        # Store callback entries for controlling visibility
+        self.selected_model_callback = state.add_selected_model_callback(
+            self.update_fields_by_target_note_type, is_visible=False
+        )
+        self.variable_names_callback = state.add_variable_names_callback(
+            self.update_fields_by_target_note_type, is_visible=False
+        )
+
+        self.query_initialized = False
+
+        query_form.addRow(self.condition_query_text_label)
+        query_form.addRow(self.condition_query_widget)
+
+        self.condition_only_on_sync_checkbox = QCheckBox(
+            "Apply condition only on sync for reviewed cards"
+        )
+        query_form.addRow(self.condition_only_on_sync_checkbox)
+
+        spacer = QSpacerItem(100, 40, QSizePolicyMinimum, QSizePolicyExpanding)
+        query_layout.addSpacerItem(spacer)
+        # Set the current text in the combo boxes to what we had in memory in the configuration
+        if copy_definition:
+            with suppress(KeyError):
+                self.condition_query_text_layout.set_text(copy_definition["copy_condition_query"])
+            with suppress(KeyError):
+                self.condition_only_on_sync_checkbox.setChecked(
+                    copy_definition.get("condition_only_on_sync", False)
+                )
+            if state.copy_on_sync:
+                self.condition_only_on_sync_checkbox.setEnabled(True)
+            else:
+                self.condition_only_on_sync_checkbox.setEnabled(False)
+                # add a tooltip explaining why it's disabled
+                self.condition_only_on_sync_checkbox.setToolTip(
+                    "This option is only available when 'Run on sync for reviewed cards' is"
+                    " enabled in Basic Settings"
+                )
+
+    def initialize_ui_state(self):
+        """Perform expensive UI state initialization for condition query tab when first shown"""
+        if self.query_initialized:
+            return
+
+        self.enable_callbacks()
+
+        # Perform the expensive initialization
+        self.update_fields_by_target_note_type()
+
+        self.query_initialized = True
+
+    def enable_callbacks(self):
+        self.selected_model_callback.is_visible = True
+        self.variable_names_callback.is_visible = True
+
+    def update_fields_by_target_note_type(self):
+        options_dict = self.state.pre_query_menu_options_dict.copy()
+        options_dict.update(self.state.variables_dict)
+        validate_dict = self.state.pre_query_text_edit_validate_dict.copy()
+        validate_dict.update(self.state.variables_validate_dict)
+        self.condition_query_text_layout.update_options(options_dict, validate_dict)
+        self.condition_query_text_layout.validate_text()
+
+
+class AcrossQueryTabWidget(QWidget):
     """
     A widget that contains the query text editor and related UI elements.
     This is used in the AcrossNotesCopyEditor to allow users to input a search query.
@@ -450,15 +578,17 @@ class TabEditorComponents(QTabWidget):
         # Create placeholder widgets for each tab
         self.basic_widget = QWidget()
         self.variables_widget = QWidget()
-        self.query_widget = QWidget()
+        self.condition_widget = QWidget()
+        self.card_query_widget = QWidget()
         self.fields_widget = QWidget()
         self.files_widget = QWidget()
 
         # Add placeholder tabs
         self.addTab(self.basic_widget, "Basic Settings")
         self.addTab(self.variables_widget, "Variables")
+        self.addTab(self.condition_widget, "Condition")
         if copy_mode == COPY_MODE_ACROSS_NOTES:
-            self.addTab(self.query_widget, "Search Query")
+            self.addTab(self.card_query_widget, "Search Query")
         self.addTab(self.fields_widget, "Field to Field")
         self.addTab(self.files_widget, "Field to File")
 
@@ -467,7 +597,8 @@ class TabEditorComponents(QTabWidget):
         self.field_to_variable_editor = None
         self.field_to_field_editor = None
         self.field_to_file_editor = None
-        self.query_tab_widget = None
+        self.across_query_tab_widget = None
+        self.condition_query_tab_widget = None
 
         # Connect tab change signal to lazy creation
         self.currentChanged.connect(self.on_tab_changed)
@@ -491,7 +622,11 @@ class TabEditorComponents(QTabWidget):
             ))
 
         self.basic_editor_form_layout = BasicEditorFormLayout(
-            self.parent, self.state, self.copy_definition, extra_top_widgets=extra_widgets
+            self.parent,
+            self.state,
+            self.get_condition_query_editor,
+            self.copy_definition,
+            extra_top_widgets=extra_widgets,
         )
         basic_layout.addLayout(self.basic_editor_form_layout)
 
@@ -572,22 +707,43 @@ class TabEditorComponents(QTabWidget):
         self.files_widget.adjustSize()
         self.created_tabs.add("files")
 
-    def create_query_tab(self):
-        """Create the query tab content lazily"""
-        if "query" in self.created_tabs:
+    def create_condition_query_tab(self):
+        """Create the condition query tab content lazily"""
+        if "condition_query" in self.created_tabs:
             return
-        query_layout = QVBoxLayout(self.query_widget)
+        query_layout = QVBoxLayout(self.condition_widget)
         query_layout.setAlignment(QAlignTop)
 
-        self.query_tab_widget = QueryTabWidget(self.parent, self.copy_definition, self.state)
-        query_layout.addWidget(self.query_tab_widget)
+        self.condition_query_tab_widget = ConditionQueryTabWidget(
+            self.parent, self.copy_definition, self.state
+        )
+        query_layout.addWidget(self.condition_query_tab_widget)
 
         # Initialize the query widget's UI state
-        self.query_tab_widget.initialize_ui_state()
+        self.condition_query_tab_widget.initialize_ui_state()
 
         # Force the widget to update its size
-        self.query_widget.adjustSize()
-        self.created_tabs.add("query")
+        self.condition_widget.adjustSize()
+        self.created_tabs.add("condition_query")
+
+    def create_across_query_tab(self):
+        """Create the query tab content lazily"""
+        if "across_query" in self.created_tabs:
+            return
+        query_layout = QVBoxLayout(self.card_query_widget)
+        query_layout.setAlignment(QAlignTop)
+
+        self.across_query_tab_widget = AcrossQueryTabWidget(
+            self.parent, self.copy_definition, self.state
+        )
+        query_layout.addWidget(self.across_query_tab_widget)
+
+        # Initialize the query widget's UI state
+        self.across_query_tab_widget.initialize_ui_state()
+
+        # Force the widget to update its size
+        self.card_query_widget.adjustSize()
+        self.created_tabs.add("across_query")
 
     def on_tab_changed(self, index):
         """Create and initialize the UI state of the newly visible tab"""
@@ -597,12 +753,14 @@ class TabEditorComponents(QTabWidget):
             self.create_basic_tab()
         elif tab_text == "Variables":
             self.create_variables_tab()
+        elif tab_text == "Condition":
+            self.create_condition_query_tab()
         elif tab_text == "Field to Field":
             self.create_fields_tab()
         elif tab_text == "Field to File":
             self.create_files_tab()
         elif tab_text == "Search Query":
-            self.create_query_tab()
+            self.create_across_query_tab()
 
         # Only resize the current tab's content, not the entire dialog
         current_widget = self.currentWidget()
@@ -629,10 +787,15 @@ class TabEditorComponents(QTabWidget):
             self.create_variables_tab()
         return self.field_to_variable_editor
 
-    def get_query_editor(self) -> Optional[QueryTabWidget]:
+    def get_condition_query_editor(self) -> Optional[ConditionQueryTabWidget]:
+        if self.condition_query_tab_widget is None:
+            self.create_condition_query_tab()
+        return self.condition_query_tab_widget
+
+    def get_across_query_editor(self) -> Optional[AcrossQueryTabWidget]:
         """Get the query editor widget if it exists, otherwise None"""
-        if "query" in self.created_tabs:
-            return self.query_tab_widget
+        if "across_query" in self.created_tabs:
+            return self.across_query_tab_widget
         return None
 
 
@@ -669,7 +832,7 @@ class AcrossNotesCopyEditor(QWidget):
         self.editor_tabs = TabEditorComponents(self, state, copy_definition, COPY_MODE_ACROSS_NOTES)
         self.main_layout.addWidget(self.editor_tabs)
 
-        self.query_editor: Optional[QueryTabWidget] = None
+        self.query_editor: Optional[AcrossQueryTabWidget] = None
 
         # Always init the direction, as this will set the checkboxes state, and various
         # labels everywhere
@@ -718,49 +881,58 @@ class AcrossNotesCopyEditor(QWidget):
     def get_field_to_variable_editor(self) -> CopyFieldToVariableEditor:
         return self.editor_tabs.get_field_to_variable_editor()
 
-    def get_query_editor(self) -> Optional[QueryTabWidget]:
-        """Get the query editor widget if it exists, otherwise None"""
-        return self.editor_tabs.get_query_editor()
+    def get_condition_query_editor(self) -> Optional[ConditionQueryTabWidget]:
+        return self.editor_tabs.get_condition_query_editor()
 
-    def create_and_set_query_editor(self):
+    def get_across_query_editor(self) -> Optional[AcrossQueryTabWidget]:
+        """Get the query editor widget if it exists, otherwise None"""
+        return self.editor_tabs.get_across_query_editor()
+
+    def create_and_set_across_query_editor(self):
         if not self.query_editor:
-            self.editor_tabs.create_query_tab()
-            self.query_editor = self.editor_tabs.get_query_editor()
+            self.editor_tabs.create_across_query_tab()
+            self.query_editor = self.editor_tabs.get_across_query_editor()
+
+    @property
+    def condition_query_text_layout(self):
+        """Lazy access to condition query text layout"""
+        condition_query_editor = self.get_condition_query_editor()
+        return condition_query_editor.condition_query_text_layout
 
     @property
     def card_query_text_layout(self):
         """Lazy access to query text layout"""
-        self.create_and_set_query_editor()
+        self.create_and_set_across_query_editor()
         return self.query_editor.card_query_text_layout
 
     @property
     def card_select_cbox(self):
         """Lazy access to card select combo box"""
-        self.create_and_set_query_editor()
+        self.create_and_set_across_query_editor()
         return self.query_editor.card_select_cbox
 
     @property
     def sort_by_field_cbox(self):
         """Lazy access to sort by field combo box"""
-        self.create_and_set_query_editor()
+        self.create_and_set_across_query_editor()
         return self.query_editor.sort_by_field_cbox
 
     @property
     def card_select_count(self):
         """Lazy access to card select count"""
-        self.create_and_set_query_editor()
+        self.create_and_set_across_query_editor()
         return self.query_editor.card_select_count
 
     @property
     def card_select_separator(self):
         """Lazy access to card select separator"""
-        self.create_and_set_query_editor()
+        self.create_and_set_across_query_editor()
         return self.query_editor.card_select_separator
 
     @property
     def show_error_for_none_found(self):
         """Lazy access to show error for none found checkbox"""
-        self.create_and_set_query_editor()
+        self.create_and_set_across_query_editor()
         return self.query_editor.show_error_for_none_found
 
 
@@ -790,6 +962,15 @@ class WithinNoteCopyEditor(QWidget):
 
     def get_field_to_variable_editor(self):
         return self.editor_tabs.get_field_to_variable_editor()
+
+    def get_condition_query_editor(self):
+        return self.editor_tabs.get_condition_query_editor()
+
+    @property
+    def condition_query_text_layout(self):
+        """Lazy access to condition query text layout"""
+        condition_query_editor = self.get_condition_query_editor()
+        return condition_query_editor.condition_query_text_layout
 
 
 class EditCopyDefinitionDialog(ScrollableQDialog):
@@ -968,6 +1149,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             field_to_field_editor = self.across_notes_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.across_notes_editor_tab.get_field_to_file_editor()
             field_to_variable_editor = self.across_notes_editor_tab.get_field_to_variable_editor()
+            condition_query_editor = self.across_notes_editor_tab.get_condition_query_editor()
             # select_card_by has been validated in check_fields()
             select_card_by = cast(
                 SelectCardByType, self.across_notes_editor_tab.card_select_cbox.currentText()
@@ -985,6 +1167,12 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "copy_from_cards_query": (
                     self.across_notes_editor_tab.card_query_text_layout.get_text()
                 ),
+                "copy_condition_query": (
+                    condition_query_editor.condition_query_text_layout.get_text()
+                ),
+                "condition_only_on_sync": (
+                    condition_query_editor.condition_only_on_sync_checkbox.isChecked()
+                ),
                 "sort_by_field": self.across_notes_editor_tab.sort_by_field_cbox.currentText(),
                 "select_card_by": select_card_by,
                 "select_card_count": self.across_notes_editor_tab.card_select_count.text(),
@@ -1000,6 +1188,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             field_to_variable_editor = self.within_note_editor_tab.get_field_to_variable_editor()
             field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
+            condition_query_editor = self.within_note_editor_tab.get_condition_query_editor()
             within_copy_definition: CopyDefinition = {
                 "definition_name": self.state.definition_name,
                 "copy_into_note_types": self.state.copy_into_note_types,
@@ -1010,6 +1199,12 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "field_to_variable_defs": field_to_variable_editor.get_field_to_variable_defs(),
                 "field_to_field_defs": field_to_field_editor.get_field_to_field_defs(),
                 "field_to_file_defs": field_to_file_editor.get_field_to_file_defs(),
+                "copy_condition_query": (
+                    condition_query_editor.condition_query_text_layout.get_text()
+                ),
+                "condition_only_on_sync": (
+                    condition_query_editor.condition_only_on_sync_checkbox.isChecked()
+                ),
                 "copy_mode": COPY_MODE_WITHIN_NOTE,
                 "across_mode_direction": None,
                 "copy_from_cards_query": None,

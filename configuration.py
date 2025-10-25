@@ -236,6 +236,8 @@ class CopyDefinition(TypedDict):
     field_to_file_defs: list[CopyFieldToFile]
     field_to_variable_defs: list[CopyFieldToVariable]
     only_copy_into_decks: str
+    copy_condition_query: Optional[str]
+    condition_only_on_sync: Optional[bool]
     copy_from_cards_query: Optional[str]
     sort_by_field: Optional[str]
     select_card_by: SelectCardByType

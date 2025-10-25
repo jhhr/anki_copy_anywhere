@@ -555,6 +555,7 @@ def copy_fields_in_background(
         success = copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
+            is_sync=is_sync,
             copied_into_notes=copied_into_notes,
             field_only=field_only,
             logger=logger,
@@ -704,6 +705,7 @@ class CopyFailedException(Exception):
 def copy_for_single_trigger_note(
     copy_definition: CopyDefinition,
     trigger_note: Note,
+    is_sync: Optional[bool] = False,
     copied_into_notes: Optional[list[Note]] = None,
     field_only: Optional[str] = None,
     deck_id: Optional[int] = None,
@@ -715,6 +717,7 @@ def copy_for_single_trigger_note(
     Copy fields into a single note
     :param copy_definition: The definition of what to copy, includes process chains
     :param trigger_note: Note that triggered this copy or was targeted otherwise
+    :param is_sync: Whether this is a sync operation or not
     :param copied_into_notes: A list of notes that were copied into, to be appended to
         with the destination notes. Can be omitted, if it's not necessary to run
         mw.col.update_notes(copied_into_notes) after the operation
@@ -735,6 +738,8 @@ def copy_for_single_trigger_note(
     field_to_variable_defs = copy_definition.get("field_to_variable_defs", [])
     only_copy_into_decks = copy_definition.get("only_copy_into_decks", None)
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
+    copy_condition_query = copy_definition.get("copy_condition_query", None)
+    condition_only_on_sync = copy_definition.get("condition_only_on_sync", False)
     sort_by_field = copy_definition.get("sort_by_field", None)
     select_card_by = copy_definition.get("select_card_by", None)
     select_card_count = copy_definition.get("select_card_count", None)
@@ -758,7 +763,36 @@ def copy_for_single_trigger_note(
             file_cache=file_cache,
         )
 
-    # Step 1: get source/destination notes for this card
+    # Step 1: Check if possibly defined condition matches for this note
+    condition_check = bool(copy_condition_query)
+    if condition_only_on_sync and not is_sync:
+        condition_check = False
+    if condition_check:
+        interpolated_condition_query, invalid_fields = interpolate_from_text(
+            copy_condition_query,
+            source_note=trigger_note,
+            variable_values_dict=variable_values_dict,
+        )
+        if interpolated_condition_query:
+            # Search for notes, this works for card properties just as well
+            note_ids = mw.col.find_notes(f"{interpolated_condition_query} nid:{trigger_note.id}")
+            if (note_ids is None) or (len(note_ids) == 0):
+                logger.debug(
+                    "copy_for_single_trigger_note: "
+                    f"Condition query '{interpolated_condition_query}' did not match for note "
+                    f"id {trigger_note.id}"
+                )
+                # Condition did not match, so skip this note, things are ok, so return True
+                return True
+        else:
+            logger.error(
+                f"Error in copy fields: Condition query '{copy_condition_query}' "
+                f"could not be interpolated for note id {trigger_note.id} "
+                f"due to missing fields: {', '.join(invalid_fields)}"
+            )
+            return False
+
+    # Step 2: Get source/destination notes for this card
     destination_notes = []
     source_notes = []
     if copy_mode == COPY_MODE_WITHIN_NOTE:
@@ -809,7 +843,7 @@ def copy_for_single_trigger_note(
 
     if progress_updater is not None:
         progress_updater.update_counts(processed_sources_inc=len(source_notes))
-    # Step 2: Get value for each field we are copying into
+    # Step 3: Get value for each field we are copying into
     for destination_note in destination_notes:
         try:
             copied_into_dest_note, copied_into_file = copy_into_single_note(

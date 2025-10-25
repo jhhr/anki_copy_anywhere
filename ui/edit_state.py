@@ -113,6 +113,7 @@ class EditState:
         self.selected_model_callbacks: list[CallbackEntry] = []
         self.copy_direction_callbacks: list[CallbackEntry] = []
         self.variable_names_callbacks: list[CallbackEntry] = []
+        self.copy_on_sync_callbacks: list[CallbackEntry] = []
 
         self.pre_query_menu_options_dict: dict = BASE_NOTE_MENU_DICT.copy()
         self.post_query_menu_options_dict: dict = get_new_base_dict(self.copy_mode)
@@ -157,6 +158,7 @@ class EditState:
         self.connect_copy_on_sync_checkbox = self._make_connect_checkbox_editor(
             self.copy_on_sync_editors,
             "copy_on_sync",
+            self.copy_on_sync_callbacks,
         )
         self.connect_copy_on_add_checkbox = self._make_connect_checkbox_editor(
             self.copy_on_add_editors,
@@ -334,6 +336,17 @@ class EditState:
         """
         callback_entry = CallbackEntry(callback, is_visible)
         self.variable_names_callbacks.append(callback_entry)
+        return callback_entry
+
+    def add_copy_on_sync_callback(
+        self, callback: Callable[[bool], None], is_visible: bool = False
+    ) -> CallbackEntry:
+        """
+        Adds a callback to be called when the copy on sync setting changes.
+        Returns the CallbackEntry so the caller can control visibility.
+        """
+        callback_entry = CallbackEntry(callback, is_visible)
+        self.copy_on_sync_callbacks.append(callback_entry)
         return callback_entry
 
     def update_copy_direction(self, new_direction: DirectionType):
