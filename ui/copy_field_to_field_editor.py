@@ -508,6 +508,8 @@ class CopyFieldToFieldEditor(QWidget):
                 field_target_cbox.addGroup(group_name)
                 for field_name in self.state.intersecting_fields:
                     field_target_cbox.addItemToGroup(group_name, field_name)
+                    if field_name == previous_text:
+                        previous_text_in_new_options = True
             elif len(self.state.selected_models) == 1:
                 model = self.state.selected_models[0]
                 field_target_cbox.addGroup(model["name"])
