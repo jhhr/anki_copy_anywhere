@@ -155,7 +155,7 @@ class CopyFieldToFieldEditor(QWidget):
 
         # Perform the expensive initialization
         self.update_all_field_target_cboxes()
-        self.update_direction_labels(self.state.copy_direction)
+        self.update_direction_labels()
 
         self.initialized = True
 
@@ -289,7 +289,7 @@ class CopyFieldToFieldEditor(QWidget):
         # Options need to exist before we can set the initial text
         self.update_an_unfocus_trigger_field_cbox(copy_on_unfocus_trigger_field)
         if self.copy_mode == COPY_MODE_ACROSS_NOTES:
-            self.update_direction_labels(self.state.copy_direction)
+            self.update_direction_labels()
         with suppress(KeyError):
             copy_on_unfocus_trigger_field.setCurrentText(
                 copy_field_to_field_definition["copy_on_unfocus_trigger_field"]
@@ -409,7 +409,7 @@ class CopyFieldToFieldEditor(QWidget):
                 self.state.post_query_text_edit_validate_dict,
             )
 
-    def update_direction_labels(self, _):
+    def update_direction_labels(self):
         if self.state.copy_direction == DIRECTION_DESTINATION_TO_SOURCES:
             copy_into_label_clarification = "in the trigger note"
             copy_from_text_clarification = "from the search"
