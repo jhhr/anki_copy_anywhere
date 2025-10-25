@@ -740,6 +740,8 @@ def copy_for_single_trigger_note(
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
     copy_condition_query = copy_definition.get("copy_condition_query", None)
     condition_only_on_sync = copy_definition.get("condition_only_on_sync", False)
+    add_tags = copy_definition.get("add_tags", "")
+    remove_tags = copy_definition.get("remove_tags", "")
     sort_by_field = copy_definition.get("sort_by_field", None)
     select_card_by = copy_definition.get("select_card_by", None)
     select_card_count = copy_definition.get("select_card_count", None)
@@ -851,6 +853,8 @@ def copy_for_single_trigger_note(
                 field_to_file_defs=field_to_file_defs,
                 destination_note=destination_note,
                 source_notes=source_notes,
+                add_tags=add_tags,
+                remove_tags=remove_tags,
                 variable_values_dict=variable_values_dict,
                 field_only=field_only,
                 modifies_other_notes=definition_modifies_other_notes(copy_definition),
@@ -878,6 +882,8 @@ def copy_into_single_note(
     field_to_file_defs: list[CopyFieldToFile],
     destination_note: Note,
     source_notes: list[Note],
+    add_tags: Optional[str] = "",
+    remove_tags: Optional[str] = "",
     variable_values_dict: Optional[dict] = None,
     field_only: Optional[str] = None,
     modifies_other_notes: bool = False,
@@ -951,6 +957,18 @@ def copy_into_single_note(
 
         # Finally, copy the value into the note
         destination_note[copy_into_note_field] = result_val
+        modified_dest_note = True
+
+    for tag in add_tags.strip('""').split('", "'):
+        if destination_note.has_tag(tag):
+            continue
+        destination_note.add_tag(tag)
+        modified_dest_note = True
+
+    for tag in remove_tags.strip('""').split('", "'):
+        if not destination_note.has_tag(tag):
+            continue
+        destination_note.remove_tag(tag)
         modified_dest_note = True
 
     for field_to_file_def in field_to_file_defs:

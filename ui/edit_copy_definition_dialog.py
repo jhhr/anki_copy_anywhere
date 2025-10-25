@@ -31,6 +31,7 @@ from .edit_state import EditState
 from .copy_field_to_field_editor import CopyFieldToFieldEditor
 from .copy_field_to_file_editor import CopyFieldToFileEditor
 from .field_to_variable_editor import CopyFieldToVariableEditor
+from .tag_editor import TagEditor
 from .grouped_combo_box import GroupedComboBox
 from .interpolated_text_edit import InterpolatedTextEditLayout
 from .required_combobox import RequiredCombobox
@@ -580,6 +581,7 @@ class TabEditorComponents(QTabWidget):
         self.variables_widget = QWidget()
         self.condition_widget = QWidget()
         self.card_query_widget = QWidget()
+        self.tags_widget = QWidget()
         self.fields_widget = QWidget()
         self.files_widget = QWidget()
 
@@ -589,6 +591,7 @@ class TabEditorComponents(QTabWidget):
         self.addTab(self.condition_widget, "Condition")
         if copy_mode == COPY_MODE_ACROSS_NOTES:
             self.addTab(self.card_query_widget, "Search Query")
+        self.addTab(self.tags_widget, "Tags")
         self.addTab(self.fields_widget, "Field to Field")
         self.addTab(self.files_widget, "Field to File")
 
@@ -599,6 +602,7 @@ class TabEditorComponents(QTabWidget):
         self.field_to_file_editor = None
         self.across_query_tab_widget = None
         self.condition_query_tab_widget = None
+        self.tag_editor = None
 
         # Connect tab change signal to lazy creation
         self.currentChanged.connect(self.on_tab_changed)
@@ -683,6 +687,28 @@ class TabEditorComponents(QTabWidget):
         self.fields_widget.adjustSize()
         self.created_tabs.add("fields")
 
+    def create_tags_tab(self):
+        if "tags" in self.created_tabs:
+            return
+        tags_layout = QVBoxLayout(self.tags_widget)
+        tags_layout.setAlignment(QAlignTop)
+
+        tags_layout.addWidget(QLabel("<h2>Tags</h2>"))
+
+        self.tag_editor = TagEditor(self.parent, self.state, self.copy_definition, self.copy_mode)
+        tags_layout.addWidget(self.tag_editor)
+
+        spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
+        tags_layout.addItem(spacer)
+        set_size_policy_for_all_widgets(tags_layout, QSizePolicyPreferred, QSizePolicyFixed)
+
+        # Initialize the editor's UI state
+        self.tag_editor.initialize_ui_state()
+
+        # Force the widget to update its size
+        self.tags_widget.adjustSize()
+        self.created_tabs.add("tags")
+
     def create_files_tab(self):
         if "files" in self.created_tabs:
             return
@@ -757,6 +783,8 @@ class TabEditorComponents(QTabWidget):
             self.create_condition_query_tab()
         elif tab_text == "Field to Field":
             self.create_fields_tab()
+        elif tab_text == "Tags":
+            self.create_tags_tab()
         elif tab_text == "Field to File":
             self.create_files_tab()
         elif tab_text == "Search Query":
@@ -776,6 +804,11 @@ class TabEditorComponents(QTabWidget):
         if self.field_to_field_editor is None:
             self.create_fields_tab()
         return self.field_to_field_editor
+
+    def get_tag_editor(self) -> TagEditor:
+        if self.tag_editor is None:
+            self.create_tags_tab()
+        return self.tag_editor
 
     def get_field_to_file_editor(self) -> CopyFieldToFileEditor:
         if self.field_to_file_editor is None:
@@ -875,6 +908,9 @@ class AcrossNotesCopyEditor(QWidget):
     def get_field_to_field_editor(self) -> CopyFieldToFieldEditor:
         return self.editor_tabs.get_field_to_field_editor()
 
+    def get_tag_editor(self) -> TagEditor:
+        return self.editor_tabs.get_tag_editor()
+
     def get_field_to_file_editor(self) -> CopyFieldToFileEditor:
         return self.editor_tabs.get_field_to_file_editor()
 
@@ -956,6 +992,9 @@ class WithinNoteCopyEditor(QWidget):
 
     def get_field_to_field_editor(self):
         return self.editor_tabs.get_field_to_field_editor()
+
+    def get_tag_editor(self):
+        return self.editor_tabs.get_tag_editor()
 
     def get_field_to_file_editor(self):
         return self.editor_tabs.get_field_to_file_editor()
@@ -1147,6 +1186,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
     def get_copy_definition(self) -> Union[CopyDefinition, None]:
         if self.selected_editor_type == COPY_MODE_ACROSS_NOTES:
             field_to_field_editor = self.across_notes_editor_tab.get_field_to_field_editor()
+            tag_editor = self.across_notes_editor_tab.get_tag_editor()
             field_to_file_editor = self.across_notes_editor_tab.get_field_to_file_editor()
             field_to_variable_editor = self.across_notes_editor_tab.get_field_to_variable_editor()
             condition_query_editor = self.across_notes_editor_tab.get_condition_query_editor()
@@ -1173,6 +1213,8 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "condition_only_on_sync": (
                     condition_query_editor.condition_only_on_sync_checkbox.isChecked()
                 ),
+                "add_tags": tag_editor.get_add_tags(),
+                "remove_tags": tag_editor.get_remove_tags(),
                 "sort_by_field": self.across_notes_editor_tab.sort_by_field_cbox.currentText(),
                 "select_card_by": select_card_by,
                 "select_card_count": self.across_notes_editor_tab.card_select_count.text(),
@@ -1187,6 +1229,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
             field_to_variable_editor = self.within_note_editor_tab.get_field_to_variable_editor()
             field_to_field_editor = self.within_note_editor_tab.get_field_to_field_editor()
+            tag_editor = self.within_note_editor_tab.get_tag_editor()
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             condition_query_editor = self.within_note_editor_tab.get_condition_query_editor()
             within_copy_definition: CopyDefinition = {
@@ -1205,6 +1248,8 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "condition_only_on_sync": (
                     condition_query_editor.condition_only_on_sync_checkbox.isChecked()
                 ),
+                "add_tags": tag_editor.get_add_tags(),
+                "remove_tags": tag_editor.get_remove_tags(),
                 "copy_mode": COPY_MODE_WITHIN_NOTE,
                 "across_mode_direction": None,
                 "copy_from_cards_query": None,
