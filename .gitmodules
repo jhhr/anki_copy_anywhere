@@ -1,3 +1,4 @@
-[submodule "logic/jpn_text_processing/mecab_controller"]
-	path = logic/jpn_text_processing/mecab_controller
-	url = https://github.com/Ajatt-Tools/mecab_controller.git
+[submodule "logic/jp_text_processing"]
+	path = logic/jp_text_processing
+	url = https://github.com/jhhr/jp_text_processing.git
+	branch = main
