@@ -1076,7 +1076,7 @@ def copy_into_single_note(
         suspend_card = card_action.get("suspend", None)
         bury_card = card_action.get("bury", None)
         set_flag = card_action.get("set_flag", None)
-        if change_deck != "-" and change_deck is not None:
+        if change_deck not in [None, "-"]:
             move_card_to_deck(card, change_deck, logger=logger)
         if suspend_card in [True, False]:
             # see pylib/anki/cards.py for queue values
