@@ -191,12 +191,12 @@ def run_copy_fields_on_review(card: Card):
             logger=logger,
         )
     # Replace the card in copied_into_cards with the merged version
-    for i, c in enumerate(copied_into_cards):
-        if c.id == card.id:
-            merge_cards(card, c)
-            # Remove the duplicate card from the list
-            copied_into_cards.pop(i)
-            break
+    # Find and merge with the matching card, if present
+    matching_card = next((c for c in copied_into_cards if c.id == card.id), None)
+    if matching_card is not None:
+        merge_cards(card, matching_card)
+    # Remove any card with the same id as the reviewed card
+    copied_into_cards = [c for c in copied_into_cards if c.id != card.id]
     # Ensure the reviewed card is always updated
     copied_into_cards.append(card)
     if has_definitions_to_process_on_sync:
