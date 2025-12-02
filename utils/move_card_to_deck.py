@@ -34,4 +34,6 @@ def move_card_to_deck(
     else:
         card.did = deck_id
 
-    # undo action needs to be managed by the caller
+    # will not call mw.col.update_card(card) here.
+    # Instead the caller should do that in the most appropriate point to manage performance
+    # and undo entries.
