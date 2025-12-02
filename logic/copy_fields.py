@@ -1053,7 +1053,7 @@ def copy_into_single_note(
     dest_note_type = destination_note.note_type()
     for card_action in card_actions:
         # The card_type_name contains the note type and card type separated by "::"
-        note_type_and_card_type = card_action.get("card_type_name ", "")
+        note_type_and_card_type = card_action.get("card_type_name", "")
         if "::" not in note_type_and_card_type:
             logger.error(
                 f"Error in copy fields: Invalid card type name '{note_type_and_card_type}'"
