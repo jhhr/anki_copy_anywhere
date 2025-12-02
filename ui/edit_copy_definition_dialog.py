@@ -1,5 +1,6 @@
 from contextlib import suppress
 from typing import Callable, Optional, Union, Tuple, cast
+import uuid
 
 
 from aqt import mw
@@ -1211,6 +1212,11 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 SelectCardByType, self.across_notes_editor_tab.card_select_cbox.currentText()
             )
             across_copy_definition: CopyDefinition = {
+                "guid": (
+                    self.copy_definition.get("guid", str(uuid.uuid4()))
+                    if self.copy_definition
+                    else str(uuid.uuid4())
+                ),
                 "definition_name": self.state.definition_name,
                 "copy_into_note_types": self.state.copy_into_note_types,
                 "only_copy_into_decks": self.state.only_copy_into_decks,
@@ -1250,6 +1256,11 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             condition_query_editor = self.within_note_editor_tab.get_condition_query_editor()
             within_copy_definition: CopyDefinition = {
+                "guid": (
+                    self.copy_definition.get("guid", str(uuid.uuid4()))
+                    if self.copy_definition
+                    else str(uuid.uuid4())
+                ),
                 "definition_name": self.state.definition_name,
                 "copy_into_note_types": self.state.copy_into_note_types,
                 "only_copy_into_decks": self.state.only_copy_into_decks,
