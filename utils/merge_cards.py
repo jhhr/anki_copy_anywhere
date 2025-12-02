@@ -4,7 +4,7 @@ from anki.cards import Card
 def merge_cards(card: Card, card_to_merge: Card) -> None:
     """Merge the editable details of card_to_merge into card. Mutates card.
 
-    Used to ensure that when peforming mw.col.update_card on a card,
+    Used to ensure that when performing mw.col.update_card on a card,
     all changes are included. This is because performing an update_card on a card
     with the same id will overwrite previous changes made to that card in the same
     operation.
