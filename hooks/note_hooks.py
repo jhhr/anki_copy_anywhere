@@ -194,7 +194,11 @@ def run_copy_fields_on_review(card: Card):
     for i, c in enumerate(copied_into_cards):
         if c.id == card.id:
             merge_cards(card, c)
-            copied_into_cards[i] = card
+            # Remove the duplicate card from the list
+            copied_into_cards.pop(i)
+            break
+    # Ensure the reviewed card is always updated
+    copied_into_cards.append(card)
     if has_definitions_to_process_on_sync:
         # In order to not have on_sync definitions run twice, we'll set a different fc value
         write_custom_data(card, key="fc", value=-1)
