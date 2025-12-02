@@ -1090,7 +1090,7 @@ def copy_into_single_note(
                 card.queue = -2
             else:
                 card.queue = card.type
-        if 0 <= set_flag <= 7:
+        if isinstance(set_flag, int) and 0 <= set_flag <= 7:
             card.set_user_flag(set_flag)
     return (modified_dest_note, wrote_to_file, dest_note_cards)
 
