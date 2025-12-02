@@ -1090,7 +1090,6 @@ def copy_into_single_note(
         set_flag = card_action.get("set_flag", None)
         if change_deck not in [None, "-"]:
             move_card_to_deck(card, change_deck, logger=logger)
-            print(f"Moved card id {card.id} to deck '{change_deck}', did={card.odid or card.did}")
             card.edited = True
         if suspend_card in [True, False]:
             # see pylib/anki/cards.py for queue values
