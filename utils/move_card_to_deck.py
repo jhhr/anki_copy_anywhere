@@ -6,7 +6,7 @@ from .logger import Logger
 
 def move_card_to_deck(
     card: Card,
-    deck_name: str = "",
+    deck_name: str = None,
     deck_id: int = None,
     logger: Logger = None,
 ) -> None:
