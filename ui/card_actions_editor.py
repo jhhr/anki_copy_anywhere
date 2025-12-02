@@ -24,6 +24,7 @@ else:
     QFrameShadowRaised = QFrame.Raised  # type: ignore
 
 from ..configuration import (
+    CARD_TYPE_SEPARATOR,
     COPY_MODE_ACROSS_NOTES,
     DIRECTION_SOURCE_TO_DESTINATIONS,
     CardAction,
@@ -170,7 +171,7 @@ class CardActionsEditor(QWidget):
                 available_templates = []
                 for template in templates:
                     template_name = template.get("name", "")
-                    item_text = f"{model_name}::{template_name}"
+                    item_text = f"{model_name}{CARD_TYPE_SEPARATOR}{template_name}"
                     # Only add if not already in card_actions
                     if item_text not in self.card_actions:
                         available_templates.append(item_text)

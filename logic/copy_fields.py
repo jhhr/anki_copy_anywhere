@@ -36,6 +36,7 @@ from .kana_highlight_process import WithTagsDef
 from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
 from ..configuration import (
+    CARD_TYPE_SEPARATOR,
     Config,
     CopyDefinition,
     definition_modifies_other_notes,
@@ -1048,9 +1049,23 @@ def copy_into_single_note(
             logger.error(f"Error in writing to file: {e}")
             raise CopyFailedException
 
-    card_actions_by_template_name = {
-        action.get("card_type_name", ""): action for action in card_actions
-    }
+    card_actions_by_template_name = {}
+    dest_note_type = destination_note.note_type()
+    for card_action in card_actions:
+        # The card_type_name contains the note type and card type separated by "::"
+        note_type_and_card_type = card_action.get("card_type_name ", "")
+        if "::" not in note_type_and_card_type:
+            logger.error(
+                f"Error in copy fields: Invalid card type name '{note_type_and_card_type}'"
+            )
+            # Skip this card action
+            continue
+        note_type_name, card_type_name = note_type_and_card_type.split(CARD_TYPE_SEPARATOR, 1)
+        if note_type_name != dest_note_type["name"]:
+            # This card action is not for this note type
+            continue
+        card_actions_by_template_name[card_type_name] = card_action
+
     dest_note_cards = destination_note.cards()
     for card in dest_note_cards:
         card_template_name = card.template()["name"]

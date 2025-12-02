@@ -155,6 +155,8 @@ MULTIPLE_ALLOWED_PROCESS_NAMES = [
 
 FlagValueType = Literal[0, 1, 2, 3, 4, 5, 6, 7]
 
+CARD_TYPE_SEPARATOR = "<::>"
+
 
 class CardAction(TypedDict):
     guid: str
