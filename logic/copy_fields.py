@@ -1052,9 +1052,9 @@ def copy_into_single_note(
     card_actions_by_template_name = {}
     dest_note_type = destination_note.note_type()
     for card_action in card_actions:
-        # The card_type_name contains the note type and card type separated by "::"
-        note_type_and_card_type = card_action.get("card_type_name", "")
-        if "::" not in note_type_and_card_type:
+        # The card_type_name contains the note type and card type separated by CARD_TYPE_SEPARATOR
+        note_type_and_card_type = card_action.get("card_type_name ", "")
+        if CARD_TYPE_SEPARATOR not in note_type_and_card_type:
             logger.error(
                 f"Error in copy fields: Invalid card type name '{note_type_and_card_type}'"
             )
@@ -1084,7 +1084,7 @@ def copy_into_single_note(
                 card.queue = -1
             else:
                 card.queue = card.type
-        if bury_card in [True, False] and suspend_card != True:
+        if bury_card in [True, False] and suspend_card is not True:
             # Card cannot be buried if it is suspended
             if bury_card:
                 card.queue = -2
