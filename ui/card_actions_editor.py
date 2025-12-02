@@ -117,17 +117,14 @@ class CardActionsEditor(QWidget):
 
     def set_description(self):
         """Update the description label based on the current copy mode and direction"""
-        self.description_label.setText(
-            base_description
-            + (
-                source_to_destinations_description
-                if (
-                    self.state.copy_mode == COPY_MODE_ACROSS_NOTES
-                    and self.state.copy_direction == DIRECTION_SOURCE_TO_DESTINATIONS
-                )
-                else destination_to_sources_description
-            )
-        )
+        if self.state.copy_mode == COPY_MODE_ACROSS_NOTES:
+            if self.state.copy_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+                description = source_to_destinations_description
+            else:
+                description = destination_to_sources_description
+        else:  # COPY_MODE_WITHIN_NOTE
+            description = ""  # or a specific description for within-note mode
+        self.description_label.setText(base_description + description)
 
     def initialize_ui_state(self):
         """Perform expensive UI state initialization when component is first shown"""
