@@ -153,6 +153,17 @@ MULTIPLE_ALLOWED_PROCESS_NAMES = [
     REGEX_PROCESS,
 ]
 
+FlagValueType = Literal[0, 1, 2, 3, 4, 5, 6, 7]
+
+
+class CardAction(TypedDict):
+    guid: str
+    card_type_name: str
+    change_deck: Optional[str]
+    set_flag: Optional[FlagValueType]
+    suspend: Optional[bool]
+    bury: Optional[bool]
+
 
 class CopyFieldToField(TypedDict):
     guid: str
@@ -235,6 +246,7 @@ class CopyDefinition(TypedDict):
     field_to_field_defs: list[CopyFieldToField]
     field_to_file_defs: list[CopyFieldToFile]
     field_to_variable_defs: list[CopyFieldToVariable]
+    card_actions: Optional[list[CardAction]]
     add_tags: Optional[str]
     remove_tags: Optional[str]
     only_copy_into_decks: Optional[str]

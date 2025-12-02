@@ -33,6 +33,7 @@ from .copy_field_to_field_editor import CopyFieldToFieldEditor
 from .copy_field_to_file_editor import CopyFieldToFileEditor
 from .field_to_variable_editor import CopyFieldToVariableEditor
 from .tag_editor import TagEditor
+from .card_actions_editor import CardActionsEditor
 from .grouped_combo_box import GroupedComboBox
 from .interpolated_text_edit import InterpolatedTextEditLayout
 from .required_combobox import RequiredCombobox
@@ -599,6 +600,7 @@ class TabEditorComponents(QTabWidget):
         self.condition_widget = QWidget()
         self.card_query_widget = QWidget()
         self.tags_widget = QWidget()
+        self.card_actions_widget = QWidget()
         self.fields_widget = QWidget()
         self.files_widget = QWidget()
 
@@ -609,6 +611,7 @@ class TabEditorComponents(QTabWidget):
         if copy_mode == COPY_MODE_ACROSS_NOTES:
             self.addTab(self.card_query_widget, "Search Query")
         self.addTab(self.tags_widget, "Tags")
+        self.addTab(self.card_actions_widget, "Card Actions")
         self.addTab(self.fields_widget, "Field to Field")
         self.addTab(self.files_widget, "Field to File")
 
@@ -620,6 +623,7 @@ class TabEditorComponents(QTabWidget):
         self.across_query_tab_widget = None
         self.condition_query_tab_widget = None
         self.tag_editor = None
+        self.card_actions_editor = None
 
         # Connect tab change signal to lazy creation
         self.currentChanged.connect(self.on_tab_changed)
@@ -726,6 +730,28 @@ class TabEditorComponents(QTabWidget):
         self.tags_widget.adjustSize()
         self.created_tabs.add("tags")
 
+    def create_card_actions_tab(self):
+        if "card_actions" in self.created_tabs:
+            return
+        card_actions_layout = QVBoxLayout(self.card_actions_widget)
+        card_actions_layout.setAlignment(QAlignTop)
+
+        card_actions_layout.addWidget(QLabel("<h2>Card Actions</h2>"))
+
+        self.card_actions_editor = CardActionsEditor(self.parent, self.state, self.copy_definition)
+        card_actions_layout.addWidget(self.card_actions_editor)
+
+        spacer = QSpacerItem(100, 20, QSizePolicyExpanding, QSizePolicyMinimum)
+        card_actions_layout.addItem(spacer)
+        set_size_policy_for_all_widgets(card_actions_layout, QSizePolicyPreferred, QSizePolicyFixed)
+
+        # Initialize the editor's UI state
+        self.card_actions_editor.initialize_ui_state()
+
+        # Force the widget to update its size
+        self.card_actions_widget.adjustSize()
+        self.created_tabs.add("card_actions")
+
     def create_files_tab(self):
         if "files" in self.created_tabs:
             return
@@ -802,6 +828,8 @@ class TabEditorComponents(QTabWidget):
             self.create_fields_tab()
         elif tab_text == "Tags":
             self.create_tags_tab()
+        elif tab_text == "Card Actions":
+            self.create_card_actions_tab()
         elif tab_text == "Field to File":
             self.create_files_tab()
         elif tab_text == "Search Query":
@@ -847,6 +875,11 @@ class TabEditorComponents(QTabWidget):
         if "across_query" in self.created_tabs:
             return self.across_query_tab_widget
         return None
+
+    def get_card_actions_editor(self) -> CardActionsEditor:
+        if self.card_actions_editor is None:
+            self.create_card_actions_tab()
+        return self.card_actions_editor
 
 
 class AcrossNotesCopyEditor(QWidget):
@@ -941,6 +974,9 @@ class AcrossNotesCopyEditor(QWidget):
         """Get the query editor widget if it exists, otherwise None"""
         return self.editor_tabs.get_across_query_editor()
 
+    def get_card_actions_editor(self) -> CardActionsEditor:
+        return self.editor_tabs.get_card_actions_editor()
+
     def create_and_set_across_query_editor(self):
         if not self.query_editor:
             self.editor_tabs.create_across_query_tab()
@@ -1021,6 +1057,9 @@ class WithinNoteCopyEditor(QWidget):
 
     def get_condition_query_editor(self):
         return self.editor_tabs.get_condition_query_editor()
+
+    def get_card_actions_editor(self):
+        return self.editor_tabs.get_card_actions_editor()
 
     @property
     def condition_query_text_layout(self):
@@ -1207,6 +1246,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             field_to_file_editor = self.across_notes_editor_tab.get_field_to_file_editor()
             field_to_variable_editor = self.across_notes_editor_tab.get_field_to_variable_editor()
             condition_query_editor = self.across_notes_editor_tab.get_condition_query_editor()
+            card_actions_editor = self.across_notes_editor_tab.get_card_actions_editor()
             # select_card_by has been validated in check_fields()
             select_card_by = cast(
                 SelectCardByType, self.across_notes_editor_tab.card_select_cbox.currentText()
@@ -1238,6 +1278,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 ),
                 "add_tags": tag_editor.get_add_tags(),
                 "remove_tags": tag_editor.get_remove_tags(),
+                "card_actions": card_actions_editor.get_card_actions(),
                 "sort_by_field": self.across_notes_editor_tab.sort_by_field_cbox.currentText(),
                 "select_card_by": select_card_by,
                 "select_card_count": self.across_notes_editor_tab.card_select_count.text(),
@@ -1255,6 +1296,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             tag_editor = self.within_note_editor_tab.get_tag_editor()
             field_to_file_editor = self.within_note_editor_tab.get_field_to_file_editor()
             condition_query_editor = self.within_note_editor_tab.get_condition_query_editor()
+            card_actions_editor = self.within_note_editor_tab.get_card_actions_editor()
             within_copy_definition: CopyDefinition = {
                 "guid": (
                     self.copy_definition.get("guid", str(uuid.uuid4()))
@@ -1279,6 +1321,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 ),
                 "add_tags": tag_editor.get_add_tags(),
                 "remove_tags": tag_editor.get_remove_tags(),
+                "card_actions": card_actions_editor.get_card_actions(),
                 "copy_mode": COPY_MODE_WITHIN_NOTE,
                 "across_mode_direction": None,
                 "copy_from_cards_query": None,

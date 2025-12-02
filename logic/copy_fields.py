@@ -26,6 +26,7 @@ from ..utils.file_exists_in_media_folder import file_exists_in_media_folder
 from ..utils.write_to_media_folder import write_to_media_folder
 from ..utils.write_custom_data import write_custom_data
 from ..utils.logger import Logger
+from ..utils.move_card_to_deck import move_card_to_deck
 
 from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
@@ -41,6 +42,7 @@ from ..configuration import (
     CopyFieldToVariable,
     CopyFieldToField,
     CopyFieldToFile,
+    CardAction,
     get_field_to_field_unfocus_trigger_fields,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
@@ -558,6 +560,7 @@ def copy_fields_in_background(
             trigger_note=note,
             is_sync=is_sync,
             copied_into_notes=copied_into_notes,
+            copied_into_cards=copied_into_cards,
             field_only=field_only,
             logger=logger,
             file_cache=file_cache,
@@ -566,7 +569,6 @@ def copy_fields_in_background(
 
         progress_updater.update_counts(note_cnt_inc=1)
 
-        copied_into_cards.extend(note.cards())
         progress_updater.maybe_render_update()
 
         if mw.progress.want_cancel():
@@ -708,6 +710,7 @@ def copy_for_single_trigger_note(
     trigger_note: Note,
     is_sync: Optional[bool] = False,
     copied_into_notes: Optional[list[Note]] = None,
+    copied_into_cards: Optional[list[Card]] = None,
     field_only: Optional[str] = None,
     deck_id: Optional[int] = None,
     logger: Logger = Logger("error"),
@@ -722,6 +725,9 @@ def copy_for_single_trigger_note(
     :param copied_into_notes: A list of notes that were copied into, to be appended to
         with the destination notes. Can be omitted, if it's not necessary to run
         mw.col.update_notes(copied_into_notes) after the operation
+    :param copied_into_cards: A list of cards that were copied into, to be appended to
+        with the cards of the destination notes. Can be omitted, if it's not necessary to run
+        mw.col.update_cards(copied_into_cards) after the operation
     :param field_only: Optional field to limit copying to. Used when copying is applied
       in the note editor
     :param deck_id: Deck ID where the cards are going into, only needed when adding
@@ -737,6 +743,7 @@ def copy_for_single_trigger_note(
     field_to_field_defs = copy_definition.get("field_to_field_defs", [])
     field_to_file_defs = copy_definition.get("field_to_file_defs", [])
     field_to_variable_defs = copy_definition.get("field_to_variable_defs", [])
+    card_actions = copy_definition.get("card_actions", [])
     only_copy_into_decks = copy_definition.get("only_copy_into_decks", None)
     include_subdecks = copy_definition.get("include_subdecks", False)
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
@@ -851,9 +858,10 @@ def copy_for_single_trigger_note(
     # Step 3: Get value for each field we are copying into
     for destination_note in destination_notes:
         try:
-            copied_into_dest_note, copied_into_file = copy_into_single_note(
+            copied_into_dest_note, copied_into_file, dest_note_cards = copy_into_single_note(
                 field_to_field_defs=field_to_field_defs,
                 field_to_file_defs=field_to_file_defs,
+                card_actions=card_actions,
                 destination_note=destination_note,
                 source_notes=source_notes,
                 add_tags=add_tags,
@@ -874,6 +882,8 @@ def copy_for_single_trigger_note(
                 )
             if copied_into_notes is not None and copied_into_dest_note:
                 copied_into_notes.append(destination_note)
+            if copied_into_cards is not None and dest_note_cards:
+                copied_into_cards.extend(dest_note_cards)
         except CopyFailedException:
             return False
 
@@ -883,6 +893,7 @@ def copy_for_single_trigger_note(
 def copy_into_single_note(
     field_to_field_defs: list[CopyFieldToField],
     field_to_file_defs: list[CopyFieldToFile],
+    card_actions: list[CardAction],
     destination_note: Note,
     source_notes: list[Note],
     add_tags: Optional[str] = "",
@@ -895,7 +906,7 @@ def copy_into_single_note(
     file_cache: Optional[dict] = None,
     logger: Logger = Logger("error"),
     progress_updater: Optional[ProgressUpdater] = None,
-) -> Tuple[bool, bool]:
+) -> Tuple[bool, bool, list[Card]]:
 
     modified_dest_note = False
     wrote_to_file = False
@@ -1036,7 +1047,37 @@ def copy_into_single_note(
         except Exception as e:
             logger.error(f"Error in writing to file: {e}")
             raise CopyFailedException
-    return (modified_dest_note, wrote_to_file)
+
+    card_actions_by_template_name = {
+        action.get("card_type_name", ""): action for action in card_actions
+    }
+    dest_note_cards = destination_note.cards()
+    for card in dest_note_cards:
+        card_template_name = card.template()["name"]
+        card_action = card_actions_by_template_name.get(card_template_name, None)
+        if card_action is None:
+            continue
+        change_deck = card_action.get("change_deck", None)
+        suspend_card = card_action.get("suspend_card", None)
+        bury_card = card_action.get("bury_card", None)
+        set_flag = card_action.get("set_flag", None)
+        if change_deck != "-" and change_deck is not None:
+            move_card_to_deck(card, change_deck, logger=logger)
+        if suspend_card in [True, False]:
+            # see pylib/anki/cards.py for queue values
+            if suspend_card:
+                card.queue = -1
+            else:
+                card.queue = card.type
+        if bury_card in [True, False] and not suspend_card:
+            # Card cannot be buried if it is suspended
+            if bury_card:
+                card.queue = -2
+            else:
+                card.queue = card.type
+        if 0 <= set_flag <= 7:
+            card.set_user_flag(set_flag)
+    return (modified_dest_note, wrote_to_file, dest_note_cards)
 
 
 def get_variable_values_for_note(

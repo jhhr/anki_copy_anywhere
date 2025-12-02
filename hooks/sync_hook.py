@@ -112,7 +112,7 @@ def remote_changes_copy_definitions(sync_result: SyncResult) -> None:
 
     def show_tooltip_on_done():
         # Showing the tooltip right after the op finishes results in it being closed right
-        # away, likely becayse the progress dialog is still open. So we use a single shot timer
+        # away, likely because the progress dialog is still open. So we use a single shot timer
         # to delay the tooltip.
         mw.progress.single_shot(100, lambda: show_result_tooltip(sync_result))
 
