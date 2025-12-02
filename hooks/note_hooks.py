@@ -181,33 +181,40 @@ def run_copy_fields_on_review(card: Card):
     undo_status = mw.col.undo_status()
     answer_card_undo_entry = undo_status.last_step
     copied_into_notes: list[Note] = []
-    copied_into_cards: list[Card] = []
+    copied_into_cards_dict: dict[int, Card] = {}
     for copy_definition in copy_definitions_to_run:
         copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
             copied_into_notes=copied_into_notes,
-            copied_into_cards=copied_into_cards,
+            copied_into_cards_dict=copied_into_cards_dict,
             logger=logger,
         )
-    # Replace the card in copied_into_cards with the merged version
-    # Find and merge with the matching card, if present
-    matching_card = next((c for c in copied_into_cards if c.id == card.id), None)
-    if matching_card is not None:
-        merge_cards(card, matching_card)
-    # Remove any card with the same id as the reviewed card
-    copied_into_cards = [c for c in copied_into_cards if c.id != card.id]
-    # Ensure the reviewed card is always updated
-    copied_into_cards.append(card)
+        # After each copy_definition, update notes and cards so that subsequent copy_definitions
+        # operate on the latest data
+        # update_note adds a new undo entry Update note
+        mw.col.update_notes(copied_into_notes)
+        edited_cards = [
+            card
+            for card in copied_into_cards_dict.values()
+            if hasattr(card, "edited") and card.edited
+        ]
+        for c in edited_cards:
+            if c.id == card.id:
+                # Merge all changes to the reviewed card so that the final update_card call
+                # doesn't overwrite the changes done here
+                merge_cards(card, c)
+            del c.edited
+        # update_card adds a new undo entry Update cards
+        mw.col.update_cards(edited_cards)
+        # merge all undo entries into the original Answer card undo entry
+        mw.col.merge_undo_entries(answer_card_undo_entry)
     if has_definitions_to_process_on_sync:
         # In order to not have on_sync definitions run twice, we'll set a different fc value
         write_custom_data(card, key="fc", value=-1)
     else:
         write_custom_data(card, key="fc", value=1)
-    # update_cards adds a new undo entry Update cards
-    mw.col.update_cards(copied_into_cards)
-    # update_note adds a new undo entry Update note
-    mw.col.update_notes(copied_into_notes)
+    mw.col.update_card(card)
     # All updates are now merged into the Answer card undo entry
     mw.col.merge_undo_entries(answer_card_undo_entry)
 
