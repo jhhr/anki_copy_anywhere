@@ -1073,8 +1073,8 @@ def copy_into_single_note(
         if card_action is None:
             continue
         change_deck = card_action.get("change_deck", None)
-        suspend_card = card_action.get("suspend_card", None)
-        bury_card = card_action.get("bury_card", None)
+        suspend_card = card_action.get("suspend", None)
+        bury_card = card_action.get("bury", None)
         set_flag = card_action.get("set_flag", None)
         if change_deck != "-" and change_deck is not None:
             move_card_to_deck(card, change_deck, logger=logger)
