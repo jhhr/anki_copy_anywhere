@@ -270,7 +270,7 @@ class EditState:
             for editor in checkbox_editors:
                 if editor is triggering_editor:
                     continue
-                editor.setChecked(self.copy_on_sync)
+                editor.setChecked(getattr(self, state_attr))
 
         def connect_func(
             checkbox: QCheckBox, callback: Optional[Callable[[QCheckBox], None]] = None
