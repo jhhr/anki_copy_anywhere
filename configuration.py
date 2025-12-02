@@ -412,6 +412,13 @@ class Config:
         self.data["copy_definitions"].append(definition)
         self.save()
 
+    def insert_definition_at_index(self, index: int, definition: CopyDefinition):
+        """Insert a definition at a specific index in the list"""
+        if "guid" not in definition:
+            definition["guid"] = str(uuid.uuid4())
+        self.data["copy_definitions"].insert(index, definition)
+        self.save()
+
     def remove_definition_by_name(self, name: str):
         definition = self.get_definition_by_name(name)
         if definition is None:
