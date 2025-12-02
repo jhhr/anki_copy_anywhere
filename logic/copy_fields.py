@@ -1084,7 +1084,7 @@ def copy_into_single_note(
                 card.queue = -1
             else:
                 card.queue = card.type
-        if bury_card in [True, False] and not suspend_card:
+        if bury_card in [True, False] and suspend_card != True:
             # Card cannot be buried if it is suspended
             if bury_card:
                 card.queue = -2
