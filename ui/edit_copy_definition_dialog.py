@@ -134,10 +134,6 @@ class BasicEditorFormLayout(QFormLayout):
         self.note_type_target_cbox.addItems([f'"{model_name}"' for model_name in model_names_list])
         self.target_note_type_label = QLabel("<h3>Trigger (destination) note type</h3>")
         self.addRow(self.target_note_type_label, self.note_type_target_cbox)
-        state.connect_target_note_type_editor(
-            self.note_type_target_cbox,
-            self.set_note_type_warning,
-        )
 
         # Set up a label for showing a warning, if selecting multiple models
         self.note_type_target_warning = QLabel("")
@@ -160,6 +156,17 @@ class BasicEditorFormLayout(QFormLayout):
             self.decks_limit_multibox,
             self.update_deck_multibox_options,
         )
+
+        # Register callbacks that should be called when note types change
+        # This includes both the warning and deck options update
+        # The callback needs to be registered for model changes to update deck options
+        state.connect_target_note_type_editor(
+            self.note_type_target_cbox,
+            self.set_note_type_warning,
+        )
+
+        # Add a callback to update deck options when models change
+        state.add_selected_model_callback(self.update_deck_multibox_options, is_visible=True)
 
         self.include_subdecks_checkbox = QCheckBox("Include subdecks of selected decks")
         self.include_subdecks_checkbox.setChecked(False)
