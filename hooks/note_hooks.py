@@ -203,6 +203,8 @@ def run_copy_fields_on_review(card: Card):
             if c.id == card.id:
                 # Merge all changes to the reviewed card so that the final update_card call
                 # doesn't overwrite the changes done here
+                # Note, edited attribute is not merged as it's not a real card attribute, we don't
+                # need it after this, as edit the card regardless
                 merge_cards(card, c)
             del c.edited
         # update_card adds a new undo entry Update cards
