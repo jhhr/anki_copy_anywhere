@@ -207,6 +207,7 @@ class ProgressUpdater:
         self.note_cnt = 0
         self.total_processed_sources = 0
         self.total_processed_destinations = 0
+        self.total_processed_cards = 0
         self.total_processed_files = 0
         self.last_render_update = 0.0
         if title is None:
@@ -219,6 +220,7 @@ class ProgressUpdater:
         processed_sources_inc: Optional[int] = None,
         processed_destinations_inc: Optional[int] = None,
         processed_files_inc: Optional[int] = None,
+        processed_cards_inc: Optional[int] = None,
     ):
         if note_cnt_inc is not None:
             self.note_cnt += note_cnt_inc
@@ -228,13 +230,16 @@ class ProgressUpdater:
             self.total_processed_destinations += processed_destinations_inc
         if processed_files_inc is not None:
             self.total_processed_files += processed_files_inc
+        if processed_cards_inc is not None:
+            self.total_processed_cards += processed_cards_inc
 
-    def get_counts(self) -> Tuple[int, int, int, int]:
+    def get_counts(self) -> Tuple[int, int, int, int, int]:
         return (
             self.note_cnt,
             self.total_processed_sources,
             self.total_processed_destinations,
             self.total_processed_files,
+            self.total_processed_cards,
         )
 
     def maybe_render_update(self, force: bool = False):
@@ -252,8 +257,9 @@ class ProgressUpdater:
         <br><small>Processed{f'-  destination notes: {self.total_processed_destinations}'
                     if self.total_processed_destinations > 0 else ''}
             {f'- files: {self.total_processed_files}' if self.total_processed_files > 0 else ''}
-            {f', sources: {self.total_processed_sources}' if self.is_across else ''}</small>
-        <br>Time: {elapsed_time}"""
+            {f', sources: {self.total_processed_sources}' if self.is_across else ''}
+            {f', cards: {self.total_processed_cards}' if self.total_processed_cards > 0 else ''}
+        </small><br>Time: {elapsed_time}"""
         if self.note_cnt / self.total_notes_count > 0.10 or elapsed_s > 1:
             if self.note_cnt > 0:
                 eta_s = (elapsed_s / self.note_cnt) * (self.total_notes_count - self.note_cnt)
@@ -606,6 +612,7 @@ def copy_fields_in_background(
             <i>{html.escape(copy_definition['definition_name'])}:</i>
             {f'{total_processed_dests} destinations' if total_processed_dests > 0 else ''}
             {f'{total_processed_files} files' if total_processed_files > 0 else ''}
+            {f'{total_processed_cards} cards' if total_processed_cards > 0 else ''}
             {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
         </span>""")
         results.incr_count(1)
@@ -817,6 +824,11 @@ def copy_for_single_trigger_note(
                 f"due to missing fields: {', '.join(invalid_fields)}"
             )
             return False
+
+    # Update progress for processing this note after we've checked the condition, so we don't
+    # count notes that are skipped due to the condition not matching
+    if progress_updater is not None:
+        progress_updater.update_counts(note_cnt_inc=1)
 
     # Step 2: Get source/destination notes for this card
     destination_notes = []
