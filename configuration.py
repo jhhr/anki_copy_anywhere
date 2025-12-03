@@ -153,6 +153,19 @@ MULTIPLE_ALLOWED_PROCESS_NAMES = [
     REGEX_PROCESS,
 ]
 
+FlagValueType = Literal[0, 1, 2, 3, 4, 5, 6, 7]
+
+CARD_TYPE_SEPARATOR = "<::>"
+
+
+class CardAction(TypedDict):
+    guid: str
+    card_type_name: str
+    change_deck: Optional[str]
+    set_flag: Optional[FlagValueType]
+    suspend: Optional[bool]
+    bury: Optional[bool]
+
 
 class CopyFieldToField(TypedDict):
     guid: str
@@ -235,6 +248,7 @@ class CopyDefinition(TypedDict):
     field_to_field_defs: list[CopyFieldToField]
     field_to_file_defs: list[CopyFieldToFile]
     field_to_variable_defs: list[CopyFieldToVariable]
+    card_actions: Optional[list[CardAction]]
     add_tags: Optional[str]
     remove_tags: Optional[str]
     only_copy_into_decks: Optional[str]
@@ -410,6 +424,13 @@ class Config:
         if "guid" not in definition:
             definition["guid"] = str(uuid.uuid4())
         self.data["copy_definitions"].append(definition)
+        self.save()
+
+    def insert_definition_at_index(self, index: int, definition: CopyDefinition):
+        """Insert a definition at a specific index in the list"""
+        if "guid" not in definition:
+            definition["guid"] = str(uuid.uuid4())
+        self.data["copy_definitions"].insert(index, definition)
         self.save()
 
     def remove_definition_by_name(self, name: str):

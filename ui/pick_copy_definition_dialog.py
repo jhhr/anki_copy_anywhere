@@ -446,14 +446,16 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
 
     def duplicate_definition_by_guid(self, definition_guid: str):
         """Duplicate a specific definition by GUID."""
-        # Find the definition to duplicate
+        # Find the definition to duplicate and its index
         definition_to_duplicate = None
-        for definition in self.copy_definitions:
+        source_index = None
+        for i, definition in enumerate(self.copy_definitions):
             if definition.get("guid") == definition_guid:
                 definition_to_duplicate = definition
+                source_index = i
                 break
 
-        if definition_to_duplicate is None:
+        if definition_to_duplicate is None or source_index is None:
             return
 
         # Create a copy and assign new GUID
@@ -463,15 +465,16 @@ class PickCopyDefinitionDialog(ScrollableQDialog):
         copy_definition["definition_name"] += " (copy)"
         copy_definition["guid"] = str(uuid.uuid4())
 
-        config.add_definition(copy_definition)
-
-        # Add to local list and UI
-        self.copy_definitions.append(copy_definition)
-        self.add_definition_row(len(self.copy_definitions) - 1, copy_definition)
+        # Insert at the next index after the source
+        target_index = source_index + 1
+        config.insert_definition_at_index(target_index, copy_definition)
 
         # Reload config to stay in sync
         config.load()
         self.copy_definitions = config.copy_definitions
+
+        # Rebuild UI to reflect the new order
+        self.rebuild_definitions_ui()
 
     def reorder_definitions(self, source_guid: str, target_guid: str, drop_below: bool):
         """Reorder definitions by moving source before or after target"""

@@ -26,6 +26,7 @@ from ..utils.file_exists_in_media_folder import file_exists_in_media_folder
 from ..utils.write_to_media_folder import write_to_media_folder
 from ..utils.write_custom_data import write_custom_data
 from ..utils.logger import Logger
+from ..utils.move_card_to_deck import move_card_to_deck
 
 from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
@@ -35,12 +36,14 @@ from .kana_highlight_process import WithTagsDef
 from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
 from ..configuration import (
+    CARD_TYPE_SEPARATOR,
     Config,
     CopyDefinition,
     definition_modifies_other_notes,
     CopyFieldToVariable,
     CopyFieldToField,
     CopyFieldToFile,
+    CardAction,
     get_field_to_field_unfocus_trigger_fields,
     COPY_MODE_WITHIN_NOTE,
     COPY_MODE_ACROSS_NOTES,
@@ -380,7 +383,7 @@ def copy_fields(
             logger.error("Error in copy fields: No definitions given")
             return CacheResults(result_text="", changes=None)
 
-        copied_into_cards: list[Card] = []
+        copied_into_cards_dict: dict[int, Card] = {}
         copied_into_notes: list[Note] = []
         # If an undo_entry isn't passed, create one
         nonlocal undo_entry
@@ -409,7 +412,7 @@ def copy_fields(
                 ),
                 logger=logger,
                 is_sync=is_sync,
-                copied_into_cards=copied_into_cards,
+                copied_into_cards_dict=copied_into_cards_dict,
                 copied_into_notes=copied_into_notes,
                 results=results,
                 field_only=field_only,
@@ -420,13 +423,25 @@ def copy_fields(
             # Because of this, if multiple ops use the same note data as a source, the final result
             # depends on the order of the ops
             mw.col.update_notes(copied_into_notes)
+            # Update all edited cards so far, then remove the edited flag
+            # This must be done after each operation, so that if subsequent use card data as source,
+            # the final result depends on the order of the ops
+            edited_cards = [
+                card
+                for card in copied_into_cards_dict.values()
+                if hasattr(card, "edited") and card.edited
+            ]
+            for card in edited_cards:
+                del card.edited
+            mw.col.update_cards(edited_cards)
             # undo_entry has to be updated after every undoable op or the last_step will
             # increment causing an "target undo op not found" error!
             results.changes = mw.col.merge_undo_entries(undo_entry)
             if mw.progress.want_cancel():
                 break
         if is_sync:
-            # Update card custom-data after all ops are complete
+            # Update all card custom-data after all ops are complete
+            copied_into_cards = list(copied_into_cards_dict.values())
             for card in copied_into_cards:
                 write_custom_data(card, key="fc", value=1)
             mw.col.update_cards(copied_into_cards)
@@ -446,7 +461,7 @@ def copy_fields(
 
 def copy_fields_in_background(
     copy_definition: CopyDefinition,
-    copied_into_cards: list[Card],
+    copied_into_cards_dict: dict[int, Card],
     copied_into_notes: list[Note],
     results: CacheResults,
     is_sync: Optional[bool] = False,
@@ -458,7 +473,7 @@ def copy_fields_in_background(
     """
     Function run to copy stuff into many notes at once.
     :param copy_definition: The definition of what to copy, includes process chains
-    :param copied_into_cards: An initially empty list of cards that will be appended to with the
+    :param copied_into_cards_dict: An initially empty dictionary of cards that will be appended to with the
         cards of the notes that were copied into
     :param copied_into_notes: An initially empty list of notes that will be appended to with the
         notes that were copied into
@@ -558,6 +573,7 @@ def copy_fields_in_background(
             trigger_note=note,
             is_sync=is_sync,
             copied_into_notes=copied_into_notes,
+            copied_into_cards_dict=copied_into_cards_dict,
             field_only=field_only,
             logger=logger,
             file_cache=file_cache,
@@ -566,7 +582,6 @@ def copy_fields_in_background(
 
         progress_updater.update_counts(note_cnt_inc=1)
 
-        copied_into_cards.extend(note.cards())
         progress_updater.maybe_render_update()
 
         if mw.progress.want_cancel():
@@ -708,6 +723,7 @@ def copy_for_single_trigger_note(
     trigger_note: Note,
     is_sync: Optional[bool] = False,
     copied_into_notes: Optional[list[Note]] = None,
+    copied_into_cards_dict: Optional[dict[int, Card]] = None,
     field_only: Optional[str] = None,
     deck_id: Optional[int] = None,
     logger: Logger = Logger("error"),
@@ -722,6 +738,9 @@ def copy_for_single_trigger_note(
     :param copied_into_notes: A list of notes that were copied into, to be appended to
         with the destination notes. Can be omitted, if it's not necessary to run
         mw.col.update_notes(copied_into_notes) after the operation
+    :param copied_into_cards_dict: A dictionary of cards that were copied into, keyed by card ID,
+        to be appended to with the cards of the destination notes. Can be omitted, if it's not necessary to run
+        mw.col.update_cards(copied_into_cards) after the operation
     :param field_only: Optional field to limit copying to. Used when copying is applied
       in the note editor
     :param deck_id: Deck ID where the cards are going into, only needed when adding
@@ -737,6 +756,7 @@ def copy_for_single_trigger_note(
     field_to_field_defs = copy_definition.get("field_to_field_defs", [])
     field_to_file_defs = copy_definition.get("field_to_file_defs", [])
     field_to_variable_defs = copy_definition.get("field_to_variable_defs", [])
+    card_actions = copy_definition.get("card_actions", [])
     only_copy_into_decks = copy_definition.get("only_copy_into_decks", None)
     include_subdecks = copy_definition.get("include_subdecks", False)
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
@@ -851,9 +871,10 @@ def copy_for_single_trigger_note(
     # Step 3: Get value for each field we are copying into
     for destination_note in destination_notes:
         try:
-            copied_into_dest_note, copied_into_file = copy_into_single_note(
+            copied_into_dest_note, copied_into_file, dest_note_cards = copy_into_single_note(
                 field_to_field_defs=field_to_field_defs,
                 field_to_file_defs=field_to_file_defs,
+                card_actions=card_actions,
                 destination_note=destination_note,
                 source_notes=source_notes,
                 add_tags=add_tags,
@@ -874,6 +895,10 @@ def copy_for_single_trigger_note(
                 )
             if copied_into_notes is not None and copied_into_dest_note:
                 copied_into_notes.append(destination_note)
+            if copied_into_cards_dict is not None and dest_note_cards:
+                # Add cards to the dict so they can be updated later
+                for new_card in dest_note_cards:
+                    copied_into_cards_dict[new_card.id] = new_card
         except CopyFailedException:
             return False
 
@@ -883,6 +908,7 @@ def copy_for_single_trigger_note(
 def copy_into_single_note(
     field_to_field_defs: list[CopyFieldToField],
     field_to_file_defs: list[CopyFieldToFile],
+    card_actions: list[CardAction],
     destination_note: Note,
     source_notes: list[Note],
     add_tags: Optional[str] = "",
@@ -895,7 +921,7 @@ def copy_into_single_note(
     file_cache: Optional[dict] = None,
     logger: Logger = Logger("error"),
     progress_updater: Optional[ProgressUpdater] = None,
-) -> Tuple[bool, bool]:
+) -> Tuple[bool, bool, list[Card]]:
 
     modified_dest_note = False
     wrote_to_file = False
@@ -1036,7 +1062,56 @@ def copy_into_single_note(
         except Exception as e:
             logger.error(f"Error in writing to file: {e}")
             raise CopyFailedException
-    return (modified_dest_note, wrote_to_file)
+
+    card_actions_by_template_name = {}
+    dest_note_type = destination_note.note_type()
+    for card_action in card_actions:
+        # The card_type_name contains the note type and card type separated by CARD_TYPE_SEPARATOR
+        note_type_and_card_type = card_action.get("card_type_name", "")
+        if CARD_TYPE_SEPARATOR not in note_type_and_card_type:
+            logger.error(
+                f"Error in copy fields: Invalid card type name '{note_type_and_card_type}'"
+            )
+            # Skip this card action
+            continue
+        note_type_name, card_type_name = note_type_and_card_type.split(CARD_TYPE_SEPARATOR, 1)
+        if note_type_name != dest_note_type["name"]:
+            # This card action is not for this note type
+            continue
+        card_actions_by_template_name[card_type_name] = card_action
+
+    dest_note_cards = destination_note.cards()
+    for card in dest_note_cards:
+        card_template_name = card.template()["name"]
+        card_action = card_actions_by_template_name.get(card_template_name, None)
+        if card_action is None:
+            continue
+        change_deck = card_action.get("change_deck", None)
+        suspend_card = card_action.get("suspend", None)
+        bury_card = card_action.get("bury", None)
+        set_flag = card_action.get("set_flag", None)
+        if change_deck not in [None, "-"]:
+            move_card_to_deck(card, change_deck, logger=logger)
+            card.edited = True
+        if suspend_card in [True, False]:
+            # see pylib/anki/cards.py for queue values
+            if suspend_card:
+                card.queue = -1
+            else:
+                card.queue = card.type
+            card.edited = True
+        if bury_card in [True, False] and card.queue != -1:
+            # Card cannot be buried, if it is suspended
+            # To bury a suspended card, it must first be unsuspended with a suspend action
+            if bury_card:
+                card.queue = -2
+            else:
+                card.queue = card.type
+            card.edited = True
+        if isinstance(set_flag, int) and 0 <= set_flag <= 7:
+            card.set_user_flag(set_flag)
+            card.edited = True
+    return (modified_dest_note, wrote_to_file, dest_note_cards)
 
 
 def get_variable_values_for_note(

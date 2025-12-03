@@ -86,10 +86,8 @@ class CopyFieldToFieldEditor(QWidget):
         self.state = state
         if copy_definition is None:
             self.field_to_field_defs = []
-            field_to_file_defs = []
         else:
             self.field_to_field_defs = copy_definition.get("field_to_field_defs", [])
-            field_to_file_defs = copy_definition.get("field_to_file_defs", [])
         self.copy_definition = copy_definition
         self.copy_mode = copy_mode
 
@@ -128,11 +126,7 @@ class CopyFieldToFieldEditor(QWidget):
 
         self.copy_field_inputs: list[FieldInputsDict] = []
 
-        # Most copy definitions copy to note fields, so
-        # Initialize with one definition, if there are none, and there are no field-to-file defs
-        if len(self.field_to_field_defs) == 0 and len(field_to_file_defs) == 0:
-            self.add_new_definition()
-        elif len(self.field_to_field_defs) > 0:
+        if len(self.field_to_field_defs) > 0:
             for index, copy_field_to_field_definition in enumerate(self.field_to_field_defs):
                 self.add_copy_field_row(index, copy_field_to_field_definition)
 

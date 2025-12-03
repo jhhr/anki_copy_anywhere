@@ -104,6 +104,7 @@ class EditState:
             self.definition_name = copy_definition.get("definition_name", "")
             self.copy_into_note_types = copy_definition.get("copy_into_note_types", "")
             self.only_copy_into_decks = copy_definition.get("only_copy_into_decks", "")
+            self.include_subdecks = copy_definition.get("include_subdecks", False)
             self.copy_on_sync = copy_definition.get("copy_on_sync", False)
             self.copy_on_add = copy_definition.get("copy_on_add", False)
             self.copy_on_review = copy_definition.get("copy_on_review", False)
@@ -270,7 +271,7 @@ class EditState:
             for editor in checkbox_editors:
                 if editor is triggering_editor:
                     continue
-                editor.setChecked(self.copy_on_sync)
+                editor.setChecked(getattr(self, state_attr))
 
         def connect_func(
             checkbox: QCheckBox, callback: Optional[Callable[[QCheckBox], None]] = None

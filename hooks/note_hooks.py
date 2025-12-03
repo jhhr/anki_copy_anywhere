@@ -15,6 +15,7 @@ from aqt.gui_hooks import (
 
 from ..utils.write_custom_data import write_custom_data
 from ..utils.logger import Logger
+from ..utils.merge_cards import merge_cards
 from ..configuration import (
     Config,
     CopyDefinition,
@@ -180,23 +181,43 @@ def run_copy_fields_on_review(card: Card):
     undo_status = mw.col.undo_status()
     answer_card_undo_entry = undo_status.last_step
     copied_into_notes: list[Note] = []
+    copied_into_cards_dict: dict[int, Card] = {}
     for copy_definition in copy_definitions_to_run:
         copy_for_single_trigger_note(
             copy_definition=copy_definition,
             trigger_note=note,
             copied_into_notes=copied_into_notes,
+            copied_into_cards_dict=copied_into_cards_dict,
             logger=logger,
         )
+        # After each copy_definition, update notes and cards so that subsequent copy_definitions
+        # operate on the latest data
+        # update_note adds a new undo entry Update note
+        mw.col.update_notes(copied_into_notes)
+        edited_cards = [
+            card
+            for card in copied_into_cards_dict.values()
+            if hasattr(card, "edited") and card.edited
+        ]
+        for c in edited_cards:
+            if c.id == card.id:
+                # Merge all changes to the reviewed card so that the final update_card call
+                # doesn't overwrite the changes done here
+                # Note, edited attribute is not merged as it's not a real card attribute, we don't
+                # need it after this, as edit the card regardless
+                merge_cards(card, c)
+            del c.edited
+        # update_card adds a new undo entry Update cards
+        mw.col.update_cards(edited_cards)
+        # merge all undo entries into the original Answer card undo entry
+        mw.col.merge_undo_entries(answer_card_undo_entry)
     if has_definitions_to_process_on_sync:
         # In order to not have on_sync definitions run twice, we'll set a different fc value
         write_custom_data(card, key="fc", value=-1)
     else:
         write_custom_data(card, key="fc", value=1)
-    # update_card adds a new undo entry Update card
     mw.col.update_card(card)
-    # update_note adds a new undo entry Update note
-    mw.col.update_notes(copied_into_notes)
-    # But now they are both merged into the Answer card undo entry
+    # All updates are now merged into the Answer card undo entry
     mw.col.merge_undo_entries(answer_card_undo_entry)
 
 
