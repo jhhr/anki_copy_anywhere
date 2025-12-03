@@ -580,8 +580,6 @@ def copy_fields_in_background(
             progress_updater=progress_updater,
         )
 
-        progress_updater.update_counts(note_cnt_inc=1)
-
         progress_updater.maybe_render_update()
 
         if mw.progress.want_cancel():
@@ -593,12 +591,16 @@ def copy_fields_in_background(
 
     # When syncing, don't show a pointless message that nothing was done
     # Otherwise, when copy fields is run manually, you want to know the result in any case
-    should_report_result = len(notes) > 0 if is_sync else True
+    (
+        processed_note_cnt,
+        total_processed_sources,
+        total_processed_dests,
+        total_processed_files,
+        total_processed_cards,
+    ) = progress_updater.get_counts()
+    should_report_result = processed_note_cnt > 0 if is_sync else True
     if should_report_result:
         #  Get counts from ProgressUpdater and render the final update
-        _, total_processed_sources, total_processed_dests, total_processed_files = (
-            progress_updater.get_counts()
-        )
         results.add_result_text(f"""<br><span>
             {time.time() - start_time:.2f}s -
             <i>{html.escape(copy_definition['definition_name'])}:</i>
@@ -1111,6 +1113,8 @@ def copy_into_single_note(
         if isinstance(set_flag, int) and 0 <= set_flag <= 7:
             card.set_user_flag(set_flag)
             card.edited = True
+        if progress_updater is not None and hasattr(card, "edited") and card.edited:
+            progress_updater.update_counts(processed_cards_inc=1)
     return (modified_dest_note, wrote_to_file, dest_note_cards)
 
 
