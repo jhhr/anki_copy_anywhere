@@ -431,6 +431,8 @@ def copy_fields(
                 for card in copied_into_cards_dict.values()
                 if hasattr(card, "edited") and card.edited
             ]
+            for card in edited_cards:
+                del card.edited
             mw.col.update_cards(edited_cards)
             # undo_entry has to be updated after every undoable op or the last_step will
             # increment causing an "target undo op not found" error!
