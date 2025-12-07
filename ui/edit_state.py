@@ -96,6 +96,7 @@ class EditState:
         self.copy_on_sync: bool = False
         self.copy_on_add: bool = False
         self.copy_on_review: bool = False
+        self.run_also_if_no_sources_found: bool = False
         self.copy_mode: CopyModeType = COPY_MODE_WITHIN_NOTE
         self.copy_direction: DirectionType = DIRECTION_DESTINATION_TO_SOURCES
         self.card_select_count: int = 1
@@ -108,6 +109,9 @@ class EditState:
             self.copy_on_sync = copy_definition.get("copy_on_sync", False)
             self.copy_on_add = copy_definition.get("copy_on_add", False)
             self.copy_on_review = copy_definition.get("copy_on_review", False)
+            self.run_also_if_no_sources_found = copy_definition.get(
+                "run_also_if_no_sources_found", False
+            )
             if copy_definition.get("copy_mode") == COPY_MODE_ACROSS_NOTES:
                 self.copy_direction = (
                     copy_definition.get("across_mode_direction") or DIRECTION_DESTINATION_TO_SOURCES

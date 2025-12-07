@@ -488,6 +488,9 @@ class AcrossQueryTabWidget(QWidget):
         self.show_error_for_none_found = QCheckBox("Show error, if no notes found for the query")
         query_form.addRow(self.show_error_for_none_found)
 
+        self.run_also_if_no_sources_found_checkbox = QCheckBox("Run also if no source notes found")
+        query_form.addRow(self.run_also_if_no_sources_found_checkbox)
+
         spacer = QSpacerItem(100, 40, QSizePolicyMinimum, QSizePolicyExpanding)
         query_layout.addSpacerItem(spacer)
         # Set the current text in the combo boxes to what we had in memory in the configuration
@@ -507,6 +510,21 @@ class AcrossQueryTabWidget(QWidget):
                 self.show_error_for_none_found.setChecked(
                     copy_definition.get("show_error_if_none_found", False)
                 )
+            with suppress(KeyError):
+                self.run_also_if_no_sources_found_checkbox.setChecked(
+                    copy_definition.get("run_also_if_no_sources_found", False)
+                )
+            self.update_run_also_if_no_sources_found_checkbox(self.state.copy_direction)
+
+    def update_run_also_if_no_sources_found_checkbox(self, direction: DirectionType):
+        if direction == DIRECTION_SOURCE_TO_DESTINATIONS:
+            self.run_also_if_no_sources_found_checkbox.setEnabled(False)
+            self.run_also_if_no_sources_found_checkbox.setToolTip(
+                "This option is not relevant in Source to Destinations mode"
+            )
+        else:
+            self.run_also_if_no_sources_found_checkbox.setEnabled(True)
+            self.run_also_if_no_sources_found_checkbox.setToolTip("")
 
     # If card_select_count is > 1, separator is required, otherwise it's ok to be empty
     def on_card_select_count_changed(self, text: str):
@@ -560,6 +578,7 @@ class AcrossQueryTabWidget(QWidget):
 
         # Perform the expensive initialization
         self.update_fields_by_target_note_type()
+        self.update_run_also_if_no_sources_found_checkbox(self.state.copy_direction)
 
         self.query_initialized = True
 
@@ -948,6 +967,8 @@ class AcrossNotesCopyEditor(QWidget):
                     self.query_editor.card_query_text_label.setText(
                         "<h2>Search query to get destination notes</h3>"
                     )
+            if self.query_editor:
+                self.query_editor.update_run_also_if_no_sources_found_checkbox(direction)
 
     def get_selected_direction(self) -> DirectionType:
         if self.source_to_destination_radio.isChecked():
@@ -1288,6 +1309,9 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "show_error_if_none_found": (
                     self.across_notes_editor_tab.show_error_for_none_found.isChecked()
                 ),
+                "run_also_if_no_sources_found": (
+                    self.across_notes_editor_tab.query_editor.run_also_if_no_sources_found_checkbox.isChecked()
+                ),
             }
             return across_copy_definition
         elif self.selected_editor_type == COPY_MODE_WITHIN_NOTE:
@@ -1330,6 +1354,7 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
                 "select_card_count": None,
                 "select_card_separator": None,
                 "show_error_if_none_found": False,
+                "run_also_if_no_sources_found": False,
             }
             return within_copy_definition
         return None

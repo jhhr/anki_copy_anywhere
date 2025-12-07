@@ -771,6 +771,7 @@ def copy_for_single_trigger_note(
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
     copy_condition_query = copy_definition.get("copy_condition_query", None)
     condition_only_on_sync = copy_definition.get("condition_only_on_sync", False)
+    run_also_if_no_sources_found = copy_definition.get("run_also_if_no_sources_found", False)
     add_tags = copy_definition.get("add_tags", "")
     remove_tags = copy_definition.get("remove_tags", "")
     sort_by_field = copy_definition.get("sort_by_field", None)
@@ -872,7 +873,7 @@ def copy_for_single_trigger_note(
         logger.error("Error in copy fields: missing copy mode value")
         return False
 
-    if len(source_notes) == 0:
+    if len(source_notes) == 0 and not run_also_if_no_sources_found:
         if progress_updater is not None:
             progress_updater.update_counts(processed_destinations_inc=len(destination_notes))
         # This case is ok, there's just nothing to do
