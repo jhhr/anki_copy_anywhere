@@ -787,7 +787,7 @@ def copy_for_single_trigger_note(
 
     extra_state: dict[str, Any] = {}
 
-    # Step 0: Get variable values for the note
+    # Step 1: Get variable values for the note
     variable_values_dict = None
     if field_to_variable_defs is not None:
         variable_values_dict = get_variable_values_for_note(
@@ -797,7 +797,42 @@ def copy_for_single_trigger_note(
             file_cache=file_cache,
         )
 
-    # Step 1: Check if possibly defined condition matches for this note
+    # Step 2: Check if the note is in a deck that is allowed for copying
+    if only_copy_into_decks and only_copy_into_decks != "-":
+        # Check if the current deck is in the white list, otherwise we don't copy into this note
+        # whitelist deck is a list of deck or sub deck names
+        # parent names can't be included since adding :: would break the filter text
+        target_deck_names = only_copy_into_decks.strip('""').split('", "')
+
+        unique_whitelist_dids: set[DeckId] = {
+            mw.col.decks.id_for_name(target_deck_name) for target_deck_name in target_deck_names
+        }
+        if include_subdecks:
+            parent_dids = set()
+            for did in unique_whitelist_dids:
+                child_dids = [d[1] for d in mw.col.decks.children(did)]
+                parent_dids.update(child_dids)
+            unique_whitelist_dids.update(parent_dids)
+        deck_ids_of_cards = []
+        if deck_id is not None:
+            deck_ids_of_cards.append(deck_id)
+        else:
+            for card in trigger_note.cards():
+                deck_ids_of_cards.append(card.odid or card.did)
+        logger.debug(
+            f"copy_for_single_trigger_note: deck_ids={deck_ids_of_cards},"
+            f" unique_whitelist_dids={unique_whitelist_dids}"
+        )
+        if deck_ids_of_cards and not any(
+            deck_id in unique_whitelist_dids for deck_id in deck_ids_of_cards
+        ):
+            logger.debug(
+                "copy_for_single_trigger_note: No deck id in whitelist, skipping copy for note"
+                f" {trigger_note.id}"
+            )
+            return False
+
+    # Step 3: Check the copy condition for this note
     condition_check = bool(copy_condition_query)
     if condition_only_on_sync and not is_sync:
         condition_check = False
@@ -831,7 +866,7 @@ def copy_for_single_trigger_note(
     if progress_updater is not None:
         progress_updater.update_counts(note_cnt_inc=1)
 
-    # Step 2: Get source/destination notes for this card
+    # Step 4: Get source/destination notes for this card
     destination_notes = []
     source_notes = []
     if copy_mode == COPY_MODE_WITHIN_NOTE:
@@ -855,7 +890,6 @@ def copy_for_single_trigger_note(
             deck_id=deck_id,
             extra_state=extra_state,
             sort_by_field=sort_by_field,
-            only_copy_into_decks=only_copy_into_decks,
             include_subdecks=include_subdecks,
             select_card_by=select_card_by,
             select_card_count=select_card_count,
@@ -1205,7 +1239,6 @@ def get_across_target_notes(
     sort_by_field: Optional[str] = None,
     deck_id: Optional[int] = None,
     variable_values_dict: Optional[dict] = None,
-    only_copy_into_decks: Optional[str] = None,
     include_subdecks: bool = False,
     select_card_count: Optional[str] = "1",
     logger: Logger = Logger("error"),
@@ -1230,10 +1263,9 @@ def get_across_target_notes(
     :return: A list of notes to copy from
     """
     logger.debug(
-        f"get_across_target_notes: copy_from_cards_query='{copy_from_cards_query}', "
-        f"select_card_by='{select_card_by}', deck_id={deck_id}, "
-        f"only_copy_into_decks='{only_copy_into_decks}', select_card_count='{select_card_count}', "
-        f"include_subdecks={include_subdecks}"
+        f"get_across_target_notes: copy_from_cards_query='{copy_from_cards_query}',"
+        f" select_card_by='{select_card_by}', deck_id={deck_id},"
+        f" select_card_count='{select_card_count}', include_subdecks={include_subdecks}"
     )
 
     if not select_card_by:
@@ -1260,40 +1292,6 @@ def get_across_target_notes(
             return []
     else:
         select_card_count_int = 1
-
-    if only_copy_into_decks and only_copy_into_decks != "-":
-        # Check if the current deck is in the white list, otherwise we don't copy into this note
-        # whitelist deck is a list of deck or sub deck names
-        # parent names can't be included since adding :: would break the filter text
-        target_deck_names = only_copy_into_decks.strip('""').split('", "')
-
-        unique_whitelist_dids: set[DeckId] = {
-            mw.col.decks.id_for_name(target_deck_name) for target_deck_name in target_deck_names
-        }
-        if include_subdecks:
-            parent_dids = set()
-            for did in unique_whitelist_dids:
-                child_dids = [d[1] for d in mw.col.decks.children(did)]
-                parent_dids.update(child_dids)
-            unique_whitelist_dids.update(parent_dids)
-        deck_ids_of_cards = []
-        if deck_id is not None:
-            deck_ids_of_cards.append(deck_id)
-        else:
-            for card in trigger_note.cards():
-                deck_ids_of_cards.append(card.odid or card.did)
-        logger.debug(
-            f"get_across_target_notes: deck_ids={deck_ids_of_cards},"
-            f" unique_whitelist_dids={unique_whitelist_dids}"
-        )
-        if deck_ids_of_cards and not any(
-            deck_id in unique_whitelist_dids for deck_id in deck_ids_of_cards
-        ):
-            logger.debug(
-                "get_across_target_notes: No deck id in whitelist, skipping copy for note"
-                f" {trigger_note.id}"
-            )
-            return []
 
     interpolated_cards_query, invalid_fields = interpolate_from_text(
         copy_from_cards_query,
