@@ -91,11 +91,24 @@ class KanaHighlightProcess(TypedDict):
     onyomi_to_katakana: bool
 
 
+WORD_HIGHLIGHT_PROCESS = "Word Highlight"
+
+
+class WordHighlightProcess(TypedDict):
+    guid: str
+    name: str
+    word_field: str
+
+
 AnyProcess = Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]
 
 
 def is_kana_highlight_process(process: Union[dict, AnyProcess]) -> TypeGuard[KanaHighlightProcess]:
     return process.get("name") == KANA_HIGHLIGHT_PROCESS
+
+
+def is_word_highlight_process(process: Union[dict, AnyProcess]) -> TypeGuard[WordHighlightProcess]:
+    return process.get("name") == WORD_HIGHLIGHT_PROCESS
 
 
 def is_regex_process(process: Union[dict, AnyProcess]) -> TypeGuard[RegexProcess]:
@@ -121,6 +134,7 @@ ALL_FIELD_TO_FIELD_PROCESS_NAMES = [
 ALL_FIELD_TO_VARIABLE_PROCESS_NAMES = [
     REGEX_PROCESS,
     KANA_HIGHLIGHT_PROCESS,
+    WORD_HIGHLIGHT_PROCESS,
 ]
 
 NEW_PROCESS_DEFAULTS: dict[str, AnyProcess] = {
@@ -146,6 +160,10 @@ NEW_PROCESS_DEFAULTS: dict[str, AnyProcess] = {
         return_type="kana_only",
         wrap_readings_in_tags=True,
         merge_consecutive_tags=True,
+    ),
+    WORD_HIGHLIGHT_PROCESS: WordHighlightProcess(
+        name=WORD_HIGHLIGHT_PROCESS,
+        word_field="",
     ),
 }
 

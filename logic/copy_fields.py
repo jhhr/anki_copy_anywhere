@@ -33,6 +33,7 @@ from .fonts_check_process import fonts_check_process
 from .interpolate_fields import interpolate_from_text, TARGET_NOTES_COUNT
 from .kana_highlight_process import kana_highlight_process
 from .kana_highlight_process import WithTagsDef
+from .word_highlight_process import word_highlight_process
 from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
 from .regex_process import regex_process
 from ..configuration import (
@@ -55,6 +56,7 @@ from ..configuration import (
     FontsCheckProcess,
     KanaHighlightProcess,
     is_kana_highlight_process,
+    is_word_highlight_process,
     is_regex_process,
     is_fonts_check_process,
     is_kanjium_to_javdejong_process,
@@ -667,7 +669,13 @@ def apply_process_chain(
                     note=dest_note,
                     logger=logger,
                 )
-
+            elif is_word_highlight_process(process):
+                text = word_highlight_process(
+                    text=text,
+                    word_field=process.get("word_field", ""),
+                    note=dest_note,
+                    logger=logger,
+                )
             elif is_regex_process(process):
                 use_all_notes = process.get("use_all_notes", False)
                 interpolated_regex = get_field_values_from_notes(

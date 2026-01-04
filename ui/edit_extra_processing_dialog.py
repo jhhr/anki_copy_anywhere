@@ -38,7 +38,6 @@ from .required_text_input import RequiredLineEdit
 
 from .list_input import ListInputWidget
 from .required_combobox import RequiredCombobox
-from ..configuration import COPY_MODE_ACROSS_NOTES, CopyDefinition
 from .multi_combo_box import MultiComboBox
 
 if qtmajor > 5:
@@ -51,11 +50,13 @@ else:
     QAlignLeft = Qt.AlignLeft  # type: ignore
 
 from ..configuration import (
+    CopyDefinition,
     AnyProcess,
     CopyFieldToField,
     CopyFieldToVariable,
     CopyFieldToFile,
     KanaHighlightProcess,
+    WordHighlightProcess,
     RegexProcess,
     get_regex_process_label,
     FontsCheckProcess,
@@ -66,10 +67,12 @@ from ..configuration import (
     REGEX_PROCESS,
     FONTS_CHECK_PROCESS,
     KANA_HIGHLIGHT_PROCESS,
+    WORD_HIGHLIGHT_PROCESS,
     MULTIPLE_ALLOWED_PROCESS_NAMES,
     COPY_MODE_WITHIN_NOTE,
     DIRECTION_SOURCE_TO_DESTINATIONS,
     DIRECTION_DESTINATION_TO_SOURCES,
+    COPY_MODE_ACROSS_NOTES,
 )
 
 from ..logic.jp_text_processing.kana.kana_highlight import FuriReconstruct
@@ -614,6 +617,66 @@ class KanaHighlightProcessDialog(QDialog):
                 self.kanji_field_cbox.addItem(field_name)
 
 
+WORD_HIGHLIGHT_DESCRIPTION = """
+"""
+
+
+class WordHighlightProcessDialog(QDialog):
+    def __init__(self, parent, process: WordHighlightProcess, copy_into_note_types: Optional[str]):
+        super().__init__(parent)
+        self.process = process
+        self.copy_into_note_types = copy_into_note_types
+
+        self.description = WORD_HIGHLIGHT_DESCRIPTION
+        self.form = QFormLayout()
+        self.setWindowModality(WindowModal)
+        self.setLayout(self.form)
+
+        self.top_label = QLabel(self.description)
+        self.form.addRow(self.top_label)
+
+        self.word_field_cbox = RequiredCombobox(placeholder_text="Select field (optional)")
+        self.form.addRow("Word field", self.word_field_cbox)
+
+        self.update_combobox_options()
+
+        with suppress(KeyError):
+            self.word_field_cbox.setCurrentText(self.process.get("word_field"))
+
+        # Add Ok and Cancel buttons as QPushButtons
+        self.ok_button = QPushButton("OK")
+        self.close_button = QPushButton("Cancel")
+
+        self.ok_button.clicked.connect(self.save_process)
+        self.close_button.clicked.connect(self.reject)
+
+        self.bottom_grid = QGridLayout()
+        self.bottom_grid.setColumnMinimumWidth(0, 150)
+        self.bottom_grid.setColumnMinimumWidth(1, 150)
+        self.bottom_grid.setColumnMinimumWidth(2, 150)
+        self.form.addRow(self.bottom_grid)
+
+        self.bottom_grid.addWidget(self.ok_button, 0, 0)
+        self.bottom_grid.addWidget(self.close_button, 0, 2)
+
+    def save_process(self):
+        self.process = {
+            "name": WORD_HIGHLIGHT_PROCESS,
+            "word_field": self.word_field_cbox.currentText(),
+        }
+        self.accept()
+
+    def update_combobox_options(self):
+        if self.copy_into_note_types is None:
+            return
+        for note_type_name in self.copy_into_note_types.strip('""').split('", "'):
+            note_type = mw.col.models.by_name(note_type_name)
+            if note_type is None:
+                continue
+            for field_name in mw.col.models.field_names(note_type):
+                self.word_field_cbox.addItem(field_name)
+
+
 class EditExtraProcessingWidget(QWidget):
 
     def __init__(
@@ -831,6 +894,15 @@ class EditExtraProcessingWidget(QWidget):
             return (
                 KanaHighlightProcessDialog(self, process, note_types),
                 lambda _: KANA_HIGHLIGHT_PROCESS,
+            )
+        if process_name == WORD_HIGHLIGHT_PROCESS:
+            note_types = None
+            with suppress(KeyError):
+                if self.copy_definition:
+                    note_types = self.copy_definition["copy_into_note_types"]
+            return (
+                WordHighlightProcessDialog(self, process, note_types),
+                lambda _: WORD_HIGHLIGHT_PROCESS,
             )
         if process_name == REGEX_PROCESS:
             return (

@@ -42,4 +42,6 @@ def kana_highlight_process(
         f"kanji_to_highlight: {kanji_to_highlight}, text: {text}, return_type: {return_type},"
         f" with_tags_def: {with_tags_def}"
     )
-    return kana_highlight(kanji_to_highlight, text, return_type, with_tags_def, logger)
+    result = kana_highlight(kanji_to_highlight, text, return_type, with_tags_def, logger)
+    logger.debug(f"kanji_to_highlight result: {result}")
+    return result
