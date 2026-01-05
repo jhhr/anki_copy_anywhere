@@ -431,10 +431,10 @@ class CopyFieldToFieldEditor(QWidget):
             )
             if self.state.copy_direction == DIRECTION_SOURCE_TO_DESTINATIONS:
                 copy_on_unfocus_when_add.setDisabled(True)
-                copy_on_unfocus_trigger_field.setDisabled(False)
+                copy_on_unfocus_trigger_field.setDisabled(True)
             else:
                 copy_on_unfocus_when_add.setDisabled(False)
-                copy_on_unfocus_trigger_field.setDisabled(True)
+                copy_on_unfocus_trigger_field.setDisabled(False)
             self.update_unfocus_trigger_field_placeholder(copy_on_unfocus_trigger_field)
 
     def update_unfocus_trigger_field_placeholder(
