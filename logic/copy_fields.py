@@ -838,7 +838,8 @@ def copy_for_single_trigger_note(
                 "copy_for_single_trigger_note: No deck id in whitelist, skipping copy for note"
                 f" {trigger_note.id}"
             )
-            return False
+            # Deck not in whitelist, so skip this note, things are ok, so return True
+            return True
 
     # Step 3: Check the copy condition for this note
     condition_check = bool(copy_condition_query)
