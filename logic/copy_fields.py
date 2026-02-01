@@ -455,6 +455,15 @@ def copy_fields(
                 write_custom_data(card, key="fc", value=1)
             mw.col.update_cards(copied_into_cards)
             results.changes = mw.col.merge_undo_entries(undo_entry)
+            # Ensure that all fc flags are reset in the DB, if the notes/cards were not
+            # modified during the copy operations
+            rest_cards = [
+                mw.col.get_card(cid) for cid in mw.col.find_cards("prop:cdn:fc=-1 OR prop:cdn:fc=0")
+            ]
+            for card in rest_cards:
+                write_custom_data(card, key="fc", value=1)
+            mw.col.update_cards(rest_cards)
+            results.changes = mw.col.merge_undo_entries(undo_entry)
         return results
 
     return (
