@@ -341,7 +341,6 @@ def copy_fields(
     is_sync = update_sync_result is not None
     config = Config()
     config.load()
-    logger = Logger()
 
     def log(message: str):
         nonlocal debug_texts
@@ -413,6 +412,8 @@ def copy_fields(
         )
 
         for i, copy_definition in enumerate(copy_definitions):
+            logger.reset_prefix()
+            logger.copy_definition_name = copy_definition.get("definition_name", None)
             results = copy_fields_in_background(
                 copy_definition=copy_definition,
                 note_ids=(
@@ -769,6 +770,7 @@ def copy_for_single_trigger_note(
     :param progress_updater: Optional object to update the progress bar
     :return: bool indicating success
     """
+    logger.nid = trigger_note.id
 
     field_to_field_defs = copy_definition.get("field_to_field_defs", [])
     field_to_file_defs = copy_definition.get("field_to_file_defs", [])
