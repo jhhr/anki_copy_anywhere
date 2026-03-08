@@ -1232,7 +1232,14 @@ def copy_into_single_note(
         if set_dr is not None:
             if isinstance(set_dr, str):
                 # Get value from custom data property
-                set_dr = json.loads(card.custom_data).get(set_dr, None)
+                if card.custom_data:
+                    try:
+                        custom_data = json.loads(card.custom_data)
+                    except json.JSONDecodeError:
+                        custom_data = {}
+                    set_dr = custom_data.get(set_dr, None)
+                else:
+                    set_dr = None
             if isinstance(set_dr, int) and not isinstance(set_dr, bool):
                 set_dr = float(set_dr) / 100
             if isinstance(set_dr, float) and 0 < set_dr < 1:
