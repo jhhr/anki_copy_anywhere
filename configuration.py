@@ -1,15 +1,15 @@
 import html
 import uuid
-from typing import TypedDict, Optional, Union, Literal, Sequence
-from typing_extensions import TypeGuard
+from typing import Literal, Optional, Sequence, TypedDict, Union
 
 from aqt import mw
+from typing_extensions import TypeGuard
 
-from .logic.jp_text_processing.kana.kana_highlight import FuriReconstruct
 from .logic.interpolate_fields import (
-    intr_format,
     TARGET_NOTES_COUNT,
+    intr_format,
 )
+from .logic.jp_text_processing.kana.kana_highlight import FuriReconstruct
 from .utils.logger import LogLevel
 
 tag = mw.addonManager.addonFromModule(__name__)
@@ -75,7 +75,9 @@ def get_fonts_check_process_label(fonts_check_process):
         fonts_limit = f", (limit {len(fonts_limit)} fonts)"
     else:
         fonts_limit = ""
-    return f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
+    return (
+        f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
+    )
 
 
 KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
@@ -100,14 +102,20 @@ class WordHighlightProcess(TypedDict):
     word_field: str
 
 
-AnyProcess = Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]
+AnyProcess = Union[
+    KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess
+]
 
 
-def is_kana_highlight_process(process: Union[dict, AnyProcess]) -> TypeGuard[KanaHighlightProcess]:
+def is_kana_highlight_process(
+    process: Union[dict, AnyProcess],
+) -> TypeGuard[KanaHighlightProcess]:
     return process.get("name") == KANA_HIGHLIGHT_PROCESS
 
 
-def is_word_highlight_process(process: Union[dict, AnyProcess]) -> TypeGuard[WordHighlightProcess]:
+def is_word_highlight_process(
+    process: Union[dict, AnyProcess],
+) -> TypeGuard[WordHighlightProcess]:
     return process.get("name") == WORD_HIGHLIGHT_PROCESS
 
 
@@ -115,7 +123,9 @@ def is_regex_process(process: Union[dict, AnyProcess]) -> TypeGuard[RegexProcess
     return process.get("name") == REGEX_PROCESS
 
 
-def is_fonts_check_process(process: Union[dict, AnyProcess]) -> TypeGuard[FontsCheckProcess]:
+def is_fonts_check_process(
+    process: Union[dict, AnyProcess],
+) -> TypeGuard[FontsCheckProcess]:
     return process.get("name") == FONTS_CHECK_PROCESS
 
 
@@ -184,12 +194,15 @@ class CardAction(TypedDict):
     set_flag: Optional[FlagValueType]
     suspend: Optional[bool]
     bury: Optional[bool]
+    set_desired_retention: Optional[Union[float, int, str]]
 
 
 class CopyFieldToField(TypedDict):
     guid: str
     copy_into_note_field: str
     copy_from_text: str
+    copy_as_code: str
+    use_code: bool
     copy_if_empty: bool
     copy_on_unfocus_when_edit: bool
     copy_on_unfocus_when_add: bool
@@ -201,6 +214,8 @@ class CopyFieldToFile(TypedDict):
     guid: str
     copy_into_filename: str
     copy_from_text: str
+    copy_as_code: str
+    use_code: bool
     copy_if_empty: bool
     copy_on_unfocus_when_edit: bool
     copy_on_unfocus_when_add: bool
@@ -214,23 +229,31 @@ def get_field_to_field_unfocus_trigger_fields(
     if modifies_other_notes:
         # source to destination mode is triggered by a field change in the trigger note
         # while the destination field is a different field in another note
-        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip('""').split('", "')
+        return (
+            field_to_field.get("copy_on_unfocus_trigger_field", "")
+            .strip('""')
+            .split('", "')
+        )
     else:
         # destination to sources mode or within note mode the destination and trigger fields
         # are in the same note
-        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip('""').split(
-            '", "'
-        ) or [field_to_field.get("copy_into_note_field", "")]
+        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip(
+            '""'
+        ).split('", "') or [field_to_field.get("copy_into_note_field", "")]
 
 
 def get_triggered_field_to_field_def_for_field(
-    field_to_field_defs: list[CopyFieldToField], field_name: str, modifies_other_notes: bool
+    field_to_field_defs: list[CopyFieldToField],
+    field_name: str,
+    modifies_other_notes: bool,
 ) -> Union[CopyFieldToField, None]:
     """
     Get the field-to-field definition that matches the field_name and the mode.
     """
     for field_def in field_to_field_defs:
-        trigger_fields = get_field_to_field_unfocus_trigger_fields(field_def, modifies_other_notes)
+        trigger_fields = get_field_to_field_unfocus_trigger_fields(
+            field_def, modifies_other_notes
+        )
         if field_name in trigger_fields:
             return field_def
     return None
@@ -240,6 +263,8 @@ class CopyFieldToVariable(TypedDict):
     guid: str
     copy_into_variable: str
     copy_from_text: str
+    copy_as_code: str
+    use_code: bool
     process_chain: Sequence[AnyProcess]
 
 
@@ -311,7 +336,6 @@ def migrate_config():
     config = Config()
     config.load()
     if compare_versions(config.version, "0.2.0") < 0:
-
         updated_definitions = []
         for definition in config.copy_definitions:
             if "guid" not in definition:
@@ -386,7 +410,8 @@ def definition_modifies_trigger_note(
 ) -> bool:
     targets_trigger_note = (
         copy_definition.get("copy_mode", None) == COPY_MODE_WITHIN_NOTE
-        or copy_definition.get("across_mode_direction", None) == DIRECTION_DESTINATION_TO_SOURCES
+        or copy_definition.get("across_mode_direction", None)
+        == DIRECTION_DESTINATION_TO_SOURCES
     )
     # definition might only save stuff to files
     has_field_to_field_defs = len(copy_definition.get("field_to_field_defs", [])) > 0
@@ -398,7 +423,8 @@ def definition_modifies_other_notes(
 ) -> bool:
     targets_other_notes = (
         copy_definition.get("copy_mode", None) == COPY_MODE_ACROSS_NOTES
-        or copy_definition.get("across_mode_direction", None) == DIRECTION_SOURCE_TO_DESTINATIONS
+        or copy_definition.get("across_mode_direction", None)
+        == DIRECTION_SOURCE_TO_DESTINATIONS
     )
     # definition might only save stuff to files
     has_field_to_field_defs = len(copy_definition.get("field_to_field_defs", [])) > 0
