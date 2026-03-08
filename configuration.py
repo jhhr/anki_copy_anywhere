@@ -194,7 +194,7 @@ class CardAction(TypedDict):
     set_flag: Optional[FlagValueType]
     suspend: Optional[bool]
     bury: Optional[bool]
-    set_desired_retention: Optional[Union[float, int]]
+    set_desired_retention: Optional[Union[float, int, str]]
 
 
 class CopyFieldToField(TypedDict):
