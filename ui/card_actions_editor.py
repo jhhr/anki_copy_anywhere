@@ -13,6 +13,8 @@ from aqt.qt import (
     QComboBox,
     QButtonGroup,
     QRadioButton,
+    QDoubleSpinBox,
+    QLineEdit,
     qtmajor,
 )
 
@@ -265,6 +267,7 @@ class CardActionsEditor(QWidget):
             "set_flag": None,
             "suspend": None,
             "bury": None,
+            "set_desired_retention": None,
         }
 
         self.card_actions[card_type_name] = new_action
@@ -400,6 +403,50 @@ class CardActionsEditor(QWidget):
 
         form_layout.addRow(QLabel("<b>Bury card:</b>"), bury_layout)
 
+        # 5. Set desired retention
+        dr_layout = QHBoxLayout()
+
+        dr_number_input = QDoubleSpinBox()
+        dr_number_input.setRange(0.0, 0.99)
+        dr_number_input.setSingleStep(0.01)
+        dr_number_input.setDecimals(2)
+        dr_number_input.setSpecialValueText(" ")  # display blank when value is 0.0 (unset)
+        dr_number_input.setValue(0.0)
+
+        dr_string_input = QLineEdit()
+        dr_string_input.setPlaceholderText("Custom data property name")
+
+        # Load existing value
+        current_dr = action.get("set_desired_retention")
+        if isinstance(current_dr, (float, int)) and not isinstance(current_dr, bool):
+            dr_number_input.setValue(float(current_dr))
+        elif isinstance(current_dr, str) and current_dr:
+            dr_string_input.setText(current_dr)
+
+        # Mutual-clear: editing number clears string, editing string clears number
+        def _dr_number_changed(value, _string_input=dr_string_input, _number_input=dr_number_input):
+            if value >= 0.01:
+                _string_input.blockSignals(True)
+                _string_input.clear()
+                _string_input.blockSignals(False)
+
+        def _dr_string_changed(text, _number_input=dr_number_input):
+            if text:
+                _number_input.blockSignals(True)
+                _number_input.setValue(0.0)
+                _number_input.blockSignals(False)
+
+        dr_number_input.valueChanged.connect(_dr_number_changed)
+        dr_string_input.textChanged.connect(_dr_string_changed)
+
+        dr_layout.addWidget(QLabel("Float (0.01–0.99):"))
+        dr_layout.addWidget(dr_number_input)
+        dr_layout.addWidget(QLabel("or custom data property:"))
+        dr_layout.addWidget(dr_string_input)
+        dr_layout.addStretch()
+
+        form_layout.addRow(QLabel("<b>Set desired retention:</b>"), dr_layout)
+
         # Delete button
         delete_button = QPushButton("Delete this card action")
         delete_button.clicked.connect(lambda: self.delete_action(card_type_name))
@@ -412,6 +459,8 @@ class CardActionsEditor(QWidget):
             "flag_group": flag_group,
             "suspend_group": suspend_group,
             "bury_group": bury_group,
+            "dr_number_input": dr_number_input,
+            "dr_string_input": dr_string_input,
         }
 
     def save_action(self, card_type_name: str):
@@ -424,6 +473,8 @@ class CardActionsEditor(QWidget):
         flag_group = ui_components["flag_group"]
         suspend_group = ui_components["suspend_group"]
         bury_group = ui_components["bury_group"]
+        dr_number_input = ui_components["dr_number_input"]
+        dr_string_input = ui_components["dr_string_input"]
 
         # Get change_deck value
         deck_text = deck_combo.currentText()
@@ -450,6 +501,16 @@ class CardActionsEditor(QWidget):
                 bury = button.property("bury_value")
                 break
 
+        # Get set_desired_retention value (string input takes priority if non-empty)
+        dr_string = dr_string_input.text().strip()
+        dr_number = dr_number_input.value()
+        if dr_string:
+            set_desired_retention = dr_string
+        elif dr_number >= 0.01:
+            set_desired_retention = dr_number
+        else:
+            set_desired_retention = None
+
         # Update the action
         self.card_actions[card_type_name] = {
             "guid": self.card_actions[card_type_name].get("guid", str(uuid.uuid4())),
@@ -458,6 +519,7 @@ class CardActionsEditor(QWidget):
             "set_flag": set_flag,
             "suspend": suspend,
             "bury": bury,
+            "set_desired_retention": set_desired_retention,
         }
 
     def delete_action(self, card_type_name: str):
@@ -491,6 +553,7 @@ class CardActionsEditor(QWidget):
                 or action.get("set_flag") is not None
                 or action.get("suspend") is not None
                 or action.get("bury") is not None
+                or action.get("set_desired_retention") is not None
             ):
                 result.append(action)
 

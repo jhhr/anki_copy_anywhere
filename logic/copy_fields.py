@@ -1,71 +1,69 @@
 import base64
-import random
-import time
 import html
+import json
+import random
 import re
-from typing import Callable, Union, Optional, Tuple, Sequence, Any
+import time
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
-from anki.collection import OpChanges
 from anki.cards import Card
-from anki.notes import Note, NoteId
+from anki.collection import OpChanges
 from anki.decks import DeckId
+from anki.notes import Note, NoteId
 from anki.utils import ids2str
 from aqt import mw
 from aqt.operations import CollectionOp
-
 from aqt.qt import (
-    QWidget,
     QDialog,
-    QVBoxLayout,
-    QScrollArea,
     QGuiApplication,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 from aqt.utils import tooltip
 
-from ..utils.file_exists_in_media_folder import file_exists_in_media_folder
-from ..utils.write_to_media_folder import write_to_media_folder
-from ..utils.write_custom_data import write_custom_data
-from ..utils.logger import Logger
-from ..utils.move_card_to_deck import move_card_to_deck
-
-from .FatalProcessError import FatalProcessError
-from .fonts_check_process import fonts_check_process
-from .interpolate_fields import interpolate_from_text, TARGET_NOTES_COUNT
-from .kana_highlight_process import kana_highlight_process
-from .kana_highlight_process import WithTagsDef
-from .word_highlight_process import word_highlight_process
-from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
-from .regex_process import regex_process
 from ..configuration import (
     CARD_TYPE_SEPARATOR,
+    COPY_MODE_ACROSS_NOTES,
+    COPY_MODE_WITHIN_NOTE,
+    DIRECTION_DESTINATION_TO_SOURCES,
+    DIRECTION_SOURCE_TO_DESTINATIONS,
+    SELECT_CARD_BY_VALUES,
+    CardAction,
     Config,
     CopyDefinition,
-    definition_modifies_other_notes,
-    CopyFieldToVariable,
     CopyFieldToField,
     CopyFieldToFile,
-    CardAction,
-    get_field_to_field_unfocus_trigger_fields,
-    COPY_MODE_WITHIN_NOTE,
-    COPY_MODE_ACROSS_NOTES,
-    DIRECTION_SOURCE_TO_DESTINATIONS,
-    DIRECTION_DESTINATION_TO_SOURCES,
-    SelectCardByType,
-    KanjiumToJavdejongProcess,
-    RegexProcess,
+    CopyFieldToVariable,
     FontsCheckProcess,
     KanaHighlightProcess,
-    is_kana_highlight_process,
-    is_word_highlight_process,
-    is_regex_process,
+    KanjiumToJavdejongProcess,
+    RegexProcess,
+    SelectCardByType,
+    definition_modifies_other_notes,
+    get_field_to_field_unfocus_trigger_fields,
     is_fonts_check_process,
+    is_kana_highlight_process,
     is_kanjium_to_javdejong_process,
-    SELECT_CARD_BY_VALUES,
+    is_regex_process,
+    is_word_highlight_process,
 )
 from ..ui.auto_resizing_text_edit import AutoResizingTextEdit
 from ..utils.duplicate_note import (
     duplicate_note,
 )
+from ..utils.file_exists_in_media_folder import file_exists_in_media_folder
+from ..utils.logger import Logger
+from ..utils.move_card_to_deck import move_card_to_deck
+from ..utils.write_custom_data import write_custom_data
+from ..utils.write_to_media_folder import write_to_media_folder
+from .FatalProcessError import FatalProcessError
+from .fonts_check_process import fonts_check_process
+from .interpolate_fields import TARGET_NOTES_COUNT, interpolate_from_text
+from .kana_highlight_process import WithTagsDef, kana_highlight_process
+from .kanjium_to_javdejong_process import kanjium_to_javdejong_process
+from .regex_process import regex_process
+from .word_highlight_process import word_highlight_process
 
 CONSOLE_COLOR_RE = r"\x1b\[[0-9;]*m"
 
@@ -176,7 +174,11 @@ class ProgressUpdateDef:
         self.max_value = max_value
 
     def has_update(self):
-        return self.label is not None or self.value is not None or self.max_value is not None
+        return (
+            self.label is not None
+            or self.value is not None
+            or self.max_value is not None
+        )
 
     def clear(self):
         self.label = None
@@ -249,22 +251,37 @@ class ProgressUpdater:
         elapsed_since_last_update = elapsed_s - self.last_render_update
         is_last_note = self.note_cnt == self.total_notes_count
         no_notes = not self.total_notes_count > 0
-        if (elapsed_since_last_update < 0.5 and not (force or is_last_note)) or no_notes:
+        if (
+            elapsed_since_last_update < 0.5 and not (force or is_last_note)
+        ) or no_notes:
             return
         self.last_render_update = elapsed_s
 
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_s))
         label = f"""<strong>{html.escape(self.definition_name)}</strong>:
         <br>Copied {self.note_cnt}/{self.total_notes_count} notes
-        <br><small>Processed{f'-  destination notes: {self.total_processed_destinations}'
-                    if self.total_processed_destinations > 0 else ''}
-            {f'- files: {self.total_processed_files}' if self.total_processed_files > 0 else ''}
-            {f', sources: {self.total_processed_sources}' if self.is_across else ''}
-            {f', cards: {self.total_processed_cards}' if self.total_processed_cards > 0 else ''}
+        <br><small>Processed{
+            f"-  destination notes: {self.total_processed_destinations}"
+            if self.total_processed_destinations > 0
+            else ""
+        }
+            {
+            f"- files: {self.total_processed_files}"
+            if self.total_processed_files > 0
+            else ""
+        }
+            {f", sources: {self.total_processed_sources}" if self.is_across else ""}
+            {
+            f", cards: {self.total_processed_cards}"
+            if self.total_processed_cards > 0
+            else ""
+        }
         </small><br>Time: {elapsed_time}"""
         if self.note_cnt / self.total_notes_count > 0.10 or elapsed_s > 1:
             if self.note_cnt > 0:
-                eta_s = (elapsed_s / self.note_cnt) * (self.total_notes_count - self.note_cnt)
+                eta_s = (elapsed_s / self.note_cnt) * (
+                    self.total_notes_count - self.note_cnt
+                )
                 eta = time.strftime("%H:%M:%S", time.gmtime(eta_s))
                 label += f" - ETA: {eta}"
         value = self.note_cnt
@@ -371,7 +388,9 @@ def copy_fields(
                     y_offset=100,
                 )
         if not is_sync and len(debug_texts) > 0:
-            ScrollMessageBox(debug_texts, title="Copy fields debug Messages", parent=parent)
+            ScrollMessageBox(
+                debug_texts, title="Copy fields debug Messages", parent=parent
+            )
         if on_done is not None:
             on_done()
 
@@ -379,7 +398,9 @@ def copy_fields(
         mw.progress.finish()
         logger.error(f"Copying failed: {exception}")
         if not is_sync and len(debug_texts) > 0:
-            ScrollMessageBox(debug_texts, title="Copy Fields debug Messages", parent=parent)
+            ScrollMessageBox(
+                debug_texts, title="Copy Fields debug Messages", parent=parent
+            )
         if on_done is not None:
             on_done()
         # Need to raise the exception to get the traceback to the cause in the console
@@ -417,7 +438,9 @@ def copy_fields(
             results = copy_fields_in_background(
                 copy_definition=copy_definition,
                 note_ids=(
-                    note_ids_per_definition[i] if note_ids_per_definition is not None else note_ids
+                    note_ids_per_definition[i]
+                    if note_ids_per_definition is not None
+                    else note_ids
                 ),
                 logger=logger,
                 is_sync=is_sync,
@@ -458,7 +481,8 @@ def copy_fields(
             # Ensure that all fc flags are reset in the DB, if the notes/cards were not
             # modified during the copy operations
             rest_cards = [
-                mw.col.get_card(cid) for cid in mw.col.find_cards("prop:cdn:fc=-1 OR prop:cdn:fc=0")
+                mw.col.get_card(cid)
+                for cid in mw.col.find_cards("prop:cdn:fc=-1 OR prop:cdn:fc=0")
             ]
             for card in rest_cards:
                 write_custom_data(card, key="fc", value=1)
@@ -542,9 +566,9 @@ def copy_fields_in_background(
         FROM notes n, cards c
         WHERE n.mid IN {ids2str(note_type_ids)}
         AND c.nid = n.id
-        AND json_extract(json_extract(c.data, '$.cd'), '$.fc') {f"IN (0, -1)"
-                                                                if copy_on_sync_after_review
-                                                                else "= 0"}
+        AND json_extract(json_extract(c.data, '$.cd'), '$.fc') {
+                f"IN (0, -1)" if copy_on_sync_after_review else "= 0"
+            }
         {nids_query}
         """
             if is_sync
@@ -621,10 +645,10 @@ def copy_fields_in_background(
         #  Get counts from ProgressUpdater and render the final update
         results.add_result_text(f"""<br><span>
             {time.time() - start_time:.2f}s -
-            <i>{html.escape(copy_definition['definition_name'])}:</i>
-            {f'{total_processed_dests} destinations' if total_processed_dests > 0 else ''}
-            {f'{total_processed_files} files' if total_processed_files > 0 else ''}
-            {f'{total_processed_cards} cards' if total_processed_cards > 0 else ''}
+            <i>{html.escape(copy_definition["definition_name"])}:</i>
+            {f"{total_processed_dests} destinations" if total_processed_dests > 0 else ""}
+            {f"{total_processed_files} files" if total_processed_files > 0 else ""}
+            {f"{total_processed_cards} cards" if total_processed_cards > 0 else ""}
             {f'''processed with {total_processed_sources} sources''' if is_across else "processed"}
         </span>""")
         results.incr_count(1)
@@ -790,7 +814,9 @@ def copy_for_single_trigger_note(
     copy_from_cards_query = copy_definition.get("copy_from_cards_query", None)
     copy_condition_query = copy_definition.get("copy_condition_query", None)
     condition_only_on_sync = copy_definition.get("condition_only_on_sync", False)
-    run_also_if_no_sources_found = copy_definition.get("run_also_if_no_sources_found", False)
+    run_also_if_no_sources_found = copy_definition.get(
+        "run_also_if_no_sources_found", False
+    )
     add_tags = copy_definition.get("add_tags", "")
     remove_tags = copy_definition.get("remove_tags", "")
     sort_by_field = copy_definition.get("sort_by_field", None)
@@ -824,7 +850,8 @@ def copy_for_single_trigger_note(
         target_deck_names = only_copy_into_decks.strip('""').split('", "')
 
         unique_whitelist_dids: set[DeckId] = {
-            mw.col.decks.id_for_name(target_deck_name) for target_deck_name in target_deck_names
+            mw.col.decks.id_for_name(target_deck_name)
+            for target_deck_name in target_deck_names
         }
         if include_subdecks:
             parent_dids = set()
@@ -864,7 +891,9 @@ def copy_for_single_trigger_note(
         )
         if interpolated_condition_query:
             # Search for notes, this works for card properties just as well
-            note_ids = mw.col.find_notes(f"{interpolated_condition_query} nid:{trigger_note.id}")
+            note_ids = mw.col.find_notes(
+                f"{interpolated_condition_query} nid:{trigger_note.id}"
+            )
             if (note_ids is None) or (len(note_ids) == 0):
                 logger.debug(
                     "copy_for_single_trigger_note: "
@@ -929,7 +958,9 @@ def copy_for_single_trigger_note(
 
     if len(source_notes) == 0 and not run_also_if_no_sources_found:
         if progress_updater is not None:
-            progress_updater.update_counts(processed_destinations_inc=len(destination_notes))
+            progress_updater.update_counts(
+                processed_destinations_inc=len(destination_notes)
+            )
         # This case is ok, there's just nothing to do
         # But we need to end early here so that the target fields aren't wiped
         # So, return True
@@ -940,22 +971,26 @@ def copy_for_single_trigger_note(
     # Step 3: Get value for each field we are copying into
     for destination_note in destination_notes:
         try:
-            copied_into_dest_note, copied_into_file, dest_note_cards = copy_into_single_note(
-                field_to_field_defs=field_to_field_defs,
-                field_to_file_defs=field_to_file_defs,
-                card_actions=card_actions,
-                destination_note=destination_note,
-                source_notes=source_notes,
-                add_tags=add_tags,
-                remove_tags=remove_tags,
-                variable_values_dict=variable_values_dict,
-                field_only=field_only,
-                modifies_other_notes=definition_modifies_other_notes(copy_definition),
-                multiple_note_types=multiple_note_types,
-                select_card_separator=select_card_separator,
-                file_cache=file_cache,
-                logger=logger,
-                progress_updater=progress_updater,
+            copied_into_dest_note, copied_into_file, dest_note_cards = (
+                copy_into_single_note(
+                    field_to_field_defs=field_to_field_defs,
+                    field_to_file_defs=field_to_file_defs,
+                    card_actions=card_actions,
+                    destination_note=destination_note,
+                    source_notes=source_notes,
+                    add_tags=add_tags,
+                    remove_tags=remove_tags,
+                    variable_values_dict=variable_values_dict,
+                    field_only=field_only,
+                    modifies_other_notes=definition_modifies_other_notes(
+                        copy_definition
+                    ),
+                    multiple_note_types=multiple_note_types,
+                    select_card_separator=select_card_separator,
+                    file_cache=file_cache,
+                    logger=logger,
+                    progress_updater=progress_updater,
+                )
             )
             if progress_updater is not None:
                 progress_updater.update_counts(
@@ -1016,7 +1051,9 @@ def copy_into_single_note(
         try:
             cur_field_value = destination_note[copy_into_note_field]
         except KeyError:
-            logger.error(f"Error in copy fields: Field '{copy_into_note_field}' not found in note")
+            logger.error(
+                f"Error in copy fields: Field '{copy_into_note_field}' not found in note"
+            )
             # Rest of defs are not processed
             raise CopyFailedException
 
@@ -1143,7 +1180,9 @@ def copy_into_single_note(
             )
             # Skip this card action
             continue
-        note_type_name, card_type_name = note_type_and_card_type.split(CARD_TYPE_SEPARATOR, 1)
+        note_type_name, card_type_name = note_type_and_card_type.split(
+            CARD_TYPE_SEPARATOR, 1
+        )
         if note_type_name != dest_note_type["name"]:
             # This card action is not for this note type
             continue
@@ -1159,6 +1198,7 @@ def copy_into_single_note(
         suspend_card = card_action.get("suspend", None)
         bury_card = card_action.get("bury", None)
         set_flag = card_action.get("set_flag", None)
+        set_dr = card_action.get("set_desired_retention", None)
         if change_deck not in [None, "-"]:
             move_card_to_deck(card, change_deck, logger=logger)
             card.edited = True
@@ -1180,6 +1220,16 @@ def copy_into_single_note(
         if isinstance(set_flag, int) and 0 <= set_flag <= 7:
             card.set_user_flag(set_flag)
             card.edited = True
+        if set_dr is not None:
+            if isinstance(set_dr, str):
+                # Get value from custom data property
+                set_dr = json.loads(card.custom_data).get(set_dr, None)
+            if isinstance(set_dr, int):
+                set_dr = float(set_dr) / 100
+            if isinstance(set_dr, float) and 0 < set_dr < 1:
+                card.desired_retention = set_dr
+                card.edited = True
+
         if progress_updater is not None and hasattr(card, "edited") and card.edited:
             progress_updater.update_counts(processed_cards_inc=1)
     return (modified_dest_note, wrote_to_file, dest_note_cards)
@@ -1289,7 +1339,9 @@ def get_across_target_notes(
     )
 
     if not select_card_by:
-        logger.error("Error in copy fields: Required value 'select_card_by' was missing.")
+        logger.error(
+            "Error in copy fields: Required value 'select_card_by' was missing."
+        )
         return []
 
     if select_card_by not in SELECT_CARD_BY_VALUES:
@@ -1323,9 +1375,13 @@ def get_across_target_notes(
         f" invalid_fields={invalid_fields}"
     )
     if not interpolated_cards_query:
-        logger.error("Error in copy fields: Could not interpolate copy_from_cards_query")
+        logger.error(
+            "Error in copy fields: Could not interpolate copy_from_cards_query"
+        )
         return []
-    cards_query_id = base64.b64encode(f"cards{interpolated_cards_query}".encode()).decode()
+    cards_query_id = base64.b64encode(
+        f"cards{interpolated_cards_query}".encode()
+    ).decode()
     try:
         card_ids = extra_state[cards_query_id]
     except KeyError:
@@ -1345,14 +1401,18 @@ def get_across_target_notes(
                 f" copy_from_cards_query='{interpolated_cards_query}'"
             )
         else:
-            logger.debug(f'No cards found with copy_from_cards_query="{interpolated_cards_query}",')
+            logger.debug(
+                f'No cards found with copy_from_cards_query="{interpolated_cards_query}",'
+            )
         return []
 
     has_sort_by_field = sort_by_field and sort_by_field != "-"
 
     def sort_notes(notes: list[Note]):
         if has_sort_by_field:
-            notes.sort(key=lambda n: int_sort_by_field_value(n, sort_by_field), reverse=True)
+            notes.sort(
+                key=lambda n: int_sort_by_field_value(n, sort_by_field), reverse=True
+            )
         return notes
 
     assert mw.col.db is not None
@@ -1372,7 +1432,9 @@ def get_across_target_notes(
         if select_card_by == "None" and len(card_ids) > 0:
             selected_card_id = card_ids.pop()
             if selected_card_id:
-                selected_notes.append(mw.col.get_note(mw.col.get_card(selected_card_id).nid))
+                selected_notes.append(
+                    mw.col.get_note(mw.col.get_card(selected_card_id).nid)
+                )
             continue
         elif len(card_ids) == 0:
             break
@@ -1395,7 +1457,9 @@ def get_across_target_notes(
             except KeyError:
                 selected_card_id = min(
                     card_ids,
-                    key=lambda c: db.scalar(f"SELECT COUNT() FROM revlog WHERE cid = {c}"),
+                    key=lambda c: db.scalar(
+                        f"SELECT COUNT() FROM revlog WHERE cid = {c}"
+                    ),
                 )
                 extra_state = {card_select_key: selected_card_id}
         if selected_card_id is None:
