@@ -36,6 +36,8 @@ from .multi_combo_box import MultiComboBox
 from .grouped_combo_box import GroupedComboBox
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
 from .interpolated_text_edit import InterpolatedTextEditLayout
+from .code_edit_layout import CodeEditLayout
+from .toggle_switch import ToggleSwitch
 from ..logic.interpolate_fields import (
     BASE_NOTE_MENU_DICT,
     DESTINATION_PREFIX,
@@ -59,6 +61,9 @@ class FieldInputsDict(TypedDict):
     target_note_field_label: QLabel
     copy_from_text_label: QLabel
     copy_from_text: InterpolatedTextEditLayout
+    text_mode_container: QWidget
+    use_code: ToggleSwitch
+    copy_as_code: CodeEditLayout
     copy_if_empty: QCheckBox
     copy_on_unfocus_when_edit: QCheckBox
     copy_on_unfocus_when_add: QCheckBox
@@ -158,6 +163,8 @@ class CopyFieldToFieldEditor(QWidget):
             "guid": str(uuid.uuid4()),
             "copy_into_note_field": "",
             "copy_from_text": "",
+            "copy_as_code": "",
+            "use_code": False,
             "copy_if_empty": False,
             "copy_on_unfocus_when_edit": False,
             "copy_on_unfocus_when_add": False,
@@ -219,7 +226,8 @@ class CopyFieldToFieldEditor(QWidget):
             field_target_cbox.setCurrentText(copy_field_to_field_definition["copy_into_note_field"])
             field_target_cbox.update_required_style()
 
-        # Copy from field
+        # Copy from field — wrap in a container widget so it can be hidden when
+        # the user switches to code mode without losing the entered text.
         copy_from_text_label = QLabel(
             # Default to within mode texts, these only need to be modifed in across mode
             "<h3>Trigger note fields' content that will replace the field</h3>"
@@ -236,14 +244,22 @@ class CopyFieldToFieldEditor(QWidget):
         <li>There are many other data values you can use, such as the
             {intr_format(NOTE_ID)}, {intr_format(CARD_IVL)}, {intr_format(CARD_TYPE)} etc.</li>
         </ul>"""
+
+        # Code mode toggle — placed first so it stays above whichever editor is shown
+        use_code_checkbox = ToggleSwitch("Execute content as Python code")
+        row_form.addRow(use_code_checkbox)
+
+        text_mode_container = QWidget()
+        text_mode_vbox = QVBoxLayout(text_mode_container)
+        text_mode_vbox.setContentsMargins(0, 0, 0, 0)
         copy_from_text_layout = InterpolatedTextEditLayout(
             is_required=True,
             label=copy_from_text_label,
             options_dict=get_new_base_dict(self.copy_mode),
             description=copy_from_text_description,
         )
-
-        row_form.addRow(copy_from_text_layout)
+        text_mode_vbox.addLayout(copy_from_text_layout)
+        row_form.addRow(text_mode_container)
 
         copy_from_text_layout.update_options(
             self.state.post_query_menu_options_dict,
@@ -251,6 +267,43 @@ class CopyFieldToFieldEditor(QWidget):
         )
         with suppress(KeyError):
             copy_from_text_layout.set_text(copy_field_to_field_definition["copy_from_text"])
+
+        # Code editor (hidden while text mode is active)
+        copy_as_code_widget = CodeEditLayout(
+            parent=self,
+            options_dict=get_new_base_dict(self.copy_mode),
+            is_required=False,
+            label=copy_from_text_label.text(),
+            description=copy_from_text_description,
+        )
+        copy_as_code_widget.hide()
+        row_form.addRow(copy_as_code_widget)
+
+        copy_as_code_widget.update_options(
+            self.state.post_query_menu_options_dict,
+            self.state.post_query_text_edit_validate_dict,
+        )
+        with suppress(KeyError):
+            saved_code = copy_field_to_field_definition.get("copy_as_code", "")
+            if saved_code:
+                copy_as_code_widget.set_text(saved_code)
+
+        # Apply initial mode and wire toggle
+        initial_use_code = copy_field_to_field_definition.get("use_code", False)
+        if initial_use_code:
+            use_code_checkbox.setChecked(True)
+            text_mode_container.hide()
+            copy_as_code_widget.show()
+
+        def on_use_code_toggled(checked: bool):
+            text_mode_container.setVisible(not checked)
+            copy_as_code_widget.setVisible(checked)
+            if checked and not copy_as_code_widget.get_text().strip():
+                copy_as_code_widget.set_text(
+                    f"return {repr(copy_from_text_layout.get_text())}"
+                )
+
+        use_code_checkbox.toggled.connect(on_use_code_toggled)
 
         copy_if_empty = QCheckBox("Only copy into field, if it's empty")
         row_form.addRow("", copy_if_empty)
@@ -307,6 +360,9 @@ class CopyFieldToFieldEditor(QWidget):
             "target_note_field_label": target_note_field_label,
             "copy_from_text_label": copy_from_text_label,
             "copy_from_text": copy_from_text_layout,
+            "text_mode_container": text_mode_container,
+            "use_code": use_code_checkbox,
+            "copy_as_code": copy_as_code_widget,
             "copy_if_empty": copy_if_empty,
             "copy_on_unfocus_trigger_label": copy_on_unfocus_trigger_label,
             "copy_on_unfocus_trigger_field": copy_on_unfocus_trigger_field,
@@ -377,6 +433,8 @@ class CopyFieldToFieldEditor(QWidget):
             copy_field_definition = {
                 "copy_into_note_field": copy_field_inputs["copy_into_note_field"].currentText(),
                 "copy_from_text": copy_field_inputs["copy_from_text"].get_text(),
+                "copy_as_code": copy_field_inputs["copy_as_code"].get_text(),
+                "use_code": copy_field_inputs["use_code"].isChecked(),
                 "copy_if_empty": copy_field_inputs["copy_if_empty"].isChecked(),
                 "copy_on_unfocus_when_edit": (
                     copy_field_inputs["copy_on_unfocus_when_edit"].isChecked()
@@ -402,6 +460,10 @@ class CopyFieldToFieldEditor(QWidget):
                 self.state.post_query_menu_options_dict,
                 self.state.post_query_text_edit_validate_dict,
             )
+            copy_field_inputs["copy_as_code"].update_options(
+                self.state.post_query_menu_options_dict,
+                self.state.post_query_text_edit_validate_dict,
+            )
 
     def update_direction_labels(self):
         if self.state.copy_direction == DIRECTION_DESTINATION_TO_SOURCES:
@@ -422,6 +484,7 @@ class CopyFieldToFieldEditor(QWidget):
             target_note_field_label.setText(new_copy_into_label)
             copy_from_text_label = cast(QLabel, copy_field_inputs["copy_from_text_label"])
             copy_from_text_label.setText(new_copy_from_text_label)
+            copy_field_inputs["copy_as_code"].set_label(new_copy_from_text_label)
             # Copy on unfocus when adding is not allowed when source to destination, disable it
             copy_on_unfocus_when_add = cast(
                 QCheckBox, copy_field_inputs["copy_on_unfocus_when_add"]

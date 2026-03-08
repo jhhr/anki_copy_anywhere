@@ -57,6 +57,7 @@ from ..utils.logger import Logger
 from ..utils.move_card_to_deck import move_card_to_deck
 from ..utils.write_custom_data import write_custom_data
 from ..utils.write_to_media_folder import write_to_media_folder
+from .execute_code import execute_code
 from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
 from .interpolate_fields import TARGET_NOTES_COUNT, interpolate_from_text
@@ -1003,7 +1004,9 @@ def copy_for_single_trigger_note(
                 # Add cards to the dict so they can be updated later
                 for new_card in dest_note_cards:
                     copied_into_cards_dict[new_card.id] = new_card
-        except CopyFailedException:
+        except CopyFailedException as e:
+            if str(e):
+                logger.error(str(e))
             return False
 
     return True
@@ -1045,6 +1048,8 @@ def copy_into_single_note(
             # Note, depending on the mode, may be that field_only == copy_into_note_field
             continue
         copy_from_text = field_to_field_def.get("copy_from_text", "")
+        copy_as_code = field_to_field_def.get("copy_as_code", "")
+        use_code = field_to_field_def.get("use_code", False)
         copy_if_empty = field_to_field_def.get("copy_if_empty", False)
         process_chain = field_to_field_def.get("process_chain", None)
 
@@ -1061,11 +1066,12 @@ def copy_into_single_note(
             continue
 
         result_val = get_field_values_from_notes(
-            copy_from_text=copy_from_text,
+            copy_from_text=copy_as_code if use_code else copy_from_text,
             notes=source_notes,
             dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
+            use_code=use_code,
             logger=logger,
             variable_values_dict=variable_values_dict,
             progress_updater=progress_updater,
@@ -1109,6 +1115,8 @@ def copy_into_single_note(
     for field_to_file_def in field_to_file_defs:
         copy_into_filename = field_to_file_def.get("copy_into_filename", "")
         copy_from_text = field_to_file_def.get("copy_from_text", "")
+        copy_as_code = field_to_file_def.get("copy_as_code", "")
+        use_code = field_to_file_def.get("use_code", False)
         process_chain = field_to_file_def.get("process_chain", None)
         dont_overwrite = field_to_file_def.get("copy_if_empty", False)
 
@@ -1116,7 +1124,7 @@ def copy_into_single_note(
             logger.error("Error in copy fields: No file name provided")
             raise CopyFailedException
 
-        # Interpolate filename with values from the note
+        # Interpolate filename with values from the note (never executed as code)
         copy_into_filename = get_field_values_from_notes(
             copy_from_text=copy_into_filename,
             notes=[destination_note],
@@ -1132,11 +1140,12 @@ def copy_into_single_note(
             continue
 
         result_val = get_field_values_from_notes(
-            copy_from_text=copy_from_text,
+            copy_from_text=copy_as_code if use_code else copy_from_text,
             notes=source_notes,
             dest_note=destination_note_copy,
             multiple_note_types=multiple_note_types,
             select_card_separator=select_card_separator,
+            use_code=use_code,
             logger=logger,
             variable_values_dict=variable_values_dict,
             progress_updater=progress_updater,
@@ -1254,11 +1263,14 @@ def get_variable_values_for_note(
     for field_to_variable_def in field_to_variable_defs:
         copy_into_variable = field_to_variable_def["copy_into_variable"]
         copy_from_text = field_to_variable_def["copy_from_text"]
+        copy_as_code = field_to_variable_def.get("copy_as_code", "")
+        use_code = field_to_variable_def.get("use_code", False)
+        active_text = copy_as_code if use_code else copy_from_text
         process_chain = field_to_variable_def.get("process_chain", None)
 
         # Step 1: Interpolate the text with values from the note
         interpolated_value, invalid_fields = interpolate_from_text(
-            copy_from_text,
+            active_text,
             source_note=note,
         )
         if len(invalid_fields) > 0:
@@ -1266,6 +1278,14 @@ def get_variable_values_for_note(
                 "Error getting variable values: Invalid fields in copy_from_text:"
                 f" {', '.join(invalid_fields)}"
             )
+
+        # Step 1b: Execute as code if requested
+        if use_code and interpolated_value is not None:
+            interpolated_value, code_error = execute_code(interpolated_value, note)
+            if code_error:
+                raise CopyFailedException(
+                    f"Code execution error in variable '{copy_into_variable}':\n{code_error}"
+                )
 
         # Step 2: If we have further processing steps, run them
         if process_chain is not None and interpolated_value is not None:
@@ -1487,6 +1507,7 @@ def get_field_values_from_notes(
     multiple_note_types: bool = False,
     variable_values_dict: Optional[dict] = None,
     select_card_separator: Optional[str] = ", ",
+    use_code: bool = False,
     logger: Logger = Logger("error"),
     progress_updater: Optional[ProgressUpdater] = None,
 ) -> str:
@@ -1502,6 +1523,8 @@ def get_field_values_from_notes(
     :param variable_values_dict: A dictionary of custom variable values to use in interpolating text
     :param select_card_separator: The separator to use when joining the values from the notes.
         Irrelevant if there is only one note
+    :param use_code: When True, the interpolated text is executed as Python code and the return
+        value of that code is used as the result instead of the interpolated text itself.
     :param logger: Logger to use for errors and debug messages, used for storing all messages
         until the end of the whole operation to show them in a GUI element at the end
     :param progress_updater: An object to update the progress bar with
@@ -1539,8 +1562,16 @@ def get_field_values_from_notes(
                 f" {', '.join(invalid_fields)}"
             )
 
+        if use_code:
+            interpolated_value, code_error = execute_code(interpolated_value, note)
+            if code_error:
+                raise CopyFailedException(f"Code execution error:\n{code_error}")
+
         if progress_updater is not None:
             progress_updater.maybe_render_update()
-        result_val += f"{select_card_separator if i > 0 else ''}{interpolated_value}"
+        if interpolated_value is not None:
+            result_val += (
+                f"{select_card_separator if i > 0 else ''}{interpolated_value}"
+            )
 
     return result_val

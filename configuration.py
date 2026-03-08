@@ -201,6 +201,8 @@ class CopyFieldToField(TypedDict):
     guid: str
     copy_into_note_field: str
     copy_from_text: str
+    copy_as_code: str
+    use_code: bool
     copy_if_empty: bool
     copy_on_unfocus_when_edit: bool
     copy_on_unfocus_when_add: bool
@@ -212,6 +214,8 @@ class CopyFieldToFile(TypedDict):
     guid: str
     copy_into_filename: str
     copy_from_text: str
+    copy_as_code: str
+    use_code: bool
     copy_if_empty: bool
     copy_on_unfocus_when_edit: bool
     copy_on_unfocus_when_add: bool
@@ -259,6 +263,8 @@ class CopyFieldToVariable(TypedDict):
     guid: str
     copy_into_variable: str
     copy_from_text: str
+    copy_as_code: str
+    use_code: bool
     process_chain: Sequence[AnyProcess]
 
 

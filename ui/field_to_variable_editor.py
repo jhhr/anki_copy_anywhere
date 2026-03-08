@@ -8,6 +8,7 @@ from aqt.qt import (
     QFrame,
     QFormLayout,
     QPushButton,
+    QCheckBox,
     qtmajor,
 )
 
@@ -23,6 +24,8 @@ else:
 
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
 from .interpolated_text_edit import InterpolatedTextEditLayout
+from .code_edit_layout import CodeEditLayout
+from .toggle_switch import ToggleSwitch
 from ..logic.interpolate_fields import (
     BASE_NOTE_MENU_DICT,
     NOTE_ID,
@@ -37,6 +40,9 @@ from .edit_state import EditState
 class VariableInputsDict(TypedDict):
     copy_into_variable: RequiredLineEdit
     copy_from_text: InterpolatedTextEditLayout
+    text_mode_container: QWidget
+    use_code: ToggleSwitch
+    copy_as_code: CodeEditLayout
     process_chain: EditExtraProcessingWidget
 
 
@@ -131,6 +137,8 @@ class CopyFieldToVariableEditor(QWidget):
             "guid": str(uuid.uuid4()),
             "copy_into_variable": "",
             "copy_from_text": "",
+            "copy_as_code": "",
+            "use_code": False,
             "process_chain": [],
         }
         self.fields_to_variable_defs.append(new_definition)
@@ -173,19 +181,30 @@ class CopyFieldToVariableEditor(QWidget):
 
         variable_name_field.textChanged.connect(self.update_variable_names_in_state)
 
-        # Copy from field
-        copy_from_text_layout = InterpolatedTextEditLayout(
-            is_required=True,
-            label="<h4>Trigger note's fields' content to store in the variable</h4>",
-            options_dict=BASE_NOTE_MENU_DICT.copy(),
-            description=f"""<ul>
+        copy_from_text_description = f"""<ul>
         <li>Reference the trigger note's fields with  {intr_format('Field Name')}.</li>
         <li>Right-click to select a  {intr_format('Field Name')} to paste</li>
         <li>There are many other data values you can use, such as the {intr_format(NOTE_ID)},
  {intr_format(CARD_IVL)}, {intr_format(CARD_TYPE)} etc.</li>
-        </ul>""",
+        </ul>"""
+
+        # Code mode toggle — placed first so it stays above whichever editor is shown
+        use_code_checkbox = ToggleSwitch("Execute content as Python code")
+        row_form.addRow(use_code_checkbox)
+
+        # Copy from field — wrap in a container widget so it can be hidden when
+        # the user switches to code mode without losing the entered text.
+        text_mode_container = QWidget()
+        text_mode_vbox = QVBoxLayout(text_mode_container)
+        text_mode_vbox.setContentsMargins(0, 0, 0, 0)
+        copy_from_text_layout = InterpolatedTextEditLayout(
+            is_required=True,
+            label="<h4>Trigger note's fields' content to store in the variable</h4>",
+            options_dict=BASE_NOTE_MENU_DICT.copy(),
+            description=copy_from_text_description,
         )
-        row_form.addRow(copy_from_text_layout)
+        text_mode_vbox.addLayout(copy_from_text_layout)
+        row_form.addRow(text_mode_container)
 
         copy_from_text_layout.update_options(
             self.state.pre_query_menu_options_dict,
@@ -193,6 +212,43 @@ class CopyFieldToVariableEditor(QWidget):
         )
         with suppress(KeyError):
             copy_from_text_layout.set_text(copy_field_to_variable_definition["copy_from_text"])
+
+        # Code editor (hidden while text mode is active)
+        copy_as_code_widget = CodeEditLayout(
+            parent=self,
+            options_dict=BASE_NOTE_MENU_DICT.copy(),
+            is_required=False,
+            label="<h4>Trigger note's fields' content to store in the variable</h4>",
+            description=copy_from_text_description,
+        )
+        copy_as_code_widget.hide()
+        row_form.addRow(copy_as_code_widget)
+
+        copy_as_code_widget.update_options(
+            self.state.pre_query_menu_options_dict,
+            self.state.pre_query_text_edit_validate_dict,
+        )
+        with suppress(KeyError):
+            saved_code = copy_field_to_variable_definition.get("copy_as_code", "")
+            if saved_code:
+                copy_as_code_widget.set_text(saved_code)
+
+        # Apply initial mode and wire toggle
+        initial_use_code = copy_field_to_variable_definition.get("use_code", False)
+        if initial_use_code:
+            use_code_checkbox.setChecked(True)
+            text_mode_container.hide()
+            copy_as_code_widget.show()
+
+        def on_use_code_toggled(checked: bool):
+            text_mode_container.setVisible(not checked)
+            copy_as_code_widget.setVisible(checked)
+            if checked and not copy_as_code_widget.get_text().strip():
+                copy_as_code_widget.set_text(
+                    f"return {repr(copy_from_text_layout.get_text())}"
+                )
+
+        use_code_checkbox.toggled.connect(on_use_code_toggled)
 
         # Extra processing
         process_chain_widget = EditExtraProcessingWidget(
@@ -211,6 +267,9 @@ class CopyFieldToVariableEditor(QWidget):
         copy_field_inputs_dict: VariableInputsDict = {
             "copy_into_variable": variable_name_field,
             "copy_from_text": copy_from_text_layout,
+            "text_mode_container": text_mode_container,
+            "use_code": use_code_checkbox,
+            "copy_as_code": copy_as_code_widget,
             "process_chain": process_chain_widget,
         }
 
@@ -287,6 +346,8 @@ class CopyFieldToVariableEditor(QWidget):
             copy_variable_definition = {
                 "copy_into_variable": copy_field_inputs["copy_into_variable"].text(),
                 "copy_from_text": copy_field_inputs["copy_from_text"].get_text(),
+                "copy_as_code": copy_field_inputs["copy_as_code"].get_text(),
+                "use_code": copy_field_inputs["use_code"].isChecked(),
                 "process_chain": copy_field_inputs["process_chain"].get_process_chain(),
             }
             field_to_field_defs.append(copy_variable_definition)
@@ -295,6 +356,10 @@ class CopyFieldToVariableEditor(QWidget):
     def update_variables_options_dicts(self):
         for copy_field_inputs in self.copy_field_inputs:
             copy_field_inputs["copy_from_text"].update_options(
+                self.state.pre_query_menu_options_dict,
+                self.state.pre_query_text_edit_validate_dict,
+            )
+            copy_field_inputs["copy_as_code"].update_options(
                 self.state.pre_query_menu_options_dict,
                 self.state.pre_query_text_edit_validate_dict,
             )

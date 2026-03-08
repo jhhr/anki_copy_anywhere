@@ -1214,7 +1214,10 @@ class EditCopyDefinitionDialog(ScrollableQDialog):
             if field_to_field_definition["copy_into_note_field"] == "":
                 missing_copy_into_error = "Destination field cannot be empty."
                 show_error = True
-            if field_to_field_definition["copy_from_text"] == "":
+            if (
+                field_to_field_definition["copy_from_text"] == ""
+                and field_to_field_definition.get("copy_as_code", "") == ""
+            ):
                 missing_copy_from_error = "Copied content cannot be empty."
                 show_error = True
 
