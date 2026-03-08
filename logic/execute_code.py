@@ -141,8 +141,8 @@ def execute_code(code: str, note: Note) -> Tuple[Union[str, None], Optional[str]
         ``return``).  ``{{field}}`` markers have already been interpolated.
     :param note: The current source note, available as ``note`` inside the
         code.
-    :return: ``(result_string, error_message)`` — *error_message* is ``None``
-        on success.
+    :return: ``(result_string|None, error_message)`` — *error_message* is ``None``
+        on success. None indicates error or invalid return value.
     """
     if not code.strip():
         return "", None
@@ -176,7 +176,7 @@ def execute_code(code: str, note: Note) -> Tuple[Union[str, None], Optional[str]
         if e.text:
             col = max(0, (e.offset or 1) - 1)
             pointer = f"\n    {e.text.rstrip()}\n    {' ' * col}^"
-        return "", f"{kind} (line {user_lineno}): {e.msg}{pointer}"
+        return None, f"{kind} (line {user_lineno}): {e.msg}{pointer}"
 
     try:
         exec(compiled, exec_globals)  # noqa: S102
