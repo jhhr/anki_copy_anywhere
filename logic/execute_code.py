@@ -15,7 +15,7 @@ against *accidental* misuse, not a cryptographic boundary.
 What IS restricted: ``__import__``, ``open``, ``exec``, ``eval``,
 ``compile``, ``breakpoint``, ``os``, ``sys``, network access.
 What IS allowed: the explicit allowlist below (``re``, ``json``, ``html``,
-``find_cards``, ``find_notes``, ``note``) plus a curated set of built-ins.
+``print``, ``find_cards``, ``find_notes``, ``note``) plus a curated set of built-ins.
 """
 
 import html
@@ -31,7 +31,7 @@ from aqt import mw
 # ---------------------------------------------------------------------------
 # Safe built-ins whitelist
 # Notably absent: __import__, open, exec, eval, compile, breakpoint,
-#                 globals, locals, vars, __build_class__, input, print, setattr
+#                 globals, locals, vars, __build_class__, input, setattr
 # ---------------------------------------------------------------------------
 _SAFE_BUILTINS: dict = {
     # Type constructors

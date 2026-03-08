@@ -40,8 +40,8 @@ from ..logic.interpolate_fields import (
 _SECURITY_NOTICE = (
     "⚠ <b>Code mode</b> — write the body of a function that <b>returns a string</b>. "
     "<tt>{{Field}}</tt> markers are resolved before execution.<br>"
-    "Available names: <tt>re</tt>, <tt>json</tt>, <tt>find_cards</tt>, "
-    "<tt>find_notes</tt>, <tt>note</tt>. "
+    "Available names: <tt>re</tt>, <tt>json</tt>, <tt>html</tt>, <tt>print</tt>, "
+    "<tt>find_cards</tt>, <tt>find_notes</tt>, <tt>note</tt>. "
     "<small>Built-ins are restricted to a safe subset.</small><br>"
     "<small>⚠ Fields containing HTML (quotes, tags) can break string literals — "
     "prefer <tt>note[\"Field Name\"]</tt> over <tt>\"{{Field Name}}\"</tt>.</small>"
