@@ -1233,7 +1233,7 @@ def copy_into_single_note(
             if isinstance(set_dr, str):
                 # Get value from custom data property
                 set_dr = json.loads(card.custom_data).get(set_dr, None)
-            if isinstance(set_dr, int):
+            if isinstance(set_dr, int) and not isinstance(set_dr, bool):
                 set_dr = float(set_dr) / 100
             if isinstance(set_dr, float) and 0 < set_dr < 1:
                 card.desired_retention = set_dr
