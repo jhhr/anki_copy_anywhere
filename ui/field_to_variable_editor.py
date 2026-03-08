@@ -8,7 +8,6 @@ from aqt.qt import (
     QFrame,
     QFormLayout,
     QPushButton,
-    QCheckBox,
     qtmajor,
 )
 
