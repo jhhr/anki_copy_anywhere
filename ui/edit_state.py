@@ -412,10 +412,10 @@ class EditState:
         and only the trigger note in Within Note mode.
         """
         options_dict = get_new_base_dict(self.copy_mode)
-        # Copy previously defined variables
-        prev_variables_dict = self.post_query_menu_options_dict.get(VARIABLES_KEY, {})
-        if prev_variables_dict:
-            options_dict[VARIABLES_KEY] = prev_variables_dict
+        # Always source variables from state so they are available even before the Variables tab
+        # has been initialized.
+        if self.variables_dict:
+            options_dict[VARIABLES_KEY] = self.variables_dict
 
         trigger_model_names = [model["name"] for model in self.selected_models]
 
@@ -493,10 +493,8 @@ class EditState:
         in Within Note mode. The raw dict is used for validating the text in the TextEdit.
         """
         field_names_by_model_dict = BASE_NOTE_MENU_DICT.copy()
-
-        prev_variables_dict = self.pre_query_menu_options_dict.get(VARIABLES_KEY, {})
-        if prev_variables_dict:
-            field_names_by_model_dict[VARIABLES_KEY] = prev_variables_dict
+        if self.variables_dict:
+            field_names_by_model_dict[VARIABLES_KEY] = self.variables_dict
 
         if len(self.selected_models) > 1:
             # If there are multiple models, add the intersecting fields only
