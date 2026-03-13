@@ -119,7 +119,7 @@ class RequiredCombobox(QComboBox):
             self.currentTextChanged.connect(self.check_text_width)
         if is_required:
             self.update_required_style()
-            # self.currentTextChanged.connect(self.update_required_style)
+            self.currentTextChanged.connect(lambda _: self.update_required_style())
 
     def update_required_style(self):
         if self.is_required and not self.currentText() and self.was_valid:
