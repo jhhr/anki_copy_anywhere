@@ -83,6 +83,7 @@ class ComboBoxPlaceholderLineEdit(QLineEdit):
         if view.isVisible():
             parent.hidePopup()
         else:
+            self.popup_open = True
             parent.showPopup()
 
 
@@ -114,6 +115,7 @@ class RequiredCombobox(QComboBox):
         # --- Size management
         self.auto_size = auto_size
         self.max_width = 0
+        self.popup_open_index = -1
         self.setMinimumWidth(minimum_width)
         if auto_size:
             self.currentTextChanged.connect(self.check_text_width)
@@ -226,12 +228,9 @@ class RequiredCombobox(QComboBox):
             self.unset_current_index()
 
     def showPopup(self):
-        # When the popup is opened by clicking on the line edit, we need to set a flag to prevent
-        # it from closing when clicking anywhere else. We check this flag in hidePopup().
-        line_edit = cast(ComboBoxPlaceholderLineEdit, self.lineEdit())
-        if not line_edit:
-            return
-        line_edit.popup_open = True
+        # popup_open is set only by ComboBoxPlaceholderLineEdit.mouseReleaseEvent() when the
+        # line edit itself triggers opening the popup.
+        self.popup_open_index = self.currentIndex()
         if self.auto_size:
             self.set_popup_and_box_width()
         super().showPopup()
@@ -242,7 +241,11 @@ class RequiredCombobox(QComboBox):
         # popup is opened by clicking on the line edit and then checking it here.
         line_edit = cast(ComboBoxPlaceholderLineEdit, self.lineEdit())
         if line_edit.popup_open:
+            # Ignore only the immediate synthetic close after opening from the line edit.
+            # If current index changed, the user selected an item and the popup should close.
+            if self.currentIndex() == self.popup_open_index:
+                line_edit.popup_open = False
+                return
             line_edit.popup_open = False
-            return
         line_edit.popup_open = False
         super().hidePopup()
