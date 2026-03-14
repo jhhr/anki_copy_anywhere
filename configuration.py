@@ -7,6 +7,7 @@ from typing_extensions import TypeGuard
 
 from .logic.interpolate_fields import (
     TARGET_NOTES_COUNT,
+    QUERY_NOTE_INDEX,
     intr_format,
 )
 from .logic.jp_text_processing.kana.kana_highlight import FuriReconstruct
@@ -75,9 +76,7 @@ def get_fonts_check_process_label(fonts_check_process):
         fonts_limit = f", (limit {len(fonts_limit)} fonts)"
     else:
         fonts_limit = ""
-    return (
-        f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
-    )
+    return f"{FONTS_CHECK_PROCESS}: {fonts_check_process['fonts_dict_file']}{fonts_limit}"
 
 
 KANA_HIGHLIGHT_PROCESS = "Kana Highlight"
@@ -102,9 +101,7 @@ class WordHighlightProcess(TypedDict):
     word_field: str
 
 
-AnyProcess = Union[
-    KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess
-]
+AnyProcess = Union[KanjiumToJavdejongProcess, RegexProcess, FontsCheckProcess, KanaHighlightProcess]
 
 
 def is_kana_highlight_process(
@@ -229,17 +226,13 @@ def get_field_to_field_unfocus_trigger_fields(
     if modifies_other_notes:
         # source to destination mode is triggered by a field change in the trigger note
         # while the destination field is a different field in another note
-        return (
-            field_to_field.get("copy_on_unfocus_trigger_field", "")
-            .strip('""')
-            .split('", "')
-        )
+        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip('""').split('", "')
     else:
         # destination to sources mode or within note mode the destination and trigger fields
         # are in the same note
-        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip(
-            '""'
-        ).split('", "') or [field_to_field.get("copy_into_note_field", "")]
+        return field_to_field.get("copy_on_unfocus_trigger_field", "").strip('""').split(
+            '", "'
+        ) or [field_to_field.get("copy_into_note_field", "")]
 
 
 def get_triggered_field_to_field_def_for_field(
@@ -251,9 +244,7 @@ def get_triggered_field_to_field_def_for_field(
     Get the field-to-field definition that matches the field_name and the mode.
     """
     for field_def in field_to_field_defs:
-        trigger_fields = get_field_to_field_unfocus_trigger_fields(
-            field_def, modifies_other_notes
-        )
+        trigger_fields = get_field_to_field_unfocus_trigger_fields(field_def, modifies_other_notes)
         if field_name in trigger_fields:
             return field_def
     return None
@@ -393,6 +384,7 @@ def get_variables_dict_from_variable_defs(
     # in any across notes mode copy operation
     if copy_mode == COPY_MODE_ACROSS_NOTES:
         variable_menu_dict[TARGET_NOTES_COUNT] = intr_format(TARGET_NOTES_COUNT)
+        variable_menu_dict[QUERY_NOTE_INDEX] = intr_format(QUERY_NOTE_INDEX)
     for variable_def in variable_defs:
         if isinstance(variable_def, str):
             # If the variable definition is just a string, use it directly
@@ -410,8 +402,7 @@ def definition_modifies_trigger_note(
 ) -> bool:
     targets_trigger_note = (
         copy_definition.get("copy_mode", None) == COPY_MODE_WITHIN_NOTE
-        or copy_definition.get("across_mode_direction", None)
-        == DIRECTION_DESTINATION_TO_SOURCES
+        or copy_definition.get("across_mode_direction", None) == DIRECTION_DESTINATION_TO_SOURCES
     )
     # definition might only save stuff to files
     has_field_to_field_defs = len(copy_definition.get("field_to_field_defs", [])) > 0
@@ -423,8 +414,7 @@ def definition_modifies_other_notes(
 ) -> bool:
     targets_other_notes = (
         copy_definition.get("copy_mode", None) == COPY_MODE_ACROSS_NOTES
-        or copy_definition.get("across_mode_direction", None)
-        == DIRECTION_SOURCE_TO_DESTINATIONS
+        or copy_definition.get("across_mode_direction", None) == DIRECTION_SOURCE_TO_DESTINATIONS
     )
     # definition might only save stuff to files
     has_field_to_field_defs = len(copy_definition.get("field_to_field_defs", [])) > 0

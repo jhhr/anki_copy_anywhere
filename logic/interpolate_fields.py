@@ -42,6 +42,7 @@ NOTE_VALUE_DICT = {key: None for key in NOTE_VALUES}
 
 VARIABLES_KEY = "__Variables"
 TARGET_NOTES_COUNT = "__Target_Notes_Count"
+QUERY_NOTE_INDEX = "__Query_Note_Index"
 
 DESTINATION_CARDS_DATA_KEY = "__Destination_Card_Data"
 CARD_ID = "__Card_ID"
@@ -172,9 +173,7 @@ BASE_NOTE_MENU_DICT = {
 DESTINATION_NOTE_MENU_DICT = {
     # The note being used to query
     DESTINATION_NOTE_DATA_KEY: {
-        "Destination Note Type ID (mid:)": intr_format(
-            f"{DESTINATION_PREFIX}{NOTE_TYPE_ID}"
-        ),
+        "Destination Note Type ID (mid:)": intr_format(f"{DESTINATION_PREFIX}{NOTE_TYPE_ID}"),
         "Destination Note ID (nid:)": intr_format(f"{DESTINATION_PREFIX}{NOTE_ID}"),
         "Destination note all tags": intr_format(f"{DESTINATION_PREFIX}{NOTE_TAGS}"),
         "Destination note has tag": intr_format(f"{DESTINATION_PREFIX}{NOTE_HAS_TAG}"),
@@ -194,9 +193,7 @@ JSONSerializableValue = Union[
     Sequence["JSONSerializableValue"],
     dict[str, "JSONSerializableValue"],
 ]
-ValueOrValueGetter = Union[
-    JSONSerializableValue, Callable[[str], JSONSerializableValue]
-]
+ValueOrValueGetter = Union[JSONSerializableValue, Callable[[str], JSONSerializableValue]]
 
 
 def get_note_data_value(
@@ -323,19 +320,13 @@ def get_value_for_card(
         CARD_IVL: card.ivl or 0,
         CARD_EASE: card.factor / 10 or 0,
         # If FSRS is not enabled, memory_state will be None
-        CARD_STABILITY: round(card.memory_state.stability, 1)
-        if card.memory_state
-        else 0,
-        CARD_DIFFICULTY: round(card.memory_state.difficulty, 1)
-        if card.memory_state
-        else 0,
+        CARD_STABILITY: round(card.memory_state.stability, 1) if card.memory_state else 0,
+        CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
         CARD_REP_COUNT: card.reps or 0,
         CARD_LAPSE_COUNT: card.lapses or 0,
         CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "-",
         CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "-",
-        CARD_AVERAGE_TIME: timespan(total / float(cnt))
-        if cnt is not None and cnt > 0
-        else "-",
+        CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-",
         CARD_TOTAL_TIME: timespan(total),
         CARD_TYPE: (
             "Review"
@@ -346,9 +337,7 @@ def get_value_for_card(
                 else (
                     "Learning"
                     if card.type == CARD_TYPE_LRN
-                    else "Relearning"
-                    if card.type == CARD_TYPE_RELEARNING
-                    else ""
+                    else "Relearning" if card.type == CARD_TYPE_RELEARNING else ""
                 )
             )
         ),
@@ -379,9 +368,7 @@ def get_card_values_dict_for_note(
     all_card_templates = note_type["tmpls"] if note_type else []
     # all cards will be empty for a new note being added
     # and some cards may be missing, if the template is conditional
-    template_names_with_current_card = {
-        card.template()["name"] for card in current_cards
-    }
+    template_names_with_current_card = {card.template()["name"] for card in current_cards}
     # For each card type that doesn't have a card yet, add default values
     for card_template in all_card_templates:
         if card_template["name"] not in template_names_with_current_card:
@@ -477,17 +464,15 @@ def get_from_note_fields(
             return value, card_values_dict
     # And last, cards are harder since they need to specify the card type name too
     card_match = (
-        CARD_VALUE_RE.match(field)
-        if not multiple_note_types
-        else MULTI_CARD_VALUE_RE.match(field)
+        CARD_VALUE_RE.match(field) if not multiple_note_types else MULTI_CARD_VALUE_RE.match(field)
     )
     if card_match:
         if multiple_note_types:
             maybe_card_value_key, maybe_card_value_arg = card_match.group(1, 2)
             maybe_card_type_name = ""
         else:
-            maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = (
-                card_match.group(1, 2, 3)
+            maybe_card_type_name, maybe_card_value_key, maybe_card_value_arg = card_match.group(
+                1, 2, 3
             )
         # Check if the card type name is valid
         if maybe_card_value_key in CARD_VALUES_DICT:
