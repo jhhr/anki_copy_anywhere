@@ -158,12 +158,29 @@ class MultiComboBox(RequiredCombobox):
             return
         if selected_text is None:
             selected_text = ""
-        for text in selected_text.split(", "):
+        # Apply programmatic selection updates without emitting re-entrant change signals.
+        combo_signals_were_blocked = self.blockSignals(True)
+        model_signals_were_blocked = model.blockSignals(True)
+        try:
+            # Replace the current checked set entirely instead of adding to it.
+            # This prevents stale selections from being re-applied when state is synced
+            # across multiple MultiComboBox instances.
             for i in range(model.rowCount()):
                 item = model.item(i)
-                if item is not None and item.text() == text:
-                    item.setCheckState(QCheckState.Checked)
-                    break
+                if item is not None:
+                    item.setCheckState(QCheckState.Unchecked)
+
+            for text in selected_text.split(", "):
+                if not text:
+                    continue
+                for i in range(model.rowCount()):
+                    item = model.item(i)
+                    if item is not None and item.text() == text:
+                        item.setCheckState(QCheckState.Checked)
+                        break
+        finally:
+            model.blockSignals(model_signals_were_blocked)
+            self.blockSignals(combo_signals_were_blocked)
         self.updateText()
 
     def currentData(self, role: int = QDisplayRole):
