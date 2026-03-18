@@ -1,3 +1,4 @@
+import html
 from typing import Optional, Dict
 import uuid
 
@@ -296,7 +297,7 @@ class CardActionsEditor(QWidget):
 
         # Header - show both model and card type in a readable format
         # card_type_name is just the template name from GroupedComboBox
-        header = QLabel(f"<h3>Actions for card type: <em>{card_type_name}</em></h3>")
+        header = QLabel(f"<h3>Actions for card type: <em>{html.escape(card_type_name)}</em></h3>")
         frame_layout.addWidget(header)
 
         form_layout = QFormLayout()
