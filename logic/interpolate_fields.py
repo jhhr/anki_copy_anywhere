@@ -10,6 +10,7 @@ from anki.consts import (
     CARD_TYPE_NEW,
     CARD_TYPE_RELEARNING,
     CARD_TYPE_REV,
+    MODEL_CLOZE,
 )
 from anki.notes import Note
 from aqt import mw
@@ -101,6 +102,35 @@ CARD_VALUES = [
 ]
 # Dict for quick matching between interpolated fields and special values
 CARD_VALUES_DICT = {key: None for key in CARD_VALUES}
+
+# Type-appropriate default values for each card value key, used when a card type
+# is not found in the card values dict (e.g. a cloze card that doesn't exist for
+# this particular note).
+CARD_VALUE_DEFAULTS: dict[str, "JSONSerializableValue"] = {
+    CARD_ID: 0,
+    OTHER_CARD_IDS: [],
+    CARD_NID: 0,
+    CARD_CREATED: "-",
+    CARD_FIRST_REVIEW: "-",
+    CARD_LATEST_REVIEW: "-",
+    CARD_DUE: 0,
+    CARD_IVL: 0,
+    CARD_EASE: 0,
+    CARD_STABILITY: 0,
+    CARD_DIFFICULTY: 0,
+    CARD_REP_COUNT: 0,
+    CARD_LAPSE_COUNT: 0,
+    CARD_AVERAGE_TIME: "-",
+    CARD_TOTAL_TIME: "-",
+    CARD_CUSTOM_DATA: {},
+    CARD_CUSTOM_DATA_PROP: "",
+    CARD_TYPE: "",
+    CARD_LAST_EASES: [],
+    CARD_LAST_FACTORS: [],
+    CARD_LAST_IVLS: [],
+    CARD_LAST_REV_TYPES: [],
+    CARD_LAST_REV_TIMES: [],
+}
 
 # The prefix for the interpolation syntax
 INTR_PREFIX = "{{"
@@ -309,7 +339,7 @@ def get_value_for_card(
         f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card.id}"
     )
     if result:
-        (first, last, cnt, total) = result
+        first, last, cnt, total = result
     else:
         first, last, cnt, total = None, None, None, None
     return {
@@ -360,25 +390,38 @@ def get_card_values_dict_for_note(
 ) -> CardValuesDict:
     """
     Get a dictionary of special fields that are card-specific.
+    For standard note types, keys are card template names (e.g. "Front").
+    For cloze note types, keys are "<template_name> <ordinal>" (e.g. "Cloze 1", "Cloze 2")
+    because all cloze cards share the same template name but differ by ordinal.
     """
     card_values = {}
 
     current_cards = note.cards()
     note_type = note.note_type()
+    is_cloze = bool(note_type and note_type.get("type") == MODEL_CLOZE)
     all_card_templates = note_type["tmpls"] if note_type else []
-    # all cards will be empty for a new note being added
-    # and some cards may be missing, if the template is conditional
-    template_names_with_current_card = {card.template()["name"] for card in current_cards}
-    # For each card type that doesn't have a card yet, add default values
-    for card_template in all_card_templates:
-        if card_template["name"] not in template_names_with_current_card:
-            # Make a fake card to get the default values
-            card_values[card_template["name"]] = get_value_for_card(Card(mw.col), note)
-    # Add values as a dict by card_type_name
-    for card in note.cards():
-        card_type_name = card.template()["name"]
 
-        card_values[card_type_name] = get_value_for_card(card, note)
+    if not is_cloze:
+        # all cards will be empty for a new note being added
+        # and some cards may be missing, if the template is conditional
+        template_names_with_current_card = {card.template()["name"] for card in current_cards}
+        # For each card type that doesn't have a card yet, add default values
+        for card_template in all_card_templates:
+            if card_template["name"] not in template_names_with_current_card:
+                # Make a fake card to get the default values
+                card_values[card_template["name"]] = get_value_for_card(Card(mw.col), note)
+        # Add values as a dict by card_type_name
+        for card in note.cards():
+            card_type_name = card.template()["name"]
+            card_values[card_type_name] = get_value_for_card(card, note)
+    else:
+        # For cloze notes all cards share the same template; differentiate by ordinal.
+        # card.ord is 0-based ({{c1:}} = ord 0, {{c2:}} = ord 1, ...)
+        template_name = all_card_templates[0]["name"] if all_card_templates else "Cloze"
+        for card in current_cards:
+            cloze_key = f"{template_name} {card.ord + 1}"
+            card_values[cloze_key] = get_value_for_card(card, note)
+
     return card_values
 
 
@@ -505,6 +548,11 @@ def get_from_note_fields(
                 else:
                     value = cast(JSONSerializableValue, value_or_partial)
                 return value, card_values_dict
+            elif value_dict is None:
+                # The card type name was not found in the dict (e.g. a cloze card that
+                # doesn't exist for this particular note). Return a type-appropriate
+                # default rather than flagging the field as invalid.
+                return CARD_VALUE_DEFAULTS.get(maybe_card_value_key, ""), card_values_dict
     # If we get here, the field is invalid
     return None, card_values_dict
 
