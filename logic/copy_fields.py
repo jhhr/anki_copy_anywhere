@@ -57,7 +57,7 @@ from ..utils.logger import Logger
 from ..utils.move_card_to_deck import move_card_to_deck
 from ..utils.write_custom_data import write_custom_data
 from ..utils.write_to_media_folder import write_to_media_folder
-from .execute_code import execute_code
+from .execute_code import execute_code_for_field, execute_code_for_files
 from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
 from .interpolate_fields import QUERY_NOTE_INDEX, TARGET_NOTES_COUNT, interpolate_from_text
@@ -1095,63 +1095,103 @@ def copy_into_single_note(
         process_chain = field_to_file_def.get("process_chain", None)
         dont_overwrite = field_to_file_def.get("copy_if_empty", False)
 
-        if not copy_into_filename:
-            logger.error("Error in copy fields: No file name provided")
-            raise CopyFailedException
+        if use_code:
+            # Code path: execute code per source note, each execution returns a list of
+            # (filename, content) tuples that are all written as separate files.
+            all_file_tuples: list[tuple[str, str]] = []
+            multiple_source_notes = len(source_notes) > 1
+            for i, note in enumerate(source_notes):
+                if multiple_source_notes and variable_values_dict is not None:
+                    variable_values_dict[QUERY_NOTE_INDEX] = i + 1
+                interpolated_code, invalid_fields = interpolate_from_text(
+                    copy_as_code,
+                    source_note=note,
+                    destination_note=destination_note_copy,
+                    variable_values_dict=variable_values_dict,
+                    multiple_note_types=multiple_note_types,
+                )
+                if invalid_fields:
+                    logger.error(
+                        "Error in copy fields: Invalid fields in copy_as_code:"
+                        f" {', '.join(invalid_fields)}"
+                    )
+                file_tuples, code_error = execute_code_for_files(interpolated_code, note)
+                if code_error:
+                    raise CopyFailedException(
+                        f"Code execution error in file definition:\n{code_error}"
+                    )
+                if file_tuples:
+                    all_file_tuples.extend(file_tuples)
+                if progress_updater is not None:
+                    progress_updater.maybe_render_update()
 
-        # Interpolate filename with values from the note (never executed as code)
-        copy_into_filename = get_field_values_from_notes(
-            copy_from_text=copy_into_filename,
-            notes=[destination_note],
-            dest_note=destination_note_copy,
-            multiple_note_types=multiple_note_types,
-            select_card_separator=select_card_separator,
-            logger=logger,
-            variable_values_dict=variable_values_dict,
-            progress_updater=progress_updater,
-        )
+            for fname, fcontent in all_file_tuples:
+                if dont_overwrite and file_exists_in_media_folder(fname):
+                    continue
+                try:
+                    write_to_media_folder(fname, fcontent)
+                    wrote_to_file = True
+                except Exception as e:
+                    logger.error(f"Error in writing to file: {e}")
+                    raise CopyFailedException
+        else:
+            # Non-code path: single file written to a pre-determined filename.
+            if not copy_into_filename:
+                logger.error("Error in copy fields: No file name provided")
+                raise CopyFailedException
 
-        if dont_overwrite and file_exists_in_media_folder(copy_into_filename):
-            continue
+            # Interpolate filename with values from the note (never executed as code)
+            copy_into_filename = get_field_values_from_notes(
+                copy_from_text=copy_into_filename,
+                notes=[destination_note],
+                dest_note=destination_note_copy,
+                multiple_note_types=multiple_note_types,
+                select_card_separator=select_card_separator,
+                logger=logger,
+                variable_values_dict=variable_values_dict,
+                progress_updater=progress_updater,
+            )
 
-        result_val = get_field_values_from_notes(
-            copy_from_text=copy_as_code if use_code else copy_from_text,
-            notes=source_notes,
-            dest_note=destination_note_copy,
-            multiple_note_types=multiple_note_types,
-            select_card_separator=select_card_separator,
-            use_code=use_code,
-            logger=logger,
-            variable_values_dict=variable_values_dict,
-            progress_updater=progress_updater,
-        )
-        if process_chain is not None:
-            processed_val = apply_process_chain(
-                process_chain=process_chain,
-                text=result_val,
+            if dont_overwrite and file_exists_in_media_folder(copy_into_filename):
+                continue
+
+            result_val = get_field_values_from_notes(
+                copy_from_text=copy_from_text,
                 notes=source_notes,
                 dest_note=destination_note_copy,
                 multiple_note_types=multiple_note_types,
+                select_card_separator=select_card_separator,
+                logger=logger,
                 variable_values_dict=variable_values_dict,
                 progress_updater=progress_updater,
-                logger=logger,
-                file_cache=file_cache,
             )
-            # result_val should always be at least "", None indicates an error
-            if processed_val is None:
-                logger.error(
-                    f"Error in copy fields: Process chain failed for file {copy_into_filename}"
+            if process_chain is not None:
+                processed_val = apply_process_chain(
+                    process_chain=process_chain,
+                    text=result_val,
+                    notes=source_notes,
+                    dest_note=destination_note_copy,
+                    multiple_note_types=multiple_note_types,
+                    variable_values_dict=variable_values_dict,
+                    progress_updater=progress_updater,
+                    logger=logger,
+                    file_cache=file_cache,
                 )
-                raise CopyFailedException
-            result_val = processed_val
+                # result_val should always be at least "", None indicates an error
+                if processed_val is None:
+                    logger.error(
+                        f"Error in copy fields: Process chain failed for file {copy_into_filename}"
+                    )
+                    raise CopyFailedException
+                result_val = processed_val
 
-        # Finally, copy the value into the file
-        try:
-            write_to_media_folder(copy_into_filename, result_val)
-            wrote_to_file = True
-        except Exception as e:
-            logger.error(f"Error in writing to file: {e}")
-            raise CopyFailedException
+            # Finally, copy the value into the file
+            try:
+                write_to_media_folder(copy_into_filename, result_val)
+                wrote_to_file = True
+            except Exception as e:
+                logger.error(f"Error in writing to file: {e}")
+                raise CopyFailedException
 
     card_actions_by_template_name = {}
     dest_note_type = destination_note.note_type()
@@ -1261,7 +1301,7 @@ def get_variable_values_for_note(
 
         # Step 1b: Execute as code if requested
         if use_code and interpolated_value is not None:
-            interpolated_value, code_error = execute_code(interpolated_value, note)
+            interpolated_value, code_error = execute_code_for_field(interpolated_value, note)
             if code_error:
                 raise CopyFailedException(
                     f"Code execution error in variable '{copy_into_variable}':\n{code_error}"
@@ -1534,7 +1574,7 @@ def get_field_values_from_notes(
             )
 
         if use_code:
-            interpolated_value, code_error = execute_code(interpolated_value, note)
+            interpolated_value, code_error = execute_code_for_field(interpolated_value, note)
             if code_error:
                 raise CopyFailedException(f"Code execution error:\n{code_error}")
 

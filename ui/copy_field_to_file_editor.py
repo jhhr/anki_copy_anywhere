@@ -35,7 +35,7 @@ from ..configuration import (
 from .multi_combo_box import MultiComboBox
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
 from .interpolated_text_edit import InterpolatedTextEditLayout
-from .code_edit_layout import CodeEditLayout
+from .code_edit_layout import CodeEditLayout, _FILE_CODE_NOTICE
 from .toggle_switch import ToggleSwitch
 from ..logic.interpolate_fields import (
     BASE_NOTE_MENU_DICT,
@@ -196,13 +196,17 @@ class CopyFieldToFileEditor(QWidget):
         <li>Source notes' fields are not included in the filename.</li>
         <li>The filename will be prefixed with _ if it doesn't start with it.</li>
         """
+        filename_container = QWidget()
+        filename_vbox = QVBoxLayout(filename_container)
+        filename_vbox.setContentsMargins(0, 0, 0, 0)
         filename_text_layout = InterpolatedTextEditLayout(
             is_required=True,
             options_dict=get_new_base_dict(self.copy_mode),
             label=filename_label,
             description=filename_description,
         )
-        row_form.addRow(filename_text_layout)
+        filename_vbox.addLayout(filename_text_layout)
+        row_form.addRow(filename_container)
         filename_text_layout.update_options(
             self.state.post_query_menu_options_dict,
             self.state.post_query_text_edit_validate_dict,
@@ -259,6 +263,7 @@ class CopyFieldToFileEditor(QWidget):
             is_required=False,
             label=copy_from_text_label.text(),
             description=copy_from_text_description,
+            notice=_FILE_CODE_NOTICE,
         )
         copy_as_code_widget.hide()
         row_form.addRow(copy_as_code_widget)
@@ -276,15 +281,22 @@ class CopyFieldToFileEditor(QWidget):
         initial_use_code = copy_field_to_field_definition.get("use_code", False)
         if initial_use_code:
             use_code_checkbox.setChecked(True)
+            filename_container.hide()
             text_mode_container.hide()
             copy_as_code_widget.show()
 
         def on_use_code_toggled(checked: bool):
+            filename_container.setVisible(not checked)
             text_mode_container.setVisible(not checked)
             copy_as_code_widget.setVisible(checked)
             if checked and not copy_as_code_widget.get_text().strip():
+                fname = repr(filename_text_layout.get_text())
+                content = repr(copy_from_text_layout.get_text())
                 copy_as_code_widget.set_text(
-                    f"return {repr(copy_from_text_layout.get_text())}"
+                    f"filename = {fname}\n"
+                    f"file_content = {content}\n"
+                    "first_file = (filename, file_content)\n"
+                    "return [first_file]"
                 )
 
         use_code_checkbox.toggled.connect(on_use_code_toggled)

@@ -37,14 +37,38 @@ from ..logic.interpolate_fields import (
     intr_format,
 )
 
-_SECURITY_NOTICE = (
-    "⚠ <b>Code mode</b> — write the body of a function that <b>returns a string</b>. "
+_CODE_NOTICE_PREFIX = "\u26a0 <b>Code mode</b> \u2014 write the body of a function that "
+
+_CODE_NOTICE_AVAILABLE_NAMES = (
     "<tt>{{Field}}</tt> markers are resolved before execution.<br>"
     "Available names: <tt>re</tt>, <tt>json</tt>, <tt>html</tt>, <tt>print</tt>, "
     "<tt>find_cards</tt>, <tt>find_notes</tt>, <tt>note</tt>. "
-    "<small>Built-ins are restricted to a safe subset.</small><br>"
-    "<small>⚠ Fields containing HTML (quotes, tags) can break string literals — "
-    "prefer <tt>note[\"Field Name\"]</tt> over <tt>\"{{Field Name}}\"</tt>.</small>"
+    "<small>Built-ins are restricted to a safe subset.</small>"
+)
+
+_CODE_NOTICE_HTML_WARNING = (
+    "<small>\u26a0 Fields containing HTML (quotes, tags) can break string literals \u2014 "
+    'prefer <tt>note["Field Name"]</tt> over <tt>"{{Field Name}}"</tt>.</small>'
+)
+
+_FIELD_CODE_NOTICE = (
+    _CODE_NOTICE_PREFIX
+    + "<b>returns a string</b>. "
+    + _CODE_NOTICE_AVAILABLE_NAMES
+    + "<br>"
+    + _CODE_NOTICE_HTML_WARNING
+)
+
+_FILE_CODE_NOTICE = (
+    _CODE_NOTICE_PREFIX
+    + "<b>returns a <tt>list</tt> of <tt>(filename, content)</tt> string tuples</b>. "
+    "Each tuple will be written as a separate file. "
+    + _CODE_NOTICE_AVAILABLE_NAMES
+    + "<br>"
+    "<small>Example: "
+    "<tt>return [('_file.html', '&lt;b&gt;' + note['Field'] + '&lt;/b&gt;')]</tt>"
+    "</small><br>"
+    + _CODE_NOTICE_HTML_WARNING
 )
 
 
@@ -63,6 +87,7 @@ class CodeEditLayout(QWidget):
         is_required: bool = False,
         label: Optional[str] = None,
         description: Optional[str] = None,
+        notice: Optional[str] = None,
     ) -> None:
         super().__init__(parent)
 
@@ -79,16 +104,14 @@ class CodeEditLayout(QWidget):
         self.set_label(label)
 
         # --- Security / context notice -------------------------------------------
-        self._notice_label = QLabel(_SECURITY_NOTICE)
-        self._notice_label.setWordWrap(True)
-        self._notice_label.setStyleSheet(
-            "color: #ddd;"
-            "border: 1px solid #ccc;"
-            "border-radius: 4px;"
-            "padding: 5px;"
-            "font-size: 10px;"
-        )
-        layout.addWidget(self._notice_label)
+        if notice is not None and not notice.strip():
+            self._notice_label = QLabel(notice)
+            self._notice_label.setWordWrap(True)
+            self._notice_label.setStyleSheet(
+                "color: #ddd;border: 1px solid #ccc;border-radius: 4px;padding: 5px;font-size:"
+                " 10px;"
+            )
+            layout.addWidget(self._notice_label)
 
         # --- Interpolation description (mirrors InterpolatedTextEditLayout) --
         self._description_label = QLabel()
@@ -153,9 +176,7 @@ class CodeEditLayout(QWidget):
         else:
             self._description_label.hide()
 
-    def update_options(
-        self, new_options_dict: dict, new_validate_dict: dict
-    ) -> None:
+    def update_options(self, new_options_dict: dict, new_validate_dict: dict) -> None:
         self.text_edit.clear_options()
         self._options_dict = new_options_dict
         self._validate_dict = new_validate_dict
@@ -174,21 +195,13 @@ class CodeEditLayout(QWidget):
         #    time; shift reported line numbers back by 1 to account for the
         #    injected ``def`` line).
         if code.strip():
-            wrapped = "def _user_func():\n" + textwrap.indent(
-                code if code else " ", "    "
-            )
+            wrapped = "def _user_func():\n" + textwrap.indent(code if code else " ", "    ")
             try:
                 ast.parse(wrapped)
             except SyntaxError as e:
                 user_line = max(1, (e.lineno or 1) - 1)
-                kind = (
-                    "Indentation error"
-                    if isinstance(e, IndentationError)
-                    else "Syntax error"
-                )
-                errors.append(
-                    f'<b style="color:red">{kind}</b> (line {user_line}): {e.msg}'
-                )
+                kind = "Indentation error" if isinstance(e, IndentationError) else "Syntax error"
+                errors.append(f'<b style="color:red">{kind}</b> (line {user_line}): {e.msg}')
 
         # 2. {{field}} interpolation-marker validation (same logic as
         #    InterpolatedTextEditLayout.validate_text()).
@@ -209,9 +222,7 @@ class CodeEditLayout(QWidget):
             try:
                 self._validate_dict[intr_format(field.lower())]
             except KeyError:
-                errors.append(
-                    f'<b style="color:red">{field}</b>: Not a valid field'
-                )
+                errors.append(f'<b style="color:red">{field}</b>: Not a valid field')
                 continue
 
             if arg is not None:
