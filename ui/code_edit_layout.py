@@ -37,12 +37,13 @@ from ..logic.interpolate_fields import (
     intr_format,
 )
 
-_CODE_NOTICE_PREFIX = "\u26a0 <b>Code mode</b> \u2014 write the body of a function that "
+CODE_NOTICE_PREFIX = "\u26a0 <b>Code mode</b> \u2014 write the body of a function that "
 
-_CODE_NOTICE_AVAILABLE_NAMES = (
+CODE_NOTICE_AVAILABLE_NAMES = (
     "<tt>{{Field}}</tt> markers are resolved before execution.<br>"
     "Available names: <tt>re</tt>, <tt>json</tt>, <tt>html</tt>, <tt>print</tt>, "
-    "<tt>find_cards</tt>, <tt>find_notes</tt>, <tt>note</tt>. "
+    "<tt>find_cards</tt>, <tt>find_notes</tt>, <tt>note</tt>, "
+    "<tt>cards</tt> (list of destination note&#39;s cards), <tt>get_card_last_reps</tt>. "
     "<small>Built-ins are restricted to a safe subset.</small>"
 )
 
@@ -51,23 +52,36 @@ _CODE_NOTICE_HTML_WARNING = (
     'prefer <tt>note["Field Name"]</tt> over <tt>"{{Field Name}}"</tt>.</small>'
 )
 
-_FIELD_CODE_NOTICE = (
-    _CODE_NOTICE_PREFIX
+FIELD_CODE_NOTICE = (
+    CODE_NOTICE_PREFIX
     + "<b>returns a string</b>. "
-    + _CODE_NOTICE_AVAILABLE_NAMES
+    + CODE_NOTICE_AVAILABLE_NAMES
     + "<br>"
     + _CODE_NOTICE_HTML_WARNING
 )
 
-_FILE_CODE_NOTICE = (
-    _CODE_NOTICE_PREFIX
+FILE_CODE_NOTICE = (
+    CODE_NOTICE_PREFIX
     + "<b>returns a <tt>list</tt> of <tt>(filename, content)</tt> string tuples</b>. "
     "Each tuple will be written as a separate file. "
-    + _CODE_NOTICE_AVAILABLE_NAMES
+    + CODE_NOTICE_AVAILABLE_NAMES
     + "<br>"
     "<small>Example: "
     "<tt>return [('_file.html', '&lt;b&gt;' + note['Field'] + '&lt;/b&gt;')]</tt>"
     "</small><br>"
+    + _CODE_NOTICE_HTML_WARNING
+)
+
+
+CARD_ACTION_CODE_NOTICE = (
+    CODE_NOTICE_PREFIX
+    + "<b>returns a <tt>dict</tt> or <tt>None</tt></b>. Return <tt>None</tt> to skip all actions"
+    " for this card type. The dict may include any of these keys (all"
+    " optional):<br>\u2014<tt>change_deck</tt>: str (deck name) <br>\u2014 <tt>set_flag</tt>: int"
+    " 0\u20137 (0=no flag, 1=red, 2=orange, 3=green, 4=blue, 5=pink, 6=turquoise, 7=purple)"
+    " <br>\u2014 <tt>suspend</tt>: bool <br>\u2014 <tt>bury</tt>: bool <br>\u2014"
+    " <tt>set_desired_retention</tt>: float 0.01\u20130.99 or custom-data key (str)<br>"
+    + CODE_NOTICE_AVAILABLE_NAMES
     + _CODE_NOTICE_HTML_WARNING
 )
 
@@ -104,7 +118,7 @@ class CodeEditLayout(QWidget):
         self.set_label(label)
 
         # --- Security / context notice -------------------------------------------
-        if notice is not None and not notice.strip():
+        if notice is not None:
             self._notice_label = QLabel(notice)
             self._notice_label.setWordWrap(True)
             self._notice_label.setStyleSheet(

@@ -184,14 +184,22 @@ FlagValueType = Literal[0, 1, 2, 3, 4, 5, 6, 7]
 CARD_TYPE_SEPARATOR = "<::>"
 
 
-class CardAction(TypedDict):
-    guid: str
+# Card action used by GUI or code
+class CardActionDict(TypedDict):
     card_type_name: str
-    change_deck: Optional[str]
+    change_deck: Optional[Union[str, int]]
     set_flag: Optional[FlagValueType]
     suspend: Optional[bool]
     bury: Optional[bool]
     set_desired_retention: Optional[Union[float, int, str]]
+
+
+# Card action saved to definition, contains either a GUI set
+# action or code that should return a CardActionDict
+class CardAction(CardActionDict):
+    guid: str
+    action_code: Optional[str]
+    use_code: bool
 
 
 class CopyFieldToField(TypedDict):

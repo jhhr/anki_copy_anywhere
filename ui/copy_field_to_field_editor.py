@@ -36,7 +36,7 @@ from .multi_combo_box import MultiComboBox
 from .grouped_combo_box import GroupedComboBox
 from .edit_extra_processing_dialog import EditExtraProcessingWidget
 from .interpolated_text_edit import InterpolatedTextEditLayout
-from .code_edit_layout import CodeEditLayout, _FIELD_CODE_NOTICE
+from .code_edit_layout import CodeEditLayout, FIELD_CODE_NOTICE
 from .toggle_switch import ToggleSwitch
 from ..logic.interpolate_fields import (
     BASE_NOTE_MENU_DICT,
@@ -275,7 +275,7 @@ class CopyFieldToFieldEditor(QWidget):
             is_required=False,
             label=copy_from_text_label.text(),
             description=copy_from_text_description,
-            notice=_FIELD_CODE_NOTICE,
+            notice=FIELD_CODE_NOTICE,
         )
         copy_as_code_widget.hide()
         row_form.addRow(copy_as_code_widget)

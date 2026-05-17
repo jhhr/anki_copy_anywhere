@@ -359,7 +359,7 @@ def format_timestamp_days(e, time_format=None):
 
 def get_card_last_reps(
     card_id: CardId,
-    rep_count: str,
+    rep_count: Union[str, int],
     get_ease: bool = False,
     get_ivl: bool = False,
     get_fct: bool = False,
@@ -376,7 +376,7 @@ def get_card_last_reps(
     all = rep_count == "all"
     if not all:
         try:
-            rep_count_int = int(rep_count)
+            rep_count_int = int(rep_count) if isinstance(rep_count, str) else rep_count
         except ValueError:
             return []
         if rep_count_int < 1:
@@ -420,21 +420,79 @@ def get_card_custom_data_prop(custom_data_str: str, prop: str) -> Any:
             return ""
         return custom_data.get(prop, "")
     except json.JSONDecodeError:
-        return ""
+        return
+
+
+def get_card_type_as_string(card_type: int) -> str:
+    return (
+        "Review"
+        if card_type == CARD_TYPE_REV
+        else (
+            "New"
+            if card_type == CARD_TYPE_NEW
+            else (
+                "Learning"
+                if card_type == CARD_TYPE_LRN
+                else "Relearning" if card_type == CARD_TYPE_RELEARNING else ""
+            )
+        )
+    )
+
+
+def get_card_time_values(
+    card_id: CardId,
+) -> Union[Tuple[float, float, float, float], Tuple[None, None, None, None]]:
+    """
+    Get the first, latest, count, and total time of reviews for a card.
+    Returns None for all values if no reviews are found.
+    """
+
+    assert mw.col.db is not None
+    result = mw.col.db.first(
+        f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card_id}"
+    )
+    if result:
+        first, last, cnt, total = result
+        return (first, last, cnt, total)
+    else:
+        return None, None, None, None
+
+
+def get_formatted_first_review_time(first_review_time: float) -> str:
+    if first_review_time is None:
+        return "-"
+    return format_timestamp(first_review_time / 1000)
+
+
+def get_formatted_latest_review_time(latest_review_time: float) -> str:
+    if latest_review_time is None:
+        return "-"
+    return format_timestamp(latest_review_time / 1000)
+
+
+def get_formatted_average_time(total_time: float, review_count: float) -> str:
+    if review_count is None or review_count == 0:
+        return "-"
+    return timespan(total_time / review_count)
+
+
+def get_formatted_total_time(total_time: float) -> str:
+    if total_time is None:
+        return "-"
+    return timespan(total_time)
+
+
+def get_formatted_card_created_time(card_id: int) -> str:
+    if not card_id:
+        return "-"
+    return format_timestamp(card_id / 1000)
 
 
 def get_value_for_card(
     card: Card,
     note: Note,
 ) -> ValuesDict:
-    assert mw.col.db is not None
-    result = mw.col.db.first(
-        f"select min(id), max(id), count(), sum(time)/1000 from revlog where cid = {card.id}"
-    )
-    if result:
-        first, last, cnt, total = result
-    else:
-        first, last, cnt, total = None, None, None, None
+    first, last, cnt, total = get_card_time_values(card.id)
     return {
         CARD_ID: card.id or 0,
         OTHER_CARD_IDS: [cid for cid in note.card_ids() if cid != card.id],
@@ -447,24 +505,12 @@ def get_value_for_card(
         CARD_DIFFICULTY: round(card.memory_state.difficulty, 1) if card.memory_state else 0,
         CARD_REP_COUNT: card.reps or 0,
         CARD_LAPSE_COUNT: card.lapses or 0,
-        CARD_FIRST_REVIEW: format_timestamp(first / 1000) if first else "-",
-        CARD_LATEST_REVIEW: format_timestamp(last / 1000) if last else "-",
-        CARD_AVERAGE_TIME: timespan(total / float(cnt)) if cnt is not None and cnt > 0 else "-",
-        CARD_TOTAL_TIME: timespan(total),
-        CARD_TYPE: (
-            "Review"
-            if card.type == CARD_TYPE_REV
-            else (
-                "New"
-                if card.type == CARD_TYPE_NEW
-                else (
-                    "Learning"
-                    if card.type == CARD_TYPE_LRN
-                    else "Relearning" if card.type == CARD_TYPE_RELEARNING else ""
-                )
-            )
-        ),
-        CARD_CREATED: format_timestamp(card.nid / 1000) if card.nid else "-",
+        CARD_FIRST_REVIEW: get_formatted_first_review_time(first),
+        CARD_LATEST_REVIEW: get_formatted_latest_review_time(last),
+        CARD_AVERAGE_TIME: get_formatted_average_time(total, cnt),
+        CARD_TOTAL_TIME: get_formatted_total_time(total),
+        CARD_TYPE: get_card_type_as_string(card.type),
+        CARD_CREATED: get_formatted_card_created_time(card.id),
         CARD_CUSTOM_DATA: card.custom_data or {},
         CARD_CUSTOM_DATA_PROP: partial(get_card_custom_data_prop, card.custom_data),
         CARD_LAST_EASES: partial(get_card_last_reps, card.id, get_ease=True),

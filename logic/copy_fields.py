@@ -57,7 +57,11 @@ from ..utils.logger import Logger
 from ..utils.move_card_to_deck import move_card_to_deck
 from ..utils.write_custom_data import write_custom_data
 from ..utils.write_to_media_folder import write_to_media_folder
-from .execute_code import execute_code_for_field, execute_code_for_files
+from .execute_code import (
+    execute_code_for_card_action,
+    execute_code_for_field,
+    execute_code_for_files,
+)
 from .FatalProcessError import FatalProcessError
 from .fonts_check_process import fonts_check_process
 from .interpolate_fields import QUERY_NOTE_INDEX, TARGET_NOTES_COUNT, interpolate_from_text
@@ -1216,12 +1220,22 @@ def copy_into_single_note(
         card_action = card_actions_by_template_name.get(card_template_name, None)
         if card_action is None:
             continue
+        action_code = card_action.get("action_code", None)
+        if card_action.get("use_code", False) and action_code and action_code.strip():
+            executed_action, code_error = execute_code_for_card_action(
+                action_code, destination_note
+            )
+            if code_error:
+                raise CopyFailedException(f"Code execution error in card action:\n{code_error}")
+            if executed_action is None:
+                continue
+            card_action = executed_action
         change_deck = card_action.get("change_deck", None)
         suspend_card = card_action.get("suspend", None)
         bury_card = card_action.get("bury", None)
         set_flag = card_action.get("set_flag", None)
         set_dr = card_action.get("set_desired_retention", None)
-        if change_deck not in [None, "-"]:
+        if change_deck not in [None, "-", 0]:
             move_card_to_deck(card, change_deck, logger=logger)
             card.edited = True
         if suspend_card in [True, False]:

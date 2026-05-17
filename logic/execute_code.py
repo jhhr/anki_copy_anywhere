@@ -19,12 +19,15 @@ What IS allowed: the explicit allowlist below (``re``, ``json``, ``html``,
 
 Public API
 ----------
-``execute_code_for_field(code, note)``
+``execute_code_for_field(code, note, cards=None)``
     Execute code expected to return a single string value.
 
-``execute_code_for_files(code, note)``
+``execute_code_for_files(code, note, cards=None)``
     Execute code expected to return a list of ``(filename, content)`` string
     tuples, each of which will be written as a separate file.
+
+``execute_code_for_card_action(code, note, cards=None)``
+    Execute code expected to return a ``CardActionDict`` or ``None``.
 """
 
 import html
@@ -34,8 +37,21 @@ import textwrap
 import traceback
 from typing import Any, Optional, Tuple, Union
 
+from anki.cards import Card
 from anki.notes import Note
 from aqt import mw
+
+from ..configuration import CardActionDict
+from .interpolate_fields import (
+    get_card_last_reps,
+    get_card_type_as_string,
+    get_formatted_card_created_time,
+    get_card_time_values,
+    get_formatted_first_review_time,
+    get_formatted_latest_review_time,
+    get_formatted_average_time,
+    get_formatted_total_time,
+)
 
 # ---------------------------------------------------------------------------
 # Safe built-ins whitelist
@@ -139,6 +155,79 @@ class _ReadOnlyNote:
         raise TypeError("note fields are read-only inside code execution")
 
 
+class _ReadOnlyCard:
+    """Read-only view of an Anki card for use inside code execution.
+
+    Exposes the same fields as a normal card but prevents mutation.
+
+    Use ``card.id`` with the ``get_card_last_reps`` function available in the
+    exec namespace to retrieve review history for a card.
+    """
+
+    __slots__ = ("_card",)
+    _card_time_values: Union[
+        # first_review_ms, latest_review_ms, review_count, total_review_time_ms
+        Tuple[float, float, float, float],
+        Tuple[None, None, None, None],
+        None,
+    ] = None
+
+    def __init__(self, card: Card) -> None:
+        object.__setattr__(self, "_card", card)
+
+    def __getattr__(self, name: str):
+        if name == "ease":
+            return getattr(object.__getattribute__(self, "_card"), "factor") / 10 or 0
+        elif name == "type":
+            card_type = getattr(object.__getattribute__(self, "_card"), "type", None)
+            return get_card_type_as_string(card_type)
+        elif name == "stability":
+            mem_state = getattr(object.__getattribute__(self, "_card"), "memory_state", None)
+            return round(mem_state.stability, 1) if mem_state else 0
+        elif name == "difficulty":
+            mem_state = getattr(object.__getattribute__(self, "_card"), "memory_state", None)
+            return round(mem_state.difficulty, 1) if mem_state else 0
+        elif name == "created":
+            # Expose created time in seconds since epoch for convenience, even though it's stored in ms
+            card_id = getattr(object.__getattribute__(self, "_card"), "id", None)
+            return get_formatted_card_created_time(card_id) if card_id else "-"
+        elif name in (
+            "first_review_time",
+            "latest_review_time",
+            "average_review_time",
+            "total_review_time",
+        ):
+            # init _card_time_values on first access to avoid unnecessary computation for cards that aren't reviewed
+            if self._card_time_values is None:
+                card_id = getattr(object.__getattribute__(self, "_card"), "id", None)
+                if card_id:
+                    self._card_time_values = get_card_time_values(card_id)
+                else:
+                    # Init to tuple so we don't keep trying to fetch time values again
+                    self._card_time_values = (None, None, None, None)
+            first_ms, latest_ms, review_count, total_ms = self._card_time_values
+            if name == "first_review_time":
+                return get_formatted_first_review_time(first_ms)
+            elif name == "latest_review_time":
+                return get_formatted_latest_review_time(latest_ms)
+            elif name == "average_review_time":
+                return get_formatted_average_time(total_ms, review_count)
+            elif name == "total_review_time":
+                return get_formatted_total_time(total_ms)
+        # id, nid, due, ivl, reps, lapses, factor, desired_retention returned as-is
+        return getattr(object.__getattribute__(self, "_card"), name)
+
+    def __setitem__(self, name: str, value) -> None:
+        raise TypeError("card properties are read-only inside code execution")
+
+    def __setattr__(self, name: str, value) -> None:
+        raise TypeError("card properties are read-only inside code execution")
+
+    def __repr__(self) -> str:
+        card_id = getattr(object.__getattribute__(self, "_card"), "id", "?")
+        return f"<_ReadOnlyCard id={card_id}>"
+
+
 def _execute_code_core(code: str, note: Note) -> Tuple[Any, Optional[str]]:
     """Compile and run user-provided code in a restricted namespace.
 
@@ -163,6 +252,12 @@ def _execute_code_core(code: str, note: Note) -> Tuple[Any, Optional[str]]:
     # Copy _SAFE_BUILTINS per-call so that exec cannot leak mutations between
     # invocations (Python exposes __builtins__ inside exec'd namespaces and
     # user code could mutate the dict if it were shared).
+    note_cards = []
+    if note.id not in (None, 0):
+        try:
+            note_cards = note.cards()
+        except Exception:
+            note_cards = []
     exec_globals: dict = {
         "__builtins__": dict(_SAFE_BUILTINS),
         "re": re,
@@ -172,6 +267,8 @@ def _execute_code_core(code: str, note: Note) -> Tuple[Any, Optional[str]]:
         "find_cards": mw.col.find_cards,
         "find_notes": mw.col.find_notes,
         "note": _ReadOnlyNote(note),
+        "cards": [_ReadOnlyCard(c) for c in note_cards],
+        "get_card_last_reps": get_card_last_reps,
     }
 
     try:
@@ -266,3 +363,54 @@ def execute_code_for_files(
         validated.append((fname, fcontent))
 
     return validated, None
+
+
+def execute_code_for_card_action(
+    code: str, note: Note
+) -> Tuple[Optional[CardActionDict], Optional[str]]:
+    """Execute user-provided Python code expected to return a CardActionDict or None.
+
+    The code must ``return`` a ``dict`` with any combination of the optional
+    ``CardActionDict`` keys (``change_deck``, ``set_flag``, ``suspend``,
+    ``bury``, ``set_desired_retention``), or ``None`` to skip all actions for
+    this card type.
+
+    :param code: The Python code to run (function body, may include
+        ``return``).  ``{{field}}`` markers have already been interpolated.
+    :param note: The destination note, available as ``note`` inside the code.
+    :return: ``(CardActionDict|None, error_message)`` — *error_message* is
+        ``None`` on success.  ``None`` result means skip all actions.
+    """
+    result, error = _execute_code_core(code, note)
+    if error:
+        return None, error
+    if result is None:
+        return None, None
+    if not isinstance(result, dict):
+        return None, f"Expected a dict or None, got {type(result).__name__}"
+
+    # Validate each known key's type if present.
+    change_deck = result.get("change_deck")
+    if change_deck is not None and not isinstance(change_deck, (str, int)):
+        return None, f"'change_deck' must be str, int, or None; got {type(change_deck).__name__}"
+    set_flag = result.get("set_flag")
+    if set_flag is not None:
+        if isinstance(set_flag, bool) or not isinstance(set_flag, int) or not (0 <= set_flag <= 7):
+            return None, f"'set_flag' must be an int 0\u20137 or None; got {set_flag!r}"
+    suspend = result.get("suspend")
+    if suspend is not None and not isinstance(suspend, bool):
+        return None, f"'suspend' must be True, False, or None; got {type(suspend).__name__}"
+    bury = result.get("bury")
+    if bury is not None and not isinstance(bury, bool):
+        return None, f"'bury' must be True, False, or None; got {type(bury).__name__}"
+    set_dr = result.get("set_desired_retention")
+    if set_dr is not None and not isinstance(set_dr, (float, int, str)):
+        return (
+            None,
+            (
+                "'set_desired_retention' must be float, int, str, or None;"
+                f" got {type(set_dr).__name__}"
+            ),
+        )
+
+    return result, None  # type: ignore[return-value]

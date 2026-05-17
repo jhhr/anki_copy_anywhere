@@ -7,9 +7,9 @@ from aqt.qt import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QFormLayout,
     QFrame,
     QLabel,
-    QFormLayout,
     QPushButton,
     QComboBox,
     QButtonGroup,
@@ -33,8 +33,10 @@ from ..configuration import (
     CardAction,
     CopyDefinition,
 )
+from .code_edit_layout import CodeEditLayout, CARD_ACTION_CODE_NOTICE
 from .edit_state import EditState
 from .grouped_combo_box import GroupedComboBox
+from .toggle_switch import ToggleSwitch
 
 base_description = """<p>Configure actions to perform on any destination note's card types.
             Select a card type from the dropdown to configure its action.</p>"""
@@ -45,6 +47,30 @@ source_to_destinations_description = (
 destination_to_sources_description = (
     "<p><small>Note: Card actions are performed on the trigger note's cards.</small></p>"
 )
+
+
+def _card_action_to_initial_code(
+    change_deck=None,
+    set_flag=None,
+    suspend=None,
+    bury=None,
+    set_desired_retention=None,
+) -> str:
+    """Generate initial Python code that returns a CardActionDict from the given form values.
+
+    Produces a ``return { ... }`` block pre-populated with the current form
+    values so the user has a ready-made starting point when switching to code
+    mode.
+    """
+    return (
+        "return {\n"
+        f'    "change_deck": {change_deck!r},\n'
+        f'    "set_flag": {set_flag!r},\n'
+        f'    "suspend": {suspend!r},\n'
+        f'    "bury": {bury!r},\n'
+        f'    "set_desired_retention": {set_desired_retention!r},\n'
+        "}"
+    )
 
 
 class CardActionsEditor(QWidget):
@@ -83,7 +109,6 @@ class CardActionsEditor(QWidget):
         self.vbox.addWidget(self.actions_container_widget)
 
         # Add new action button and selector
-        self.add_action_form = QFormLayout()
         self.card_type_selector = GroupedComboBox(is_required=False)
         self.card_type_selector.setPlaceholderText("Select a card type to add")
         self.add_action_button = QPushButton("Add Card Action")
@@ -269,6 +294,8 @@ class CardActionsEditor(QWidget):
             "suspend": None,
             "bury": None,
             "set_desired_retention": None,
+            "use_code": False,
+            "action_code": "",
         }
 
         self.card_actions[card_type_name] = new_action
@@ -291,28 +318,26 @@ class CardActionsEditor(QWidget):
         frame.setFrameShape(QFrameStyledPanel)
         frame.setFrameShadow(QFrameShadowRaised)
         frame_layout = QVBoxLayout(frame)
-
-        # Add frame to the actions layout
         self.actions_layout.addWidget(frame)
 
-        # Header - show both model and card type in a readable format
-        # card_type_name is just the template name from GroupedComboBox
+        # Header
         header = QLabel(f"<h3>Actions for card type: <em>{html.escape(card_type_name)}</em></h3>")
         frame_layout.addWidget(header)
 
-        form_layout = QFormLayout()
-        frame_layout.addLayout(form_layout)
+        # Code mode toggle
+        use_code_toggle = ToggleSwitch("Execute as Python code")
+        frame_layout.addWidget(use_code_toggle)
+
+        # --- Form mode container ---
+        form_mode_container = QWidget()
+        form_layout = QFormLayout(form_mode_container)
 
         # 1. Change Deck dropdown
         deck_combo = QComboBox()
-        deck_combo.addItem("-")  # Default: no action
-
-        # Add all decks
+        deck_combo.addItem("-")
         all_decks = mw.col.decks.all_names_and_ids()
         for deck_name_and_id in all_decks:
             deck_combo.addItem(deck_name_and_id.name)
-
-        # Set current value
         current_deck = action.get("change_deck")
         if current_deck:
             index = deck_combo.findText(current_deck)
@@ -320,13 +345,11 @@ class CardActionsEditor(QWidget):
                 deck_combo.setCurrentIndex(index)
         else:
             deck_combo.setCurrentIndex(0)
-
         form_layout.addRow(QLabel("<b>Move card to deck:</b>"), deck_combo)
 
         # 2. Set Flag button group
         flag_group = QButtonGroup()
         flag_layout = QHBoxLayout()
-
         flag_options = [
             (None, "N/A"),
             (0, "No flag"),
@@ -338,130 +361,155 @@ class CardActionsEditor(QWidget):
             (6, "Turquoise"),
             (7, "Purple"),
         ]
-
         current_flag = action.get("set_flag")
         for value, text in flag_options:
             radio = QRadioButton(text)
             radio.setProperty("flag_value", value)
             flag_group.addButton(radio)
             flag_layout.addWidget(radio)
-
-            # Set checked state
-            if current_flag == value:
+            if current_flag == value or (current_flag is None and value is None):
                 radio.setChecked(True)
-            elif current_flag is None and value is None:
-                radio.setChecked(True)
-
         form_layout.addRow(QLabel("<b>Set card flag:</b>"), flag_layout)
 
         # 3. Suspend button group
         suspend_group = QButtonGroup()
         suspend_layout = QHBoxLayout()
-
-        suspend_options = [
-            (None, "N/A"),
-            (True, "Suspend"),
-            (False, "Unsuspend"),
-        ]
-
         current_suspend = action.get("suspend")
-        for value, text in suspend_options:
+        for value, text in [(None, "N/A"), (True, "Suspend"), (False, "Unsuspend")]:
             radio = QRadioButton(text)
             radio.setProperty("suspend_value", value)
             suspend_group.addButton(radio)
             suspend_layout.addWidget(radio)
-
-            # Set checked state
-            if current_suspend == value:
+            if current_suspend == value or (current_suspend is None and value is None):
                 radio.setChecked(True)
-            elif current_suspend is None and value is None:
-                radio.setChecked(True)
-
         form_layout.addRow(QLabel("<b>Suspend card:</b>"), suspend_layout)
 
         # 4. Bury button group
         bury_group = QButtonGroup()
         bury_layout = QHBoxLayout()
-
-        bury_options = [
-            (None, "N/A"),
-            (True, "Bury"),
-            (False, "Unbury"),
-        ]
-
         current_bury = action.get("bury")
-        for value, text in bury_options:
+        for value, text in [(None, "N/A"), (True, "Bury"), (False, "Unbury")]:
             radio = QRadioButton(text)
             radio.setProperty("bury_value", value)
             bury_group.addButton(radio)
             bury_layout.addWidget(radio)
-
-            # Set checked state
-            if current_bury == value:
+            if current_bury == value or (current_bury is None and value is None):
                 radio.setChecked(True)
-            elif current_bury is None and value is None:
-                radio.setChecked(True)
-
         form_layout.addRow(QLabel("<b>Bury card:</b>"), bury_layout)
 
         # 5. Set desired retention
         dr_layout = QHBoxLayout()
-
         dr_number_input = QDoubleSpinBox()
         dr_number_input.setRange(0.0, 0.99)
         dr_number_input.setSingleStep(0.01)
         dr_number_input.setDecimals(2)
-        dr_number_input.setSpecialValueText(" ")  # display blank when value is 0.0 (unset)
+        dr_number_input.setSpecialValueText(" ")
         dr_number_input.setValue(0.0)
-
         dr_string_input = QLineEdit()
         dr_string_input.setPlaceholderText("Custom data property name")
-
-        # Load existing value
         current_dr = action.get("set_desired_retention")
         if isinstance(current_dr, (float, int)) and not isinstance(current_dr, bool):
             dr_number_input.setValue(float(current_dr))
         elif isinstance(current_dr, str) and current_dr:
             dr_string_input.setText(current_dr)
 
-        # Mutual-clear: editing number clears string, editing string clears number
-        def _dr_number_changed(value, _string_input=dr_string_input, _number_input=dr_number_input):
+        def _dr_number_changed(value, _s=dr_string_input, _n=dr_number_input):
             if value >= 0.01:
-                _string_input.blockSignals(True)
-                _string_input.clear()
-                _string_input.blockSignals(False)
+                _s.blockSignals(True)
+                _s.clear()
+                _s.blockSignals(False)
 
-        def _dr_string_changed(text, _number_input=dr_number_input):
+        def _dr_string_changed(text, _n=dr_number_input):
             if text:
-                _number_input.blockSignals(True)
-                _number_input.setValue(0.0)
-                _number_input.blockSignals(False)
+                _n.blockSignals(True)
+                _n.setValue(0.0)
+                _n.blockSignals(False)
 
         dr_number_input.valueChanged.connect(_dr_number_changed)
         dr_string_input.textChanged.connect(_dr_string_changed)
-
-        dr_layout.addWidget(QLabel("Float (0.01–0.99):"))
+        dr_layout.addWidget(QLabel("Float (0.01\u20130.99):"))
         dr_layout.addWidget(dr_number_input)
         dr_layout.addWidget(QLabel("or custom data property:"))
         dr_layout.addWidget(dr_string_input)
         dr_layout.addStretch()
-
         form_layout.addRow(QLabel("<b>Set desired retention:</b>"), dr_layout)
+
+        frame_layout.addWidget(form_mode_container)
+
+        # --- Code mode widget ---
+        code_editor = CodeEditLayout(
+            parent=frame,
+            options_dict=self.state.post_query_menu_options_dict,
+            is_required=False,
+            label=None,
+            description=None,
+            notice=CARD_ACTION_CODE_NOTICE,
+        )
+        code_editor.update_options(
+            self.state.post_query_menu_options_dict,
+            self.state.post_query_text_edit_validate_dict,
+        )
+        code_editor.set_text(action.get("action_code", "") or "")
+        code_editor.hide()
+        frame_layout.addWidget(code_editor)
+
+        # Apply initial mode and wire toggle
+        initial_use_code = action.get("use_code", False)
+        if initial_use_code:
+            use_code_toggle.setChecked(True)
+            form_mode_container.hide()
+            code_editor.show()
+
+        def on_use_code_toggled(checked: bool):
+            form_mode_container.setVisible(not checked)
+            code_editor.setVisible(checked)
+            if checked and not code_editor.get_text().strip():
+                deck_text = deck_combo.currentText()
+                current_change_deck = None if deck_text == "-" else deck_text
+                current_set_flag = next(
+                    (b.property("flag_value") for b in flag_group.buttons() if b.isChecked()),
+                    None,
+                )
+                current_suspend = next(
+                    (b.property("suspend_value") for b in suspend_group.buttons() if b.isChecked()),
+                    None,
+                )
+                current_bury = next(
+                    (b.property("bury_value") for b in bury_group.buttons() if b.isChecked()),
+                    None,
+                )
+                dr_string = dr_string_input.text().strip()
+                dr_number = dr_number_input.value()
+                current_dr = dr_string or (dr_number if dr_number >= 0.01 else None)
+                code_editor.set_text(
+                    _card_action_to_initial_code(
+                        change_deck=current_change_deck,
+                        set_flag=current_set_flag,
+                        suspend=current_suspend,
+                        bury=current_bury,
+                        set_desired_retention=current_dr,
+                    )
+                )
+
+        use_code_toggle.toggled.connect(on_use_code_toggled)
 
         # Delete button
         delete_button = QPushButton("Delete this card action")
         delete_button.clicked.connect(lambda: self.delete_action(card_type_name))
-        form_layout.addRow("", delete_button)
+        frame_layout.addWidget(delete_button)
 
         # Store UI components for later retrieval
         self.action_ui_components[card_type_name] = {
             "frame": frame,
+            "use_code_toggle": use_code_toggle,
+            "form_mode_container": form_mode_container,
             "deck_combo": deck_combo,
             "flag_group": flag_group,
             "suspend_group": suspend_group,
             "bury_group": bury_group,
             "dr_number_input": dr_number_input,
             "dr_string_input": dr_string_input,
+            "code_editor": code_editor,
         }
 
     def save_action(self, card_type_name: str):
@@ -469,42 +517,33 @@ class CardActionsEditor(QWidget):
         if card_type_name not in self.action_ui_components:
             return
 
-        ui_components = self.action_ui_components[card_type_name]
-        deck_combo = ui_components["deck_combo"]
-        flag_group = ui_components["flag_group"]
-        suspend_group = ui_components["suspend_group"]
-        bury_group = ui_components["bury_group"]
-        dr_number_input = ui_components["dr_number_input"]
-        dr_string_input = ui_components["dr_string_input"]
+        ui = self.action_ui_components[card_type_name]
+        use_code = ui["use_code_toggle"].isChecked()
 
-        # Get change_deck value
-        deck_text = deck_combo.currentText()
+        # Read form fields (always saved so values are preserved when toggling modes)
+        deck_text = ui["deck_combo"].currentText()
         change_deck = None if deck_text == "-" else deck_text
 
-        # Get set_flag value
         set_flag = None
-        for button in flag_group.buttons():
+        for button in ui["flag_group"].buttons():
             if button.isChecked():
                 set_flag = button.property("flag_value")
                 break
 
-        # Get suspend value
         suspend = None
-        for button in suspend_group.buttons():
+        for button in ui["suspend_group"].buttons():
             if button.isChecked():
                 suspend = button.property("suspend_value")
                 break
 
-        # Get bury value
         bury = None
-        for button in bury_group.buttons():
+        for button in ui["bury_group"].buttons():
             if button.isChecked():
                 bury = button.property("bury_value")
                 break
 
-        # Get set_desired_retention value (string input takes priority if non-empty)
-        dr_string = dr_string_input.text().strip()
-        dr_number = dr_number_input.value()
+        dr_string = ui["dr_string_input"].text().strip()
+        dr_number = ui["dr_number_input"].value()
         if dr_string:
             set_desired_retention = dr_string
         elif dr_number >= 0.01:
@@ -512,15 +551,17 @@ class CardActionsEditor(QWidget):
         else:
             set_desired_retention = None
 
-        # Update the action
+        existing = self.card_actions.get(card_type_name, {})
         self.card_actions[card_type_name] = {
-            "guid": self.card_actions[card_type_name].get("guid", str(uuid.uuid4())),
+            "guid": existing.get("guid", str(uuid.uuid4())),
             "card_type_name": card_type_name,
             "change_deck": change_deck,
             "set_flag": set_flag,
             "suspend": suspend,
             "bury": bury,
             "set_desired_retention": set_desired_retention,
+            "use_code": use_code,
+            "action_code": ui["code_editor"].get_text(),
         }
 
     def delete_action(self, card_type_name: str):
@@ -546,11 +587,12 @@ class CardActionsEditor(QWidget):
         for card_type_name in list(self.action_ui_components.keys()):
             self.save_action(card_type_name)
 
-        # Return only actions that have at least one non-None value
+        # Include actions with non-empty code or any non-None form field
         result = []
         for action in self.card_actions.values():
             if (
-                action.get("change_deck") is not None
+                (action.get("use_code", False) and action.get("action_code", "").strip())
+                or action.get("change_deck") is not None
                 or action.get("set_flag") is not None
                 or action.get("suspend") is not None
                 or action.get("bury") is not None

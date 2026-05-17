@@ -1,3 +1,4 @@
+from typing import Union
 from aqt import mw
 from anki.cards import Card
 
@@ -6,17 +7,20 @@ from .logger import Logger
 
 def move_card_to_deck(
     card: Card,
-    deck_name: str = None,
-    deck_id: int = None,
+    deck: Union[int, str],
     logger: Logger = None,
 ) -> None:
     """Move the given card to the specified deck.
 
-    If deck_id is provided, it will be used directly. Otherwise,
-    the deck_name will be used to find the deck. A new deck cannot be created
-    by this function.
+    If deck is an integer, it will be used as the deck ID directly. If deck is a string, it will be used as the deck name to find the deck ID. A new deck cannot be created by this function.
     """
     dm = mw.col.decks
+    deck_name = None
+    deck_id = None
+    if isinstance(deck, int):
+        deck_id = deck
+    elif isinstance(deck, str):
+        deck_name = deck
     if deck_id is None and deck_name is not None:
         deck_id = dm.id_for_name(deck_name)
         if not deck_id:
