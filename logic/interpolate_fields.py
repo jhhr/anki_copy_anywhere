@@ -148,11 +148,104 @@ def intr_format(s: str) -> str:
 FROM_TEXT_FIELD_REGEX = re.compile(rf"{INTR_PREFIX}(.+?){INTR_SUFFIX}")
 
 
+# Anki cloze delimiters are fixed and may differ from the interpolation delimiters
+CLOZE_OPEN = "{{"
+CLOZE_CLOSE = "}}"
+
+# Regex to match the start of Anki cloze notation: {{c<N>::
+CLOZE_START_RE = re.compile(r"\{\{c(\d+)::")
+
+
+def extract_cloze_patterns(text: str) -> List[Tuple[int, int, str, str]]:
+    """
+    Find all top-level cloze patterns {{c<N>::<content>}} in text.
+    Handles nested interpolation within cloze content.
+    Returns a list of (start, end, cloze_num, content) tuples where end is exclusive.
+    """
+    # When the cloze and interpolation delimiters are the same (the common case),
+    # tracking only the cloze delimiters already accounts for all nested openers
+    # and closers.  When they differ, both sets must be tracked independently so
+    # that interpolation fields such as [[Field]] inside cloze content are counted
+    # correctly and do not interfere with finding the cloze closing delimiter.
+    same_delimiters = CLOZE_OPEN == INTR_PREFIX and CLOZE_CLOSE == INTR_SUFFIX
+
+    result = []
+    i = 0
+    while i < len(text):
+        m = CLOZE_START_RE.search(text, i)
+        if not m:
+            break
+        start = m.start()
+        cloze_num = m.group(1)
+        depth = 1
+        j = m.end()
+
+        if same_delimiters:
+            # Case 1: cloze and interpolation use the same delimiters.
+            # A single set of checks covers both cloze nesting and interpolation fields.
+            while j < len(text) and depth > 0:
+                if text[j : j + len(CLOZE_OPEN)] == CLOZE_OPEN:
+                    depth += 1
+                    j += len(CLOZE_OPEN)
+                elif text[j : j + len(CLOZE_CLOSE)] == CLOZE_CLOSE:
+                    depth -= 1
+                    if depth == 0:
+                        break
+                    j += len(CLOZE_CLOSE)
+                else:
+                    j += 1
+        else:
+            # Case 2: cloze and interpolation use different delimiters.
+            # Track cloze nesting ({{/}}) and interpolation field nesting separately.
+            while j < len(text) and depth > 0:
+                if text[j : j + len(CLOZE_OPEN)] == CLOZE_OPEN:
+                    depth += 1
+                    j += len(CLOZE_OPEN)
+                elif text[j : j + len(CLOZE_CLOSE)] == CLOZE_CLOSE:
+                    depth -= 1
+                    if depth == 0:
+                        break
+                    j += len(CLOZE_CLOSE)
+                elif text[j : j + len(INTR_PREFIX)] == INTR_PREFIX:
+                    depth += 1
+                    j += len(INTR_PREFIX)
+                elif text[j : j + len(INTR_SUFFIX)] == INTR_SUFFIX:
+                    depth -= 1
+                    if depth == 0:
+                        break
+                    j += len(INTR_SUFFIX)
+                else:
+                    j += 1
+
+        if depth == 0:
+            cloze_content = text[m.end() : j]
+            end = j + len(CLOZE_CLOSE)
+            result.append((start, end, cloze_num, cloze_content))
+            i = end
+        else:
+            # Malformed cloze notation with no matching closing delimiter, skip past it
+            i = m.end()
+    return result
+
+
 def get_fields_from_text(from_text: str) -> List[str]:
     """
-    Get all fields from a text that uses double curly brace syntax.
+    Get all interpolation fields from text that uses double curly brace syntax.
+    Cloze notation {{c<N>::content}} is excluded as a field itself, but any
+    interpolation fields within the cloze content are still returned.
     """
-    fields = FROM_TEXT_FIELD_REGEX.findall(from_text)
+    cloze_patterns = extract_cloze_patterns(from_text)
+    fields: List[str] = []
+    remaining_text = from_text
+    # Process in reverse order to preserve string indices when removing cloze regions
+    for start, end, _cloze_num, cloze_content in reversed(cloze_patterns):
+        # Collect interpolation fields from inside the cloze content
+        fields.extend(get_fields_from_text(cloze_content))
+        # Remove the cloze pattern from the remaining text so the outer {{c<N>:: is
+        # not picked up as an interpolation field
+        remaining_text = remaining_text[:start] + remaining_text[end:]
+    # Find regular interpolation fields in the non-cloze parts of the text
+    fields.extend(FROM_TEXT_FIELD_REGEX.findall(remaining_text))
     return fields
 
 
@@ -576,6 +669,28 @@ def interpolate_from_text(
     :param variable_values_dict: A dictionary of custom variables to use in the interpolation
     :param multiple_note_types: Whether the copy is into multiple note types
     """
+    # Pre-process cloze patterns: {{c<N>::content}} → placeholder.
+    # The content inside each cloze is interpolated separately so that
+    # interpolation fields within cloze content are resolved while the
+    # outer {{c<N>::...}} wrapper is preserved and never treated as a field.
+    cloze_patterns = extract_cloze_patterns(text)
+    cloze_placeholder_map: dict[str, str] = {}
+    all_inner_invalid: List[str] = []
+    # Process in reverse order to preserve string indices when splicing text
+    for idx, (start, end, cloze_num, cloze_content) in enumerate(reversed(cloze_patterns)):
+        interpolated_content, inner_invalid = interpolate_from_text(
+            cloze_content,
+            source_note,
+            destination_note,
+            variable_values_dict,
+            multiple_note_types,
+        )
+        all_inner_invalid.extend(inner_invalid)
+        placeholder = f"\x00CLOZE{idx}\x00"
+        resolved = interpolated_content if interpolated_content is not None else cloze_content
+        cloze_placeholder_map[placeholder] = f"{{{{c{cloze_num}::{resolved}}}}}"
+        text = text[:start] + placeholder + text[end:]
+
     # Bunch of extra logic to make this whole process case-insensitive
 
     # Regex to pull out any words enclosed in double curly braces
@@ -586,7 +701,7 @@ def interpolate_from_text(
     all_dest_note_fields = to_lowercase_dict(destination_note)
     variable_fields = to_lowercase_dict(variable_values_dict)
 
-    # Lowercase the characters inside {{}} in the text
+    # Lowercase the characters inside {{}} in the text (placeholders are not {{}} so safe)
     text = FROM_TEXT_FIELD_REGEX.sub(lambda x: intr_format(x.group(1).lower()), text)
 
     card_values_dict = None
@@ -625,4 +740,13 @@ def interpolate_from_text(
 
         text = text.replace(intr_format(field_lower), str(value))
 
-    return text, invalid_fields
+    # Restore cloze patterns with their interpolated content
+    for placeholder, cloze_value in cloze_placeholder_map.items():
+        text = text.replace(placeholder, cloze_value)
+
+    # Merge invalid fields, avoiding duplicates
+    combined_invalid = all_inner_invalid.copy()
+    for field in invalid_fields:
+        if field not in combined_invalid:
+            combined_invalid.append(field)
+    return text, combined_invalid
