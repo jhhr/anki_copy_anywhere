@@ -164,16 +164,11 @@ class _ReadOnlyCard:
     exec namespace to retrieve review history for a card.
     """
 
-    __slots__ = ("_card",)
-    _card_time_values: Union[
-        # first_review_ms, latest_review_ms, review_count, total_review_time_ms
-        Tuple[float, float, float, float],
-        Tuple[None, None, None, None],
-        None,
-    ] = None
+    __slots__ = ("_card", "_card_time_values")
 
     def __init__(self, card: Card) -> None:
         object.__setattr__(self, "_card", card)
+        object.__setattr__(self, "_card_time_values", None)
 
     def __getattr__(self, name: str):
         if name == "ease":
@@ -201,10 +196,10 @@ class _ReadOnlyCard:
             if self._card_time_values is None:
                 card_id = getattr(object.__getattribute__(self, "_card"), "id", None)
                 if card_id:
-                    self._card_time_values = get_card_time_values(card_id)
+                    object.__setattr__(self, "_card_time_values", get_card_time_values(card_id))
                 else:
                     # Init to tuple so we don't keep trying to fetch time values again
-                    self._card_time_values = (None, None, None, None)
+                    object.__setattr__(self, "_card_time_values", (None, None, None, None))
             first_ms, latest_ms, review_count, total_ms = self._card_time_values
             if name == "first_review_time":
                 return get_formatted_first_review_time(first_ms)
