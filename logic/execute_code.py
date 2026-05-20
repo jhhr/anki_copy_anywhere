@@ -37,8 +37,10 @@ import textwrap
 import traceback
 from typing import Any, Optional, Tuple, Union
 
+from anki.consts import MODEL_CLOZE
 from anki.cards import Card
 from anki.notes import Note
+from anki.models import NotetypeDict
 from aqt import mw
 
 from ..configuration import CardActionDict
@@ -164,11 +166,14 @@ class _ReadOnlyCard:
     exec namespace to retrieve review history for a card.
     """
 
-    __slots__ = ("_card", "_card_time_values")
+    __slots__ = ("_card", "_card_time_values", "_is_cloze")
 
-    def __init__(self, card: Card) -> None:
+    def __init__(self, card: Card, note_type: NotetypeDict) -> None:
         object.__setattr__(self, "_card", card)
         object.__setattr__(self, "_card_time_values", None)
+        object.__setattr__(
+            self, "_is_cloze", bool(note_type and note_type.get("type") == MODEL_CLOZE)
+        )
 
     def __getattr__(self, name: str):
         if name == "ease":
@@ -209,6 +214,14 @@ class _ReadOnlyCard:
                 return get_formatted_average_time(total_ms, review_count)
             elif name == "total_review_time":
                 return get_formatted_total_time(total_ms)
+        elif name == "template_name":
+            template = getattr(object.__getattribute__(self, "_card"), "template", None)
+            tmpl_name = template()["name"] if template else "-"
+            if self._is_cloze:
+                return (
+                    f'{tmpl_name} {getattr(object.__getattribute__(self, "_card"), "ord", "?") + 1}'
+                )
+            return tmpl_name
         # id, nid, due, ivl, reps, lapses, factor, desired_retention returned as-is
         return getattr(object.__getattribute__(self, "_card"), name)
 
@@ -253,6 +266,7 @@ def _execute_code_core(code: str, note: Note) -> Tuple[Any, Optional[str]]:
             note_cards = note.cards()
         except Exception:
             note_cards = []
+    note_type = note.note_type()
     exec_globals: dict = {
         "__builtins__": dict(_SAFE_BUILTINS),
         "re": re,
@@ -262,7 +276,7 @@ def _execute_code_core(code: str, note: Note) -> Tuple[Any, Optional[str]]:
         "find_cards": mw.col.find_cards,
         "find_notes": mw.col.find_notes,
         "note": _ReadOnlyNote(note),
-        "cards": [_ReadOnlyCard(c) for c in note_cards],
+        "cards": [_ReadOnlyCard(c, note_type) for c in note_cards],
         "get_card_last_reps": get_card_last_reps,
     }
 
